@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const stats = [
   ["학업", 63],
   ["실무", 41],
@@ -28,18 +30,18 @@ export default function Home() {
             관찰하는 감각이 좋다.
           </p>
           <nav className="mt-[22px] grid gap-2" aria-label="주요 메뉴">
-            <a className="rounded-lg border border-[#ded9ce] bg-white px-2.5 py-2 text-sm" href="/">
+            <Link className="rounded-lg border border-[#ded9ce] bg-white px-2.5 py-2 text-sm" href="/">
               진행
-            </a>
-            <a className="rounded-lg px-2.5 py-2 text-sm" href="/">
+            </Link>
+            <Link className="rounded-lg px-2.5 py-2 text-sm" href="/">
               캐릭터
-            </a>
-            <a className="rounded-lg px-2.5 py-2 text-sm" href="/">
+            </Link>
+            <Link className="rounded-lg px-2.5 py-2 text-sm" href="/">
               관계
-            </a>
-            <a className="rounded-lg px-2.5 py-2 text-sm" href="/">
+            </Link>
+            <Link className="rounded-lg px-2.5 py-2 text-sm" href="/">
               커리어와 엔딩 기록
-            </a>
+            </Link>
           </nav>
           <section className="mt-3.5 rounded-lg border border-[#ded9ce] bg-white p-3.5" aria-labelledby="stats-title">
             <h2 id="stats-title" className="text-base font-bold">

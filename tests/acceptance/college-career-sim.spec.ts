@@ -1,9 +1,9 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 const email = `player-${Date.now()}@example.com`;
 const password = 'Password123!';
 
-async function signUpAndCreateCharacter(page) {
+async function signUpAndCreateCharacter(page: Page) {
   await page.goto('/');
   await page.getByRole('link', { name: /회원가입|가입|sign up/i }).click();
   await page.getByLabel(/이메일|email/i).fill(email);
@@ -13,9 +13,9 @@ async function signUpAndCreateCharacter(page) {
 
   await page.getByRole('button', { name: /새 캐릭터|캐릭터 만들기|create/i }).click();
   await page.getByLabel(/이름|name/i).fill('한서윤');
-  await page.getByLabel(/나이|age/i).selectOption({ label: /21/ });
-  await page.getByLabel(/학년|grade|year/i).selectOption({ label: /2/ });
-  await page.getByLabel(/전공|과|major/i).selectOption({ label: /사회학과|Sociology/i });
+  await page.getByLabel(/나이|age/i).selectOption({ label: '21' });
+  await page.getByLabel(/학년|grade|year/i).selectOption({ label: '2' });
+  await page.getByLabel(/전공|과|major/i).selectOption({ label: '사회학과' });
   await page.getByRole('button', { name: /시작|생성|create/i }).click();
   await expect(page.getByText('한서윤')).toBeVisible();
 }
