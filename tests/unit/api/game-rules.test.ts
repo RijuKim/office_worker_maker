@@ -21,9 +21,10 @@ describe("clampPublicStat", () => {
 });
 
 describe("clampTrust", () => {
-  it("clamps trust within 0-100", () => {
+  it("clamps trust within -100-100", () => {
     expect(clampTrust(50)).toBe(50);
-    expect(clampTrust(-10)).toBe(0);
+    expect(clampTrust(-10)).toBe(-10);
+    expect(clampTrust(-150)).toBe(-100);
     expect(clampTrust(150)).toBe(100);
   });
 });

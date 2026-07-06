@@ -29,6 +29,12 @@ interface EventData {
   forced?: boolean;
 }
 
+interface ChoiceFeedback {
+  statDelta: Record<string, number>;
+  relationshipDelta: { name: string; trust: number }[];
+  summary: string;
+}
+
 const statLabels: Record<string, string> = {
   academic: "학업",
   practical: "실무",
@@ -67,6 +73,21 @@ function getStoryPhase(coreEventCount: number) {
   return "결말";
 }
 
+function relationshipState(trust: number) {
+  if (trust >= 80) return "연애";
+  if (trust >= 45) return "호감";
+  if (trust >= 10) return "우호";
+  if (trust > -10) return "미묘";
+  if (trust > -45) return "불신";
+  if (trust > -80) return "적대";
+  return "증오";
+}
+
+function trustHearts(trust: number) {
+  const count = Math.max(1, Math.min(5, Math.ceil(Math.abs(trust) / 20)));
+  return trust >= 0 ? "♥".repeat(count) : "♡".repeat(count);
+}
+
 export default function AppPage() {
   const { status } = useSession();
   const [screen, setScreen] = useState<Screen>("auth");
@@ -78,6 +99,7 @@ export default function AppPage() {
   const [records, setRecords] = useState<Record<string, unknown>[]>([]);
   const [pendingNext, setPendingNext] = useState(false);
   const [endingNotice, setEndingNotice] = useState("");
+  const [choiceFeedback, setChoiceFeedback] = useState<ChoiceFeedback | null>(null);
 
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
@@ -118,6 +140,7 @@ export default function AppPage() {
   }
 
   async function fetchNextEvent(charId: string) {
+    setChoiceFeedback(null);
     const { ok, data } = await doFetch(`/api/characters/${charId}/events/next`, "POST");
     if (ok) {
       setCurrentEvent(data.event);
@@ -228,6 +251,11 @@ export default function AppPage() {
       });
       if (!ok) return;
       await loadCharacterEvent(currentChar.id);
+      setChoiceFeedback({
+        statDelta: data.result?.statDelta ?? {},
+        relationshipDelta: data.result?.relationshipDelta ?? [],
+        summary: data.result?.summary ?? "",
+      });
       setCurrentEvent(null);
       if (data.result?.endingTriggered) {
         setPendingNext(false);
@@ -458,6 +486,24 @@ export default function AppPage() {
         {activeScreen === "play" && (
           <section className="mx-auto max-w-[760px]">
             {error && <p className="mb-4 rounded bg-red-50 p-2 text-sm text-red-600">{error}</p>}
+            {choiceFeedback && (
+              <div className="feedback-pop pixel-panel mb-5 p-4">
+                <p className="text-sm font-black text-[#6d4a2f]">선택의 결과</p>
+                {choiceFeedback.summary && <p className="mt-2 text-sm leading-6">{choiceFeedback.summary}</p>}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {Object.entries(choiceFeedback.statDelta).map(([key, delta]) => (
+                    <span className={`border-2 px-2 py-1 text-xs font-bold ${delta > 0 ? "border-[#305d73] bg-[#d5edf6] text-[#244c5e]" : "border-[#b3423c] bg-[#ffe1db] text-[#7b2d29]"}`} key={key}>
+                      {statLabels[key] ?? key} {delta > 0 ? "+" : ""}{delta}
+                    </span>
+                  ))}
+                  {choiceFeedback.relationshipDelta.map((rel) => (
+                    <span className={`border-2 px-2 py-1 text-xs font-bold ${rel.trust > 0 ? "border-[#a53f66] bg-[#ffe1ec] text-[#842b50]" : "border-[#2b3348] bg-[#dce2f5] text-[#26304a]"}`} key={`${rel.name}-${rel.trust}`}>
+                      {rel.name} {rel.trust > 0 ? "♥+" : "♥"}{rel.trust}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
             {endingNotice && (
               <div className="pixel-panel mb-5 border-[#b3423c] bg-[#ffe1db] p-5 text-[#6f211d]">
                 <p className="font-black">BAD END</p>
@@ -523,10 +569,17 @@ export default function AppPage() {
               {currentChar.relationships?.map((rel) => (
                 <div className="pixel-panel p-4" key={rel.name}>
                   <div className="flex items-center justify-between"><span className="font-bold">{rel.name}</span><span className="text-sm text-[#706b62]">{rel.role}</span></div>
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className="text-sm">신뢰:</span>
-                    <div className="h-2 flex-1 rounded-full bg-[#eee8dd]"><div className="h-2 rounded-full bg-[#8a4f2d]" style={{ width: `${rel.trust}%` }} /></div>
-                    <span className="text-sm font-bold">{rel.trust}</span>
+                  <div className="mt-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span>{relationshipState(rel.trust)}</span>
+                      <span className="font-bold">{trustHearts(rel.trust)} {rel.trust}</span>
+                    </div>
+                    <div className="mt-2 h-3 border-2 border-[#2a2018] bg-[#d8c8b4]">
+                      <div
+                        className={`${rel.trust >= 0 ? "bg-[#d85f87]" : "bg-[#3f5f9f]"} h-full`}
+                        style={{ width: `${Math.min(100, Math.abs(rel.trust))}%` }}
+                      />
+                    </div>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1">{(rel.tags ?? []).map((tag: string) => (<span className="rounded-full bg-[#efe5d7] px-2 py-1 text-xs text-[#68412b]" key={tag}>{tag}</span>))}</div>
                 </div>

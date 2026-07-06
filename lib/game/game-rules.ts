@@ -3,7 +3,7 @@ export const STAT_MAX = 100;
 export const MAX_STAT_DELTA_PER_CHOICE = 15;
 export const BURNOUT_THRESHOLD = 85;
 
-export const TRUST_MIN = 0;
+export const TRUST_MIN = -100;
 export const TRUST_MAX = 100;
 
 export type StatDelta = Partial<Record<string, number>>;

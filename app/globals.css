@@ -113,3 +113,22 @@ button {
   word-break: keep-all;
   line-height: 1.9;
 }
+
+.feedback-pop {
+  animation: feedback-pop 720ms steps(4, end);
+}
+
+@keyframes feedback-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  45% {
+    opacity: 1;
+    transform: translateY(-3px) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

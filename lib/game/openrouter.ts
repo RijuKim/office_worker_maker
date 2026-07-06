@@ -23,6 +23,10 @@ const aiEventSchema = z.object({
           reputation: z.number().int().min(-15).max(15).optional(),
           charm: z.number().int().min(-15).max(15).optional(),
         }),
+        relationshipDelta: z.array(z.object({
+          name: z.string().min(1).max(60),
+          trust: z.number().int().min(-30).max(30),
+        })).optional(),
       }),
     )
     .min(2)
@@ -45,6 +49,9 @@ Generate ONE narrative event in JSON format. The event should:
 - Keep continuity with recent choices, relationships, open threads, foreshadowing, and stats.
 - Be a slice-of-life college scenario that can organically lead to career outcomes: study, relationships, part-time jobs, clubs, career exploration, leave of absence, internship, exam prep, public sector, professional licenses, entrepreneurship, or self-employment.
 - Include 2-4 meaningful choices that affect character stats
+- Choices may include relationshipDelta with name and trust from -30 to +30. Use it when a person clearly appears in the scene.
+- Relationships can become romantic, friendly, hostile, or hateful depending on trust. Let some choices worsen relationships.
+- Trust around 80+ suggests romance, below -80 suggests hatred. Do not create romance unless the scene has earned it.
 - Use only these public stats in statDelta: academic, practical, health, mental, wealth, charm, reputation
 - Each choice's statDelta must be within -15 to +15 range
 - Every choice must include at least one negative statDelta. Good opportunities still cost time, health, money, reputation, or mental energy.
@@ -214,6 +221,7 @@ function normalizeChoice(raw: unknown, index: number) {
       `${index + 1}번째 선택을 한다.`,
     summary,
     statDelta: adjustedStatDelta,
+    relationshipDelta: normalizeRelationshipDelta(choice.relationshipDelta ?? choice.relationshipChanges),
   };
 }
 
@@ -231,6 +239,22 @@ function ensureChoiceCost(statDelta: Record<string, number>, index: number) {
 
 function readRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null ? value as Record<string, unknown> : null;
+}
+
+function normalizeRelationshipDelta(raw: unknown) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      const rel = readRecord(item);
+      if (!rel || typeof rel.name !== "string") return null;
+      const trust = Number(rel.trust ?? rel.delta ?? rel.change);
+      if (!Number.isFinite(trust)) return null;
+      return {
+        name: rel.name,
+        trust: Math.max(-30, Math.min(30, Math.round(trust))),
+      };
+    })
+    .filter((item): item is { name: string; trust: number } => Boolean(item));
 }
 
 export async function checkDailyAiLimit(userId: string): Promise<{

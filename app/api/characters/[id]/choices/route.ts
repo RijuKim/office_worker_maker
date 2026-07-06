@@ -81,6 +81,15 @@ export async function POST(request: Request, context: RouteContext) {
     },
     choice.statDelta,
   );
+  const previousStats = {
+    academic: character.stats.academic,
+    practical: character.stats.practical,
+    health: character.stats.health,
+    mental: character.stats.mental,
+    wealth: character.stats.wealth,
+    reputation: character.stats.reputation,
+    charm: character.stats.charm,
+  };
   const currentFlags = (character.hiddenState.eventFlags as Record<string, unknown>) ?? {};
   const updatedEventFlags = applyFlagDeltas(currentFlags, choice.flagDelta);
 
@@ -158,12 +167,23 @@ export async function POST(request: Request, context: RouteContext) {
       choiceId: choice.id,
       summary: choice.summary,
       stats: updatedStats,
-      relationships: updatedRelationships,
+      statDelta: diffPublicStats(previousStats, updatedStats),
+      relationships: [...updatedRelationships, ...newRelationships.map((rel) => ({ name: rel.name, trust: rel.trust }))],
+      relationshipDelta: choice.relationshipDelta,
       eventResolved: true,
       endingTriggered: Boolean(endingRecord),
       endingType,
     },
   });
+}
+
+function diffPublicStats(previous: Record<string, number>, next: Record<string, number>) {
+  const keys = ["academic", "practical", "health", "mental", "wealth", "reputation", "charm"];
+  return Object.fromEntries(
+    keys
+      .map((key) => [key, (next[key] ?? previous[key] ?? 0) - (previous[key] ?? 0)] as const)
+      .filter(([, delta]) => delta !== 0),
+  );
 }
 
 function getImmediateBadEnding(stats: Record<string, number>) {
