@@ -7,7 +7,6 @@ import {
   buildFirstEvent,
   buildInitialHiddenState,
   buildInitialStats,
-  buildStarterRelationships,
   pickRandomGradeYear,
   pickRandomMajor,
   serializeCharacterRun,
@@ -92,9 +91,6 @@ export async function POST(request: Request) {
         },
         hiddenState: {
           create: buildInitialHiddenState(createInput),
-        },
-        relationships: {
-          create: buildStarterRelationships(),
         },
       },
       include: {

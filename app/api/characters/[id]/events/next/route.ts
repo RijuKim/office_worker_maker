@@ -26,7 +26,8 @@ export async function POST(_request: Request, context: RouteContext) {
       },
       eventHistory: {
         orderBy: { createdAt: "desc" },
-        take: 10,
+        take: 20,
+        include: { event: true },
       },
       events: {
         where: { status: "ACTIVE" },
@@ -61,6 +62,9 @@ export async function POST(_request: Request, context: RouteContext) {
   const recentTitles = character.eventHistory
     .map((h: { summary: string }) => h.summary)
     .filter(Boolean) as string[];
+  const usedEventTitles = character.eventHistory
+    .map((h: { event?: { title?: string } }) => h.event?.title)
+    .filter(Boolean) as string[];
   const currentFlags = (character.hiddenState.eventFlags as Record<string, unknown>) ?? {};
   const storyArc = advanceStoryArc(currentFlags.storyArc, character.coreEventCount);
 
@@ -82,6 +86,7 @@ export async function POST(_request: Request, context: RouteContext) {
         gradeYear: character.currentGradeYear,
         coreEventCount: character.coreEventCount,
         recentSummaries: recentTitles,
+        usedEventTitles,
         storyArc,
         relationships: character.relationships.map((rel: { name: string; role: string; trust: number }) => ({
           name: rel.name,
@@ -115,6 +120,11 @@ export async function POST(_request: Request, context: RouteContext) {
         source = "AI";
       }
     }
+  }
+
+  if (source === "AI" && isRepeatedEvent(selectedEvent.title, selectedEvent.tags, usedEventTitles, recentTitles)) {
+    selectedEvent = event;
+    source = event.source;
   }
 
   const newEvent = await prisma.event.create({
@@ -159,6 +169,18 @@ export async function POST(_request: Request, context: RouteContext) {
       forced: type === "forced",
     },
   });
+}
+
+function isRepeatedEvent(title: string, tags: string[], usedTitles: string[], recentSummaries: string[]) {
+  if (usedTitles.some((used) => used === title || used.includes(title) || title.includes(used))) {
+    return true;
+  }
+  const normalizedTitle = title.replace(/\s/g, "");
+  if (recentSummaries.some((summary) => summary.replace(/\s/g, "").includes(normalizedTitle))) {
+    return true;
+  }
+  const tagOverlap = tags.filter((tag) => recentSummaries.slice(0, 5).some((summary) => summary.includes(tag)));
+  return tagOverlap.length >= 3;
 }
 
 function advanceStoryArc(rawArc: unknown, coreEventCount: number) {

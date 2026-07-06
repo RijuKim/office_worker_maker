@@ -128,7 +128,7 @@ describe("account and character API foundation", () => {
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
-  it("creates a character with initialized stats, hidden state, relationships, and first event", async () => {
+  it("creates a character with initialized stats, hidden state, and first event before relationships form", async () => {
     sessionMock.requireCurrentUserId.mockResolvedValueOnce("user-1");
     const created = characterRecord();
 
@@ -146,9 +146,9 @@ describe("account and character API foundation", () => {
                 major: "사회학과",
                 stats: { create: expect.objectContaining({ academic: expect.any(Number), charm: expect.any(Number) }) },
                 hiddenState: { create: expect.objectContaining({ burnoutRisk: 18 }) },
-                relationships: { create: expect.arrayContaining([expect.objectContaining({ name: "지민 선배" })]) },
               }),
             );
+            expect(data.relationships).toBeUndefined();
             return { id: "char-1" };
           }),
           update: vi.fn(async ({ data }) => {

@@ -59,6 +59,14 @@ function statLevel(value: number) {
   return Math.max(1, Math.min(5, Math.ceil(value / 20)));
 }
 
+function getStoryPhase(coreEventCount: number) {
+  if (coreEventCount < 3) return "발단";
+  if (coreEventCount < 8) return "전개";
+  if (coreEventCount < 12) return "위기";
+  if (coreEventCount < 15) return "절정";
+  return "결말";
+}
+
 export default function AppPage() {
   const { status } = useSession();
   const [screen, setScreen] = useState<Screen>("auth");
@@ -69,6 +77,7 @@ export default function AppPage() {
   const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState<Record<string, unknown>[]>([]);
   const [pendingNext, setPendingNext] = useState(false);
+  const [endingNotice, setEndingNotice] = useState("");
 
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
@@ -201,6 +210,7 @@ export default function AppPage() {
   const pickCharacter = useCallback(async (char: CharacterData) => {
     setCurrentChar(char);
     setPendingNext(false);
+    setEndingNotice("");
     if (char.currentEventId) {
       await loadCharacterEvent(char.id);
     } else {
@@ -213,13 +223,18 @@ export default function AppPage() {
     if (!currentChar || !currentEvent) return;
     setLoading(true);
     try {
-      const { ok } = await doFetch(`/api/characters/${currentChar.id}/choices`, "POST", {
+      const { ok, data } = await doFetch(`/api/characters/${currentChar.id}/choices`, "POST", {
         choiceIndex,
       });
       if (!ok) return;
       await loadCharacterEvent(currentChar.id);
       setCurrentEvent(null);
-      setPendingNext(true);
+      if (data.result?.endingTriggered) {
+        setPendingNext(false);
+        setEndingNotice(`${data.result.endingType} 배드엔딩이 기록되었습니다. 커리어와 엔딩 기록에서 확인할 수 있습니다.`);
+      } else {
+        setPendingNext(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -251,6 +266,9 @@ export default function AppPage() {
       setLoading(false);
     }
   }, []);
+
+  const storyPhase = currentChar ? getStoryPhase(currentChar.coreEventCount) : "발단";
+  const endingProgress = currentChar ? Math.min(100, Math.round((currentChar.coreEventCount / 15) * 100)) : 0;
 
   if (status === "loading") {
     return (
@@ -398,7 +416,11 @@ export default function AppPage() {
     <div className="app-layout pixel-shell min-h-screen text-[#2a241e]">
       <aside className="sidebar border-r border-[#3b3025] bg-[#231d17] p-[22px] text-[#f7efe2] max-[900px]:border-0 max-[900px]:p-[18px]">
         <h1 className="text-[22px] font-bold leading-tight">{currentChar?.name ?? "..."}</h1>
-        <p className="mt-2 text-[13px] leading-relaxed text-[#c4b39c]">{currentChar?.major} {currentChar?.currentGradeYear ?? currentChar?.startGradeYear}학년 · 사건 {currentChar?.coreEventCount}회</p>
+        <p className="mt-2 text-[13px] leading-relaxed text-[#c4b39c]">{currentChar?.major} {currentChar?.currentGradeYear ?? currentChar?.startGradeYear}학년 · {storyPhase} · 사건 {currentChar?.coreEventCount}회</p>
+        <div className="mt-3">
+          <div className="mb-1 flex justify-between text-[11px] text-[#c4b39c]"><span>엔딩까지</span><span>{endingProgress}%</span></div>
+          <div className="h-3 border-2 border-[#0f0b08] bg-[#4c4035]"><div className="h-full bg-[#d79b52]" style={{ width: `${endingProgress}%` }} /></div>
+        </div>
         <nav className="mt-[22px] grid gap-2">
           <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "play" ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`} onClick={() => setScreen("play")}>진행</button>
           <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "character_detail" ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`} onClick={() => setScreen("character_detail")}>캐릭터</button>
@@ -436,6 +458,13 @@ export default function AppPage() {
         {activeScreen === "play" && (
           <section className="mx-auto max-w-[760px]">
             {error && <p className="mb-4 rounded bg-red-50 p-2 text-sm text-red-600">{error}</p>}
+            {endingNotice && (
+              <div className="pixel-panel mb-5 border-[#b3423c] bg-[#ffe1db] p-5 text-[#6f211d]">
+                <p className="font-black">BAD END</p>
+                <p className="mt-2 text-sm leading-6">{endingNotice}</p>
+                <button className="pixel-button mt-4 px-4 py-2 text-sm" onClick={() => { setScreen("records"); loadRecords(); }}>기록 보기</button>
+              </div>
+            )}
             {currentEvent && (
               <>
                 <p className="mb-4 text-[13px] font-bold text-[#8a4f2d]">{currentEvent.source === "FORCED" ? "강제 이벤트 발생" : currentEvent.source === "AI" ? `${currentEvent.title} · AI` : currentEvent.title}</p>
@@ -451,7 +480,7 @@ export default function AppPage() {
                 </div>
               </>
             )}
-            {!currentEvent && (
+            {!currentEvent && !endingNotice && (
               <div
                 className="pixel-panel cursor-pointer p-8 text-center"
                 onClick={continueToNextEvent}

@@ -7,7 +7,7 @@ const AI_TIMEOUT_MS = 10_000;
 
 const aiEventSchema = z.object({
   title: z.string().min(1).max(100),
-  body: z.string().min(300).max(4200),
+  body: z.string().min(80).max(4200),
   choices: z
     .array(
       z.object({
@@ -32,6 +32,8 @@ const aiEventSchema = z.object({
 
 export type AiEventResponse = z.infer<typeof aiEventSchema>;
 
+const allowedStats = ["academic", "practical", "health", "mental", "wealth", "reputation", "charm"] as const;
+
 const SYSTEM_PROMPT = `You are a creative writer for a Korean college life text-adventure game.
 
 Generate ONE narrative event in JSON format. The event should:
@@ -45,6 +47,8 @@ Generate ONE narrative event in JSON format. The event should:
 - Include 2-4 meaningful choices that affect character stats
 - Use only these public stats in statDelta: academic, practical, health, mental, wealth, charm, reputation
 - Each choice's statDelta must be within -15 to +15 range
+- Every choice must include at least one negative statDelta. Good opportunities still cost time, health, money, reputation, or mental energy.
+- At least one choice should be clearly risky with a larger downside.
 - No real company names, no real executives, no real controversies
 - Use fictional/parody names only
 - Choice labels should be natural actions, not system descriptions.
@@ -58,6 +62,7 @@ export function buildUserPrompt(state: {
   age: number;
   coreEventCount: number;
   recentSummaries: string[];
+  usedEventTitles: string[];
   stats: Record<string, number>;
   relationships: { name: string; role: string; trust: number }[];
   storyArc: unknown;
@@ -66,10 +71,11 @@ export function buildUserPrompt(state: {
 진행된 핵심 사건 수: ${state.coreEventCount}
 큰 사건 아크: ${JSON.stringify(state.storyArc)}
 최근 선택과 기억: ${state.recentSummaries.join("; ") || "당신은 낯선 아침에 눈을 떴다."}
+이미 사용한 사건 제목: ${state.usedEventTitles.join("; ") || "없음"}
 현재 공개 스탯: ${JSON.stringify(state.stats)}
 주요 관계: ${JSON.stringify(state.relationships)}
 
-위 정보를 바탕으로 다음 작은 사건 하나를 생성하세요. 이번 사건은 이전 선택의 결과가 느껴져야 하며, 동시에 다음 장면을 궁금하게 만드는 미해결 감각을 남겨야 합니다.`;
+위 정보를 바탕으로 다음 작은 사건 하나를 생성하세요. 이미 사용한 사건 제목과 같은 상황, 같은 장소, 같은 갈등을 반복하지 마세요. 이번 사건은 이전 선택의 결과가 느껴져야 하며, 동시에 다음 장면을 궁금하게 만드는 미해결 감각을 남겨야 합니다.`;
 }
 
 export interface OpenRouterResult {
@@ -133,8 +139,8 @@ export async function generateAiEvent(
       return { success: false, reason: "invalid_response" };
     }
 
-    const parsed = JSON.parse(content);
-    const validated = aiEventSchema.safeParse(parsed);
+    const parsed = extractJson(content);
+    const validated = aiEventSchema.safeParse(normalizeAiEvent(parsed));
 
     if (!validated.success) {
       return { success: false, reason: "invalid_response" };
@@ -149,6 +155,82 @@ export async function generateAiEvent(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function extractJson(content: string) {
+  try {
+    return JSON.parse(content);
+  } catch {
+    const match = content.match(/\{[\s\S]*\}/);
+    if (!match) {
+      throw new Error("No JSON object found");
+    }
+    return JSON.parse(match[0]);
+  }
+}
+
+function normalizeAiEvent(raw: unknown) {
+  if (typeof raw !== "object" || raw === null) return raw;
+  const container = raw as Record<string, unknown>;
+  const event = readRecord(container.event) ?? readRecord(container.storyEvent) ?? container;
+  const rawChoices = Array.isArray(event.choices) ? event.choices :
+    Array.isArray(event.options) ? event.options :
+    Array.isArray(event.actions) ? event.actions :
+    [];
+  const tags = Array.isArray(event.tags)
+    ? event.tags.filter((tag) => typeof tag === "string").slice(0, 5)
+    : [];
+
+  return {
+    title: typeof event.title === "string" ? event.title : "이름 없는 하루",
+    body: typeof event.body === "string" ? event.body :
+      typeof event.description === "string" ? event.description :
+      typeof event.narrative === "string" ? event.narrative :
+      "",
+    tags: tags.length > 0 ? tags : ["AI"],
+    choices: rawChoices.map((choice, index) => normalizeChoice(choice, index)),
+  };
+}
+
+function normalizeChoice(raw: unknown, index: number) {
+  const choice = typeof raw === "object" && raw !== null ? raw as Record<string, unknown> : {};
+  const rawDelta = readRecord(choice.statDelta) ?? readRecord(choice.statChanges) ?? {};
+  const statDelta = Object.fromEntries(
+    Object.entries(rawDelta)
+      .map(([key, value]) => [key, Number(value)] as const)
+      .filter(([key, value]) => allowedStats.includes(key as typeof allowedStats[number]) && Number.isFinite(value))
+      .map(([key, value]) => [key, Math.max(-15, Math.min(15, Math.round(value)))]),
+  );
+  const adjustedStatDelta = ensureChoiceCost(statDelta, index);
+  const summarySource = typeof choice.summary === "string" ? choice.summary :
+    typeof choice.nextEvent === "string" ? choice.nextEvent :
+    "선택의 결과가 다음 장면으로 이어졌다.";
+  const summary = summarySource.startsWith("당신은") ? summarySource : `당신은 ${summarySource}`;
+
+  return {
+    id: typeof choice.id === "string" ? choice.id : `choice_${index + 1}`,
+    label: typeof choice.label === "string" ? choice.label :
+      typeof choice.text === "string" ? choice.text :
+      `${index + 1}번째 선택을 한다.`,
+    summary,
+    statDelta: adjustedStatDelta,
+  };
+}
+
+function ensureChoiceCost(statDelta: Record<string, number>, index: number) {
+  if (Object.values(statDelta).some((value) => value < 0)) {
+    return statDelta;
+  }
+  const costByIndex = ["mental", "health", "wealth", "reputation"] as const;
+  const key = costByIndex[index % costByIndex.length];
+  return {
+    ...statDelta,
+    [key]: Math.min(-1, statDelta[key] ?? (index === 0 ? -2 : -3)),
+  };
+}
+
+function readRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null ? value as Record<string, unknown> : null;
 }
 
 export async function checkDailyAiLimit(userId: string): Promise<{
