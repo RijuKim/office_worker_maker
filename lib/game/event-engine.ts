@@ -167,6 +167,54 @@ export const STATIC_EVENTS: StaticEvent[] = [
     tags: ["공무원", "공기업", "자격증"],
     source: "STATIC" as const,
   },
+  {
+    title: "분실 지갑과 CCTV",
+    body: `당신은 학생회관 계단 아래에서 낡은 지갑 하나를 줍는다. 안에는 현금보다 더 눈에 띄는 USB와 경찰공무원 학원 영수증, 그리고 누군가의 이름이 적힌 쪽지가 들어 있다. 분실물 센터에 바로 맡기면 가장 안전하지만, 이상하게도 USB 라벨에 적힌 '면접 자료'라는 글자가 마음에 걸린다.
+
+그때 복도 끝에서 누군가 급히 뛰어가는 발소리가 들린다. 당신은 이 일이 단순한 분실인지, 누군가 일부러 흘린 단서인지 알 수 없다. 사소한 호기심은 때로 탐정 같은 하루를 만들고, 때로는 곤란한 사건의 공범처럼 보이게 만든다.`,
+    choices: [
+      { id: "turn_wallet_in", label: "바로 분실물 센터에 맡긴다.", summary: "당신은 안전한 절차를 택해 괜한 의심을 피했다.", statDelta: { reputation: 4, mental: 1, practical: -1, charm: -1 }, relationshipDelta: [], flagDelta: { investigationThread: "lawful" } },
+      { id: "check_usb", label: "USB 안의 내용을 먼저 확인한다.", summary: "당신은 위험한 호기심을 따라가며 사건의 단서를 보았다.", statDelta: { practical: 4, mental: -3, reputation: -5, health: -1 }, relationshipDelta: [{ name: "수상한 조교", trust: -12 }], flagDelta: { investigationThread: "snooped" } },
+    ],
+    tags: ["탐정", "경찰", "위험"],
+    source: "STATIC" as const,
+  },
+  {
+    title: "호주 워홀 포스터",
+    body: `당신은 국제교류처 앞 게시판에서 오래된 워킹홀리데이 설명회 포스터를 본다. 사진 속 사람들은 햇빛 아래에서 웃고 있고, 포스터 아래에는 '도망이 아니라 경험'이라는 문장이 굵게 적혀 있다. 취업 준비가 막막해질수록 먼 나라의 계절은 이상할 만큼 구체적인 탈출구처럼 보인다.
+
+하지만 비행기표는 싸지 않고, 돌아왔을 때 이력서의 빈칸을 어떻게 설명할지도 알 수 없다. 당신은 지금의 답답함을 벗어나고 싶은 마음과, 여기서 버텨야 한다는 마음 사이에 선다.`,
+    choices: [
+      { id: "prepare_working_holiday", label: "워홀 자금을 모으고 영어 공부를 시작한다.", summary: "당신은 해외에서 다른 삶을 시험해보기로 마음먹었다.", statDelta: { charm: 3, practical: 3, wealth: -4, mental: -1 }, relationshipDelta: [], flagDelta: { overseasThread: "working_holiday" } },
+      { id: "stay_and_apply", label: "포스터를 접어두고 국내 인턴 지원서를 쓴다.", summary: "당신은 떠나는 상상 대신 지금의 경쟁에 남기로 했다.", statDelta: { practical: 3, reputation: 2, mental: -3, health: -1 }, relationshipDelta: [], flagDelta: { overseasThread: "stayed" } },
+    ],
+    tags: ["해외", "워홀", "진로"],
+    source: "STATIC" as const,
+  },
+  {
+    title: "불법 과외 제안",
+    body: `당신은 과외 중개 단체방에서 이상하게 높은 시급의 제안을 받는다. 학생의 성적을 올리는 일이라기보다, 특정 시험 자료를 대신 정리해달라는 말에 가깝다. 제안자는 별일 아니라는 듯 웃는 이모티콘을 붙였지만, 문장 사이에는 분명 선을 넘는 냄새가 있다.
+
+돈은 급하고, 이번 달 카드값은 이미 계산보다 커졌다. 그러나 한 번 쉬운 돈을 받아들이면 다음 제안은 더 쉽게 들어올 것이다. 당신은 자산과 평판, 그리고 스스로에 대한 설명 사이에서 잠시 멈춘다.`,
+    choices: [
+      { id: "refuse_dirty_money", label: "제안을 거절하고 단체방을 나온다.", summary: "당신은 쉬운 돈을 포기하고 위험한 연결을 끊었다.", statDelta: { reputation: 4, mental: 2, wealth: -5, practical: -1 }, relationshipDelta: [{ name: "중개자", trust: -20 }], flagDelta: { crimeThread: "refused" } },
+      { id: "accept_gray_work", label: "이번 한 번만 하겠다고 답한다.", summary: "당신은 돈 때문에 회색지대의 일을 받아들였다.", statDelta: { wealth: 8, practical: 2, reputation: -8, mental: -4 }, relationshipDelta: [{ name: "중개자", trust: 10 }], flagDelta: { crimeThread: "accepted" } },
+    ],
+    tags: ["범죄", "자산", "평판"],
+    source: "STATIC" as const,
+  },
+  {
+    title: "같이 살자는 말",
+    body: `당신은 늦은 저녁, 익숙해진 사람과 학교 앞 분식집에 앉아 있다. 상대는 농담처럼 월세가 너무 비싸다고 말하다가, 문득 같이 살면 어떻겠냐고 묻는다. 가볍게 던진 말처럼 들리지만 숟가락을 내려놓는 손끝이 조금 떨린다.
+
+연애는 스펙처럼 관리되지 않고, 결혼이나 동거는 더더욱 계획표대로 움직이지 않는다. 하지만 누군가와 삶의 비용을 나눈다는 상상은 생각보다 현실적이고, 생각보다 무섭다.`,
+    choices: [
+      { id: "consider_living_together", label: "진지하게 같이 사는 가능성을 이야기한다.", summary: "당신은 관계를 생활의 문제로 끌어와 진지하게 마주했다.", statDelta: { charm: 4, wealth: 2, mental: -3, reputation: -1 }, relationshipDelta: [{ name: "서연", trust: 18 }], flagDelta: { romanceFuture: "cohabitation" } },
+      { id: "choose_solitude", label: "아직은 혼자 사는 시간이 필요하다고 말한다.", summary: "당신은 관계보다 혼자 버티는 리듬을 선택했다.", statDelta: { mental: 3, health: 1, charm: -3, wealth: -2 }, relationshipDelta: [{ name: "서연", trust: -10 }], flagDelta: { romanceFuture: "solitude" } },
+    ],
+    tags: ["연애", "결혼", "혼자살기"],
+    source: "STATIC" as const,
+  },
 ];
 
 export interface StaticEventChoice {

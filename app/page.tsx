@@ -379,23 +379,25 @@ export default function AppPage() {
                     className={`pixel-button px-4 py-3 text-left text-sm ${charResidence === option.id ? "bg-[#ffe0a2]" : ""}`}
                     key={option.id}
                     onClick={() => setCharResidence(option.id)}
+                    type="button"
                   >
-                    <span className="block font-bold">{option.label}</span>
+                    <span className="block font-bold">{charResidence === option.id ? "[선택됨] " : ""}{option.label}</span>
                     <span className="mt-1 block text-xs leading-5 text-[#706b62]">{option.description}</span>
                   </button>
                 ))}
               </div>
             </div>
             <div>
-              <p className="mb-2 block text-sm font-bold">당신이 믿고 싶은 능력 두 가지는?</p>
+              <p className="mb-2 block text-sm font-bold">당신이 믿고 싶은 능력 두 가지는? ({preferredStats.length}/2)</p>
               <div className="grid grid-cols-2 gap-2">
                 {Object.entries(statLabels).map(([key, label]) => (
                   <button
                     className={`pixel-button px-3 py-3 text-left text-sm ${preferredStats.includes(key) ? "bg-[#ffe0a2]" : ""}`}
                     key={key}
                     onClick={() => togglePreferredStat(key)}
+                    type="button"
                   >
-                    <span className="mr-2 text-xs text-[#8a4f2d]">{statIcons[key]}</span>
+                    <span className="mr-2 text-xs text-[#8a4f2d]">{preferredStats.includes(key) ? "■" : "□"} {statIcons[key]}</span>
                     <span className="font-bold">{label}</span>
                   </button>
                 ))}
