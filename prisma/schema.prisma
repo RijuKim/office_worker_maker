@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum AcademicStatus {
@@ -36,38 +35,38 @@ enum DestinationType {
 }
 
 model User {
-  id            String               @id @default(uuid())
-  email         String               @unique
-  passwordHash  String
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
-  characters    CharacterRun[]
-  records       CareerEndingRecord[]
-  aiUsage       AiUsage[]
+  id           String               @id @default(uuid())
+  email        String               @unique
+  passwordHash String
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  characters   CharacterRun[]
+  records      CareerEndingRecord[]
+  aiUsage      AiUsage[]
 }
 
 model CharacterRun {
-  id                String               @id @default(uuid())
-  userId            String
-  name              String
-  age               Int
-  startGradeYear    Int
-  currentGradeYear  Int?
-  major             String
-  academicStatus    AcademicStatus       @default(ENROLLED)
-  lifeStatus        Json                 @default("[]")
-  majorEventCount   Int                  @default(0)
-  coreEventCount    Int                  @default(0)
-  currentEventId    String?
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
-  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  stats             CharacterStats?
-  hiddenState       HiddenState?
-  relationships     Relationship[]
-  events            Event[]
-  eventHistory      EventHistory[]
-  records           CareerEndingRecord[]
+  id               String               @id @default(uuid())
+  userId           String
+  name             String
+  age              Int
+  startGradeYear   Int
+  currentGradeYear Int?
+  major            String
+  academicStatus   AcademicStatus       @default(ENROLLED)
+  lifeStatus       Json                 @default("[]")
+  majorEventCount  Int                  @default(0)
+  coreEventCount   Int                  @default(0)
+  currentEventId   String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stats            CharacterStats?
+  hiddenState      HiddenState?
+  relationships    Relationship[]
+  events           Event[]
+  eventHistory     EventHistory[]
+  records          CareerEndingRecord[]
 }
 
 model CharacterStats {
@@ -112,17 +111,17 @@ model Relationship {
 }
 
 model Event {
-  id             String          @id @default(uuid())
+  id             String         @id @default(uuid())
   characterRunId String?
   source         EventSource
-  status         EventStatus     @default(ACTIVE)
+  status         EventStatus    @default(ACTIVE)
   title          String
   body           String
   choices        Json
-  tags           Json            @default("[]")
+  tags           Json           @default("[]")
   safetyChecked  Boolean
-  createdAt      DateTime        @default(now())
-  characterRun   CharacterRun?   @relation(fields: [characterRunId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+  characterRun   CharacterRun?  @relation(fields: [characterRunId], references: [id], onDelete: Cascade)
   history        EventHistory[]
 }
 
