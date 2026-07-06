@@ -1,0 +1,192 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AcademicStatus {
+  ENROLLED
+  LEAVE
+  DROPPED_OUT
+  GRADUATED
+}
+
+enum EventSource {
+  STATIC
+  AI
+  FALLBACK
+  FORCED
+}
+
+enum EventStatus {
+  ACTIVE
+  RESOLVED
+  DISCARDED
+}
+
+enum DestinationType {
+  PARODY_COMPANY
+  PUBLIC_SECTOR
+  LICENSED_PROFESSION
+  ENTREPRENEURSHIP
+  SELF_EMPLOYMENT
+}
+
+model User {
+  id            String               @id @default(uuid())
+  email         String               @unique
+  passwordHash  String
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  characters    CharacterRun[]
+  records       CareerEndingRecord[]
+  aiUsage       AiUsage[]
+}
+
+model CharacterRun {
+  id                String               @id @default(uuid())
+  userId            String
+  name              String
+  age               Int
+  startGradeYear    Int
+  currentGradeYear  Int?
+  major             String
+  academicStatus    AcademicStatus       @default(ENROLLED)
+  lifeStatus        Json                 @default("[]")
+  majorEventCount   Int                  @default(0)
+  coreEventCount    Int                  @default(0)
+  currentEventId    String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stats             CharacterStats?
+  hiddenState       HiddenState?
+  relationships     Relationship[]
+  events            Event[]
+  eventHistory      EventHistory[]
+  records           CareerEndingRecord[]
+}
+
+model CharacterStats {
+  characterRunId String       @id
+  academic       Int
+  practical      Int
+  communication  Int
+  creativity     Int
+  health         Int
+  mental         Int
+  network        Int
+  wealth         Int
+  reputation     Int
+  charm          Int
+  characterRun   CharacterRun @relation(fields: [characterRunId], references: [id], onDelete: Cascade)
+}
+
+model HiddenState {
+  characterRunId         String       @id
+  majorFit               Int
+  burnoutRisk            Int
+  romanceState           Json         @default("{}")
+  familyState            Json         @default("{}")
+  friendState            Json         @default("{}")
+  careerInterests        Json         @default("[]")
+  companyRolePreferences Json         @default("[]")
+  imageFit               Json         @default("{}")
+  selfCareCondition      Json         @default("{}")
+  eventFlags             Json         @default("{}")
+  characterRun           CharacterRun @relation(fields: [characterRunId], references: [id], onDelete: Cascade)
+}
+
+model Relationship {
+  id             String       @id @default(uuid())
+  characterRunId String
+  name           String
+  role           String
+  trust          Int
+  tags           Json         @default("[]")
+  createdAt      DateTime     @default(now())
+  characterRun   CharacterRun @relation(fields: [characterRunId], references: [id], onDelete: Cascade)
+}
+
+model Event {
+  id             String          @id @default(uuid())
+  characterRunId String?
+  source         EventSource
+  status         EventStatus     @default(ACTIVE)
+  title          String
+  body           String
+  choices        Json
+  tags           Json            @default("[]")
+  safetyChecked  Boolean
+  createdAt      DateTime        @default(now())
+  characterRun   CharacterRun?   @relation(fields: [characterRunId], references: [id], onDelete: Cascade)
+  history        EventHistory[]
+}
+
+model EventHistory {
+  id                String       @id @default(uuid())
+  characterRunId    String
+  eventId           String
+  choiceId          String?
+  summary           String
+  statDelta         Json
+  relationshipDelta Json
+  flagDelta         Json
+  createdAt         DateTime     @default(now())
+  characterRun      CharacterRun @relation(fields: [characterRunId], references: [id], onDelete: Cascade)
+  event             Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model CareerDestination {
+  id               String          @id @default(uuid())
+  displayName      String
+  destinationType  DestinationType
+  industry         String
+  roles            Json
+  salaryBand       String
+  cultureTags      Json            @default("[]")
+  hiringDifficulty Int
+  preferredStats   Json
+  eventTone        Json
+}
+
+model CareerEndingRecord {
+  id                String       @id @default(uuid())
+  userId            String
+  characterRunId    String
+  title             String
+  summary           String
+  longNarrative     String
+  careerPath        String
+  jobRole           String?
+  destinationName   String?
+  salaryBand        String?
+  workplaceTone     Json         @default("[]")
+  statSnapshot      Json
+  keyRelationships  Json
+  majorEvents       Json
+  satisfaction      Int
+  growthPotential   Int
+  workLifeBalance   Int
+  healthState       String
+  relationshipState String
+  tags              Json         @default("[]")
+  similarityKey     String
+  createdAt         DateTime     @default(now())
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  characterRun      CharacterRun @relation(fields: [characterRunId], references: [id], onDelete: Cascade)
+}
+
+model AiUsage {
+  id        String   @id @default(uuid())
+  userId    String
+  date      String
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+}
