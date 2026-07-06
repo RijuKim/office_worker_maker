@@ -49,6 +49,7 @@ export default function AppPage() {
   const [charMajor, setCharMajor] = useState("");
 
   const mountedRef = useRef(false);
+  const activeScreen = status === "authenticated" && screen === "auth" ? "create" : screen;
 
   async function doFetch(url: string, method = "GET", body?: unknown) {
     const opts: RequestInit = { method, headers: { "Content-Type": "application/json" } };
@@ -82,15 +83,23 @@ export default function AppPage() {
     setError("");
     setLoading(true);
     try {
+      const email = authEmail.trim().toLowerCase();
       const { ok, data } = await doFetch("/api/auth/signup", "POST", {
-        email: authEmail,
+        email,
         password: authPassword,
       });
       if (!ok) {
         setError(data.error || "회원가입에 실패했습니다.");
         return;
       }
-      await signIn("credentials", { email: authEmail, password: authPassword, redirect: false });
+      const res = await signIn("credentials", { email, password: authPassword, redirect: false });
+      if (!res?.ok) {
+        setAuthMode("login");
+        setError("회원가입은 완료됐지만 자동 로그인에 실패했습니다. 다시 로그인해 주세요.");
+        return;
+      }
+      await loadCharacters();
+      setScreen("create");
     } catch {
       setError("서버 오류가 발생했습니다.");
     } finally {
@@ -102,15 +111,26 @@ export default function AppPage() {
     setError("");
     setLoading(true);
     try {
-      const res = await signIn("credentials", { email: authEmail, password: authPassword, redirect: false });
-      if (res?.error) setError("이메일 또는 비밀번호가 일치하지 않습니다.");
+      const res = await signIn("credentials", { email: authEmail.trim().toLowerCase(), password: authPassword, redirect: false });
+      if (!res?.ok) {
+        setError("이메일 또는 비밀번호가 일치하지 않습니다.");
+        return;
+      }
+      await loadCharacters();
+      setScreen("create");
+    } catch {
+      setError("서버 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
   }, [authEmail, authPassword]);
 
   useEffect(() => {
-    if (mountedRef.current || status !== "authenticated") return;
+    if (status !== "authenticated") {
+      mountedRef.current = false;
+      return;
+    }
+    if (mountedRef.current) return;
     mountedRef.current = true;
     loadCharacters();
   }, [status]);
@@ -198,12 +218,12 @@ export default function AppPage() {
     );
   }
 
-  if (status === "unauthenticated" || screen === "auth") {
+  if (status === "unauthenticated") {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#fbfaf6] p-4">
         <div className="w-full max-w-sm rounded-lg border border-[#ded9ce] bg-white p-8">
-          <h1 className="mb-6 text-center text-2xl font-bold">College Career Sim</h1>
-          <p className="mb-6 text-center text-sm text-[#706b62]">한국형 문학 텍스트 어드벤처</p>
+          <h1 className="mb-6 text-center text-2xl font-bold">일어나보니 대한민국 취준생</h1>
+          <p className="mb-6 text-center text-sm text-[#706b62]">문학형 커리어 텍스트 어드벤처</p>
           {error && <p className="mb-4 rounded bg-red-50 p-2 text-sm text-red-600">{error}</p>}
           <div className="space-y-4">
             <input className="w-full rounded-lg border border-[#cbbfae] px-4 py-3 text-sm" placeholder="이메일" type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} />
@@ -225,7 +245,7 @@ export default function AppPage() {
     );
   }
 
-  if (screen === "create" && !currentChar) {
+  if (activeScreen === "create" && !currentChar) {
     return (
       <main className="flex min-h-screen items-start justify-center bg-[#fbfaf6] p-4 pt-16">
         <div className="w-full max-w-lg">
@@ -276,7 +296,7 @@ export default function AppPage() {
     );
   }
 
-  if (screen === "records") {
+  if (activeScreen === "records") {
     return (
       <main className="min-h-screen bg-[#fbfaf6] p-4 pt-8">
         <div className="mx-auto max-w-3xl">
@@ -318,9 +338,9 @@ export default function AppPage() {
         <h1 className="text-[22px] font-bold leading-tight">{currentChar?.name ?? "..."}</h1>
         <p className="mt-2 text-[13px] leading-relaxed text-[#706b62]">{currentChar?.major} {currentChar?.currentGradeYear ?? currentChar?.startGradeYear}학년 · 이벤트 {currentChar?.coreEventCount}회</p>
         <nav className="mt-[22px] grid gap-2">
-          <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${screen === "play" ? "border border-[#ded9ce] bg-white" : ""}`} onClick={() => setScreen("play")}>진행</button>
-          <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${screen === "character_detail" ? "border border-[#ded9ce] bg-white" : ""}`} onClick={() => setScreen("character_detail")}>캐릭터</button>
-          <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${screen === "relationships" ? "border border-[#ded9ce] bg-white" : ""}`} onClick={() => setScreen("relationships")}>관계</button>
+          <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "play" ? "border border-[#ded9ce] bg-white" : ""}`} onClick={() => setScreen("play")}>진행</button>
+          <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "character_detail" ? "border border-[#ded9ce] bg-white" : ""}`} onClick={() => setScreen("character_detail")}>캐릭터</button>
+          <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "relationships" ? "border border-[#ded9ce] bg-white" : ""}`} onClick={() => setScreen("relationships")}>관계</button>
           <button className="rounded-lg px-2.5 py-2 text-left text-sm" onClick={() => { setScreen("records"); loadRecords(); }}>커리어와 엔딩 기록</button>
           <button className="rounded-lg px-2.5 py-2 text-left text-sm text-[#706b62]" onClick={() => signOut()}>로그아웃</button>
         </nav>
@@ -344,7 +364,7 @@ export default function AppPage() {
       </aside>
 
       <main className="px-11 py-[34px] max-[900px]:px-[18px] max-[900px]:py-[22px]">
-        {screen === "play" && (
+        {activeScreen === "play" && (
           <section className="mx-auto max-w-[760px]">
             {error && <p className="mb-4 rounded bg-red-50 p-2 text-sm text-red-600">{error}</p>}
             {currentEvent && (
@@ -373,7 +393,7 @@ export default function AppPage() {
             </div>
           </section>
         )}
-        {screen === "character_detail" && currentChar && (
+        {activeScreen === "character_detail" && currentChar && (
           <section className="mx-auto max-w-[760px]">
             <h2 className="text-xl font-bold">캐릭터 상세</h2>
             <div className="mt-4 space-y-3">
@@ -388,7 +408,7 @@ export default function AppPage() {
             </div>
           </section>
         )}
-        {screen === "relationships" && currentChar && (
+        {activeScreen === "relationships" && currentChar && (
           <section className="mx-auto max-w-[760px]">
             <h2 className="text-xl font-bold">관계</h2>
             <div className="mt-4 space-y-3">
