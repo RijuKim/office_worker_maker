@@ -51,7 +51,7 @@ export async function GET(_request: Request, context: RouteContext) {
     currentEvent: character.events[0] ?? null,
     recordsSummary: {
       recentCount: character.records.length,
-      recentTitles: character.records.map((record) => record.title),
+      recentTitles: character.records.map((record: { title: string }) => record.title),
     },
   });
 }

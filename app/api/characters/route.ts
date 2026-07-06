@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+import { prisma } from "@/lib/server/prisma";
+import { requireCurrentUserId } from "@/lib/server/session";
+
 import {
   buildFirstEvent,
   buildInitialHiddenState,
@@ -8,8 +11,6 @@ import {
   serializeCharacterRun,
 } from "@/lib/game/character-foundation";
 import { characterCreateSchema } from "@/lib/game/validation";
-import { prisma } from "@/lib/server/prisma";
-import { requireCurrentUserId } from "@/lib/server/session";
 
 const includeCharacterDetails = {
   stats: true,
