@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mockup 01 Literary</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, sans-serif; background: #fbfaf6; color: #232323; }
+    .app { min-height: 100vh; display: grid; grid-template-columns: 260px minmax(0, 1fr) 300px; }
+    aside { padding: 22px; border-right: 1px solid #ded9ce; background: #f2efe7; }
+    .right { border-right: 0; border-left: 1px solid #ded9ce; }
+    main { padding: 34px 44px; }
+    h1 { margin: 0 0 4px; font-size: 22px; }
+    .muted { color: #706b62; font-size: 13px; line-height: 1.45; }
+    .scene { max-width: 760px; margin: 0 auto; }
+    .chapter { color: #8a4f2d; font-weight: 700; font-size: 13px; margin-bottom: 16px; }
+    .story { font-size: 20px; line-height: 1.82; letter-spacing: 0; }
+    .choices { display: grid; gap: 10px; margin-top: 28px; }
+    button { text-align: left; border: 1px solid #cbbfae; background: #fff; color: #2f2b26; border-radius: 8px; padding: 14px 16px; font-size: 15px; cursor: pointer; }
+    button:hover { border-color: #8a4f2d; background: #fff9f2; }
+    .card { border: 1px solid #ded9ce; border-radius: 8px; background: #fff; padding: 14px; margin-top: 14px; }
+    .stat { display: flex; justify-content: space-between; gap: 8px; padding: 7px 0; border-bottom: 1px solid #eee8dd; font-size: 13px; }
+    .stat:last-child { border-bottom: 0; }
+    .tag { display: inline-block; margin: 4px 4px 0 0; padding: 5px 8px; border-radius: 999px; background: #efe5d7; color: #68412b; font-size: 12px; }
+    nav { display: grid; gap: 8px; margin-top: 22px; }
+    nav a { color: #3f3a34; text-decoration: none; padding: 9px 10px; border-radius: 8px; }
+    nav a.active { background: #fff; border: 1px solid #ded9ce; }
+    @media (max-width: 900px) {
+      .app { display: block; }
+      aside, .right, main { border: 0; padding: 18px; }
+      main { padding-top: 22px; }
+      .story { font-size: 17px; line-height: 1.72; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <h1>한서윤</h1>
+      <p class="muted">사용자가 입력한 이름. 사회학과 2학년. 동아리 회계 담당. 최근 컨디션은 애매하지만 사람을 관찰하는 감각이 좋다.</p>
+      <nav>
+        <a class="active" href="#">진행</a>
+        <a href="#">캐릭터</a>
+        <a href="#">관계</a>
+        <a href="#">커리어와 엔딩 기록</a>
+      </nav>
+      <div class="card">
+        <strong>공개 스탯</strong>
+        <div class="stat"><span>학업</span><b>63</b></div>
+        <div class="stat"><span>실무</span><b>41</b></div>
+        <div class="stat"><span>커뮤니케이션</span><b>72</b></div>
+        <div class="stat"><span>멘탈</span><b>54</b></div>
+        <div class="stat"><span>매력</span><b>68</b></div>
+      </div>
+    </aside>
+    <main>
+      <section class="scene">
+        <div class="chapter">봄 축제 준비 회의 · 숨은 사건 후보</div>
+        <p class="story">동아리방 창문이 덜컹거릴 때마다 회의록 위에 놓인 영수증이 조금씩 밀렸다. 선배 지민은 예산표를 보다가 네가 정리한 지출 내역에서 멈칫했다. "이 정도로 정리할 줄 알면, 우리 회사 인턴 업무도 버틸 것 같은데."</p>
+        <p class="story">농담처럼 말했지만, 그의 표정은 가볍지 않았다. 휴학을 고민하던 마음 한구석이 조용히 반응했다.</p>
+        <div class="choices">
+          <button>인턴 이야기를 더 물어본다. 관계 신뢰도가 일정 이상이면 제안이 구체화된다.</button>
+          <button>지금은 축제 준비에 집중한다. 동아리 평판과 커뮤니케이션이 오른다.</button>
+          <button>혼자 남아 예산표를 다시 검토한다. 실무와 번아웃 위험이 함께 움직인다.</button>
+        </div>
+      </section>
+    </main>
+    <aside class="right">
+      <h1>기억과 관계</h1>
+      <div class="card">
+        <strong>주요 인물</strong>
+        <p class="muted">지민 선배 · 신뢰 높음 · 인턴 제안 플래그 후보</p>
+      </div>
+      <div class="card">
+        <strong>최근 기억</strong>
+        <span class="tag">축제 예산 정리</span>
+        <span class="tag">동아리 회계</span>
+        <span class="tag">휴학 고민</span>
+      </div>
+      <div class="card">
+        <strong>패러디 안내</strong>
+        <p class="muted">이 게임의 기업, 인물, 사건은 허구 및 패러디입니다.</p>
+      </div>
+    </aside>
+  </div>
+</body>
+</html>

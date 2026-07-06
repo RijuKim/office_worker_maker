@@ -1,0 +1,49 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "openrouter/~anthropic/claude-sonnet-latest",
+  "enabled_providers": [
+    "github-copilot",
+    "openrouter"
+  ],
+  "provider": {
+    "openrouter": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "OpenRouter",
+      "options": {
+        "baseURL": "https://openrouter.ai/api/v1",
+        "apiKey": "{env:OPENROUTER_API_KEY}"
+      },
+      "models": {
+        "~anthropic/claude-sonnet-latest": {
+          "name": "Claude Sonnet Latest"
+        },
+        "~openai/gpt-latest": {
+          "name": "OpenAI GPT Latest"
+        }
+      }
+    }
+  },
+  "mcp": {
+    "tenet": {
+      "type": "local",
+      "command": [
+        "tenet",
+        "serve"
+      ]
+    },
+    "playwright": {
+      "type": "local",
+      "command": [
+        "npx",
+        "@playwright/mcp@latest"
+      ],
+      "enabled": true
+    }
+  },
+  "permission": {
+    "mcp": {
+      "playwright": "allow",
+      "tenet": "allow"
+    }
+  }
+}

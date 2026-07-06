@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mockup 02 Command Center</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, sans-serif; background: #edf2f7; color: #17212b; }
+    header { height: 62px; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; background: #ffffff; border-bottom: 1px solid #d7dee8; }
+    h1 { font-size: 19px; margin: 0; }
+    .tabs { display: flex; gap: 8px; }
+    .tabs span { padding: 8px 11px; border-radius: 8px; font-size: 13px; color: #52606d; }
+    .tabs .active { background: #17212b; color: #ffffff; }
+    .grid { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 18px; padding: 18px; max-width: 1320px; margin: 0 auto; }
+    .panel { background: #fff; border: 1px solid #d7dee8; border-radius: 8px; padding: 16px; }
+    .profile { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: center; }
+    .avatar { width: 64px; height: 64px; border-radius: 8px; background: linear-gradient(135deg, #79b8a9, #f2b880); }
+    .muted { color: #52606d; font-size: 13px; line-height: 1.45; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+    .stat { border: 1px solid #e1e7ef; border-radius: 8px; padding: 10px; }
+    .stat span { color: #52606d; font-size: 12px; }
+    .stat b { display: block; margin-top: 4px; font-size: 18px; }
+    .main { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 18px; }
+    .scene-title { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 14px; }
+    .badge { display: inline-block; padding: 5px 8px; border-radius: 999px; background: #e6fffa; color: #177a65; font-size: 12px; }
+    .story { font-size: 18px; line-height: 1.72; margin: 0 0 18px; }
+    .choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    button { border: 1px solid #cbd5e1; background: #f8fafc; border-radius: 8px; padding: 14px; text-align: left; cursor: pointer; font-size: 14px; color: #17212b; min-height: 86px; }
+    button:hover { border-color: #2563eb; background: #eff6ff; }
+    .timeline { display: grid; gap: 10px; }
+    .event { border-left: 3px solid #79b8a9; padding-left: 10px; }
+    .record { margin-top: 12px; padding: 12px; border-radius: 8px; background: #f8fafc; border: 1px solid #e1e7ef; }
+    @media (max-width: 920px) {
+      header { height: auto; padding: 14px; align-items: flex-start; gap: 12px; flex-direction: column; }
+      .grid, .main { display: block; padding: 12px; }
+      .panel { margin-bottom: 12px; }
+      .choices { grid-template-columns: 1fr; }
+      .tabs { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>대학생 커리어 시뮬레이션</h1>
+    <div class="tabs">
+      <span class="active">플레이</span><span>캐릭터</span><span>커리어</span><span>기록</span><span>저장</span>
+    </div>
+  </header>
+  <div class="grid">
+    <section class="panel">
+      <div class="profile">
+        <div class="avatar"></div>
+        <div>
+          <h1>한서윤</h1>
+          <div class="muted">사용자가 입력한 이름 · 사회학과 2학년 · 동아리 회계 · AI 생성 4/30</div>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat"><span>학업</span><b>63</b></div>
+        <div class="stat"><span>실무</span><b>41</b></div>
+        <div class="stat"><span>커뮤니케이션</span><b>72</b></div>
+        <div class="stat"><span>창의성</span><b>57</b></div>
+        <div class="stat"><span>체력</span><b>48</b></div>
+        <div class="stat"><span>멘탈</span><b>54</b></div>
+        <div class="stat"><span>인맥</span><b>66</b></div>
+        <div class="stat"><span>매력</span><b>68</b></div>
+      </div>
+      <div class="record">
+        <b>커리어 후보</b>
+        <p class="muted">인턴십 · 공공기관 준비 · 마케팅 직무 · 창업 아이디어</p>
+      </div>
+    </section>
+    <main class="main">
+      <section class="panel">
+        <div class="scene-title">
+          <h1>동아리방의 뜻밖의 제안</h1>
+          <span class="badge">숨은 이벤트</span>
+        </div>
+        <p class="story">지민 선배는 네가 정리한 축제 예산표를 한참 바라보다가, 작은 스타트업 인턴 자리를 꺼냈다. 학교 생활을 이어가면 평판은 안정적으로 쌓이겠지만, 이번 제안은 실무를 크게 움직일 수 있다.</p>
+        <div class="choices">
+          <button><b>제안을 구체적으로 묻기</b><br>관계 신뢰와 실무 플래그를 확인한다.</button>
+          <button><b>휴학 가능성을 계산하기</b><br>멘탈, 자산, 가족 관계가 함께 흔들린다.</button>
+          <button><b>축제 업무를 먼저 끝내기</b><br>평판과 커뮤니케이션이 오른다.</button>
+          <button><b>친구에게 상담하기</b><br>관계와 커리어 관심사가 바뀔 수 있다.</button>
+        </div>
+      </section>
+      <aside class="panel">
+        <h1>최근 흐름</h1>
+        <div class="timeline">
+          <div class="event"><b>팀플 갈등 중재</b><br><span class="muted">커뮤니케이션 +4</span></div>
+          <div class="event"><b>축제 회계 정리</b><br><span class="muted">실무 후보 플래그</span></div>
+          <div class="event"><b>지민 선배 신뢰 상승</b><br><span class="muted">숨은 관계 74</span></div>
+        </div>
+        <div class="record">
+          <b>허구/패러디 안내</b>
+          <p class="muted">기업과 사건은 모두 가상 세계관의 패러디입니다.</p>
+        </div>
+      </aside>
+    </main>
+  </div>
+</body>
+</html>

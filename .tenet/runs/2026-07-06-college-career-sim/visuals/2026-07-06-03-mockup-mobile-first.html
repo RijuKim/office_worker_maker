@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mockup 03 Mobile First</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, sans-serif; background: #f4f6f8; color: #1b2533; }
+    .shell { max-width: 1180px; margin: 0 auto; padding: 18px; }
+    .top { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-bottom: 14px; }
+    h1, h2 { margin: 0; }
+    h1 { font-size: 22px; }
+    h2 { font-size: 16px; }
+    .muted { color: #667085; font-size: 13px; line-height: 1.45; }
+    .notice { padding: 9px 12px; border: 1px solid #d0d5dd; border-radius: 8px; background: #fff; font-size: 12px; color: #475467; }
+    .layout { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 14px; align-items: start; }
+    .panel { background: #fff; border: 1px solid #d0d5dd; border-radius: 8px; padding: 16px; }
+    .create { display: grid; gap: 10px; }
+    label { display: grid; gap: 6px; font-size: 13px; color: #344054; }
+    input, select { width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 11px 12px; font-size: 14px; color: #1b2533; background: #fff; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .primary { border: 0; border-radius: 8px; padding: 12px 14px; color: #fff; background: #0f766e; font-weight: 700; cursor: pointer; }
+    .play { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 14px; }
+    .scene-title { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .pill { border-radius: 999px; padding: 5px 8px; background: #e7f8f5; color: #0f766e; font-size: 12px; white-space: nowrap; }
+    .story { font-size: 17px; line-height: 1.75; margin: 0 0 16px; }
+    .choices { display: grid; gap: 9px; }
+    .choice { border: 1px solid #cbd5e1; border-radius: 8px; padding: 13px; background: #f8fafc; text-align: left; font-size: 14px; cursor: pointer; color: #1b2533; }
+    .choice:hover { border-color: #0f766e; background: #f0fdfa; }
+    .forced { border-color: #f59e0b; background: #fffbeb; }
+    .stats { display: grid; gap: 8px; }
+    .stat { display: flex; justify-content: space-between; gap: 8px; padding: 9px 10px; background: #f8fafc; border: 1px solid #e4e7ec; border-radius: 8px; font-size: 13px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .chip { padding: 6px 8px; border-radius: 999px; background: #eef4ff; color: #3538cd; font-size: 12px; }
+    .bottom-nav { display: none; position: sticky; bottom: 0; margin: 14px -18px -18px; background: #fff; border-top: 1px solid #d0d5dd; grid-template-columns: repeat(4, 1fr); }
+    .bottom-nav span { text-align: center; padding: 12px 4px; font-size: 12px; color: #475467; }
+    .bottom-nav .active { color: #0f766e; font-weight: 700; }
+    @media (max-width: 768px) {
+      .shell { padding: 14px; }
+      .top { display: block; }
+      .notice { margin-top: 10px; }
+      .layout, .play { display: block; }
+      .panel { margin-bottom: 12px; }
+      .row { grid-template-columns: 1fr; }
+      .story { font-size: 16px; line-height: 1.68; }
+      .bottom-nav { display: grid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="top">
+      <div>
+        <h1>커리어와 엔딩 기록</h1>
+        <p class="muted">이름, 학년, 나이, 전공은 사용자가 직접 정하고 사건은 상태에 따라 이어진다.</p>
+      </div>
+      <div class="notice">기업, 인물, 사건은 허구 및 패러디입니다.</div>
+    </div>
+
+    <div class="layout">
+      <section class="panel">
+        <h2>새 캐릭터 만들기</h2>
+        <p class="muted">주인공은 임의 생성되지 않는다. 사용자가 시작 조건을 정한다.</p>
+        <div class="create">
+          <label>이름<input value="한서윤" aria-label="캐릭터 이름"></label>
+          <div class="row">
+            <label>나이<select><option>21세</option><option>20세</option><option>22세</option><option>24세</option></select></label>
+            <label>시작 학년<select><option>2학년</option><option>1학년</option><option>3학년</option><option>4학년</option></select></label>
+          </div>
+          <label>과/전공<select><option>사회학과</option><option>경영학과</option><option>컴퓨터공학과</option><option>디자인학과</option><option>자유전공</option></select></label>
+          <button class="primary">이 조건으로 시작</button>
+        </div>
+      </section>
+
+      <main class="play">
+        <section class="panel">
+          <div class="scene-title">
+            <h2>컨디션이 무너진 아침</h2>
+            <span class="pill">강제 이벤트</span>
+          </div>
+          <p class="story">며칠째 잠을 줄이며 알바와 과제를 같이 처리했다. 오늘은 선택지를 고르기도 전에 몸이 먼저 반응했다. 휴대폰 알람을 끄는 손이 떨렸고, 수업 출석보다 회복이 더 급한 상태가 되었다.</p>
+          <div class="choices">
+            <button class="choice forced"><b>자동 발생:</b> 번아웃 임계치 초과로 회복 이벤트가 시작된다.</button>
+            <button class="choice">병원에 가고 알바 매니저에게 연락한다. 체력 회복, 자산 감소, 관계 변화.</button>
+            <button class="choice">친구에게 도움을 요청한다. 인맥과 멘탈이 회복될 수 있다.</button>
+            <button class="choice">무리해서 하루를 버틴다. 단기 평판은 유지되지만 번아웃 위험이 커진다.</button>
+          </div>
+        </section>
+
+        <aside class="panel">
+          <h2>상태 요약</h2>
+          <div class="stats">
+            <div class="stat"><span>체력</span><b>22</b></div>
+            <div class="stat"><span>멘탈</span><b>31</b></div>
+            <div class="stat"><span>실무</span><b>48</b></div>
+            <div class="stat"><span>인맥</span><b>61</b></div>
+            <div class="stat"><span>자산</span><b>36</b></div>
+          </div>
+          <div class="chips">
+            <span class="chip">알바 중</span>
+            <span class="chip">휴학 고민</span>
+            <span class="chip">번아웃 위험 높음</span>
+            <span class="chip">전과 관심</span>
+          </div>
+        </aside>
+      </main>
+    </div>
+
+    <nav class="bottom-nav">
+      <span class="active">진행</span><span>상태</span><span>관계</span><span>기록</span>
+    </nav>
+  </div>
+</body>
+</html>

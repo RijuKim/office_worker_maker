@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prototype Core Flow</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, sans-serif; background: #fbfaf6; color: #232323; }
+    .screen { display: none; min-height: 100vh; }
+    .screen.active { display: block; }
+    .app { min-height: 100vh; display: grid; grid-template-columns: 260px minmax(0, 1fr) 300px; }
+    aside { padding: 22px; border-right: 1px solid #ded9ce; background: #f2efe7; }
+    .right { border-right: 0; border-left: 1px solid #ded9ce; }
+    main { padding: 34px 44px; }
+    .auth { max-width: 440px; margin: 0 auto; padding: 52px 20px; }
+    .panel, .card { border: 1px solid #ded9ce; border-radius: 8px; background: #fff; padding: 16px; }
+    .card { margin-top: 14px; }
+    h1 { margin: 0 0 8px; font-size: 22px; }
+    h2 { margin: 0 0 10px; font-size: 17px; }
+    .muted { color: #706b62; font-size: 13px; line-height: 1.45; }
+    label { display: grid; gap: 6px; margin: 12px 0; font-size: 13px; color: #3f3a34; }
+    input, select { width: 100%; border: 1px solid #cbbfae; border-radius: 8px; padding: 11px 12px; font-size: 14px; background: #fff; color: #232323; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    button { border: 1px solid #cbbfae; background: #fff; color: #2f2b26; border-radius: 8px; padding: 13px 15px; font-size: 14px; cursor: pointer; }
+    button:hover { border-color: #8a4f2d; background: #fff9f2; }
+    .primary { background: #8a4f2d; color: #fff; border-color: #8a4f2d; font-weight: 700; width: 100%; }
+    .scene { max-width: 760px; margin: 0 auto; }
+    .chapter { color: #8a4f2d; font-weight: 700; font-size: 13px; margin-bottom: 16px; }
+    .story { font-size: 20px; line-height: 1.82; letter-spacing: 0; }
+    .choices { display: grid; gap: 10px; margin-top: 26px; }
+    .choices button { text-align: left; }
+    .stat { display: flex; justify-content: space-between; gap: 8px; padding: 7px 0; border-bottom: 1px solid #eee8dd; font-size: 13px; }
+    .stat:last-child { border-bottom: 0; }
+    .tag { display: inline-block; margin: 4px 4px 0 0; padding: 5px 8px; border-radius: 999px; background: #efe5d7; color: #68412b; font-size: 12px; }
+    nav { display: grid; gap: 8px; margin-top: 22px; }
+    nav a { color: #3f3a34; text-decoration: none; padding: 9px 10px; border-radius: 8px; }
+    nav a.active { background: #fff; border: 1px solid #ded9ce; }
+    .alert { border-color: #e3a008; background: #fffbeb; }
+    .success { border-color: #74a88c; background: #f0fff4; }
+    @media (max-width: 900px) {
+      .app { display: block; }
+      aside, .right, main { border: 0; padding: 18px; }
+      main { padding-top: 22px; }
+      .story { font-size: 17px; line-height: 1.72; }
+      .row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <section id="login" class="screen active">
+    <div class="auth">
+      <div class="panel">
+        <h1>대학생 커리어 시뮬레이션</h1>
+        <p class="muted">이메일/비밀번호로 로그인하고 캐릭터의 커리어와 엔딩 기록을 계정에 저장합니다.</p>
+        <label>이메일<input value="player@example.com"></label>
+        <label>비밀번호<input type="password" value="password"></label>
+        <button class="primary" onclick="show('create')">로그인</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="create" class="screen">
+    <div class="auth">
+      <div class="panel">
+        <h1>새 캐릭터 만들기</h1>
+        <p class="muted">주인공 이름과 시작 조건은 사용자가 직접 정합니다.</p>
+        <label>이름<input value="한서윤"></label>
+        <div class="row">
+          <label>나이<select><option>21세</option><option>20세</option><option>22세</option><option>24세</option></select></label>
+          <label>시작 학년<select><option>2학년</option><option>1학년</option><option>3학년</option><option>4학년</option></select></label>
+        </div>
+        <label>과/전공<select><option>사회학과</option><option>경영학과</option><option>컴퓨터공학과</option><option>디자인학과</option><option>자유전공</option></select></label>
+        <button class="primary" onclick="show('play')">이 조건으로 시작</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="play" class="screen">
+    <div class="app">
+      <aside>
+        <h1>한서윤</h1>
+        <p class="muted">사용자가 입력한 이름 · 사회학과 2학년 · 동아리 회계</p>
+        <nav><a class="active">진행</a><a>캐릭터</a><a>관계</a><a>커리어와 엔딩 기록</a></nav>
+        <div class="card">
+          <strong>공개 스탯</strong>
+          <div class="stat"><span>학업</span><b>63</b></div>
+          <div class="stat"><span>실무</span><b>41</b></div>
+          <div class="stat"><span>커뮤니케이션</span><b>72</b></div>
+          <div class="stat"><span>체력</span><b>48</b></div>
+          <div class="stat"><span>멘탈</span><b>54</b></div>
+          <div class="stat"><span>매력</span><b>68</b></div>
+        </div>
+      </aside>
+      <main>
+        <section class="scene">
+          <div class="chapter">봄 축제 준비 회의 · 숨은 사건 후보</div>
+          <p class="story">선배 지민은 네가 정리한 지출 내역을 보다가 말했다. "이 정도로 정리할 줄 알면, 우리 회사 인턴 업무도 버틸 것 같은데." 농담처럼 시작된 말이지만 표정은 가볍지 않았다.</p>
+          <div class="choices">
+            <button onclick="show('aiFallback')">인턴 이야기를 더 물어본다. 관계 신뢰도가 일정 이상이면 제안이 구체화된다.</button>
+            <button onclick="show('forced')">혼자 남아 예산표를 다시 검토한다. 실무와 번아웃 위험이 함께 움직인다.</button>
+            <button onclick="show('record')">축제 업무를 마무리하고 취업 준비에 집중한다. 커리어 분기점에 가까워진다.</button>
+          </div>
+        </section>
+      </main>
+      <aside class="right">
+        <h1>기억과 관계</h1>
+        <div class="card"><strong>지민 선배</strong><p class="muted">신뢰 높음 · 인턴 제안 플래그 후보</p></div>
+        <div class="card"><span class="tag">축제 예산 정리</span><span class="tag">휴학 고민</span></div>
+        <div class="card"><strong>패러디 안내</strong><p class="muted">기업, 인물, 사건은 허구 및 패러디입니다.</p></div>
+      </aside>
+    </div>
+  </section>
+
+  <section id="aiFallback" class="screen">
+    <div class="auth">
+      <div class="panel alert">
+        <h1>AI 이벤트 대체</h1>
+        <p class="muted">OpenRouter 응답이 10초를 넘기거나 유효하지 않은 JSON을 반환하면 서버는 정적 이벤트 풀에서 같은 태그의 대체 사건을 보여줍니다.</p>
+        <p>인턴 제안은 유지되지만 세부 서사는 서버가 검증한 fallback 이벤트로 바뀌었습니다.</p>
+        <button class="primary" onclick="show('play')">게임으로 돌아가기</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="forced" class="screen">
+    <div class="auth">
+      <div class="panel alert">
+        <h1>강제 이벤트: 번아웃 임계치</h1>
+        <p>며칠째 무리한 일정이 이어졌다. 선택지를 고르기도 전에 몸이 먼저 반응했고, 서버는 번아웃 위험 임계치를 감지해 회복 이벤트를 자동으로 발생시켰습니다.</p>
+        <button class="primary" onclick="show('play')">회복 선택지로 이어가기</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="record" class="screen">
+    <div class="auth">
+      <div class="panel success">
+        <h1>커리어와 엔딩 기록 저장</h1>
+        <p class="muted">핵심 사건 15개 이상과 커리어 분기점 조건을 만족해 기록이 생성되었습니다.</p>
+        <h2>케이띠 브랜드 마케팅팀의 조용한 출발</h2>
+        <p>초봉은 높지 않았지만 동아리에서 쌓은 조율 경험과 지민 선배와의 관계가 첫 직장 적응을 도왔다. 낮아진 체력은 여전히 과제였고, 퇴근 후 회복 루틴을 만드는 것이 다음 국면의 핵심이 되었다.</p>
+        <button class="primary" onclick="show('play')">기록 저장 후 계속</button>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    function show(id) {
+      document.querySelectorAll('.screen').forEach(function (el) { el.classList.remove('active'); });
+      document.getElementById(id).classList.add('active');
+      window.scrollTo(0, 0);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+node_modules/
+.next/
+coverage/
+test-results/
+playwright-report/
+.tenet/.state/tenet.db
+.tenet/.state/tenet.db-wal
+.tenet/.state/tenet.db-shm
