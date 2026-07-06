@@ -1,12 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fbfaf6;
-  --foreground: #232323;
-  --panel: #f2efe7;
-  --line: #ded9ce;
-  --accent: #8a4f2d;
-  --accent-soft: #efe5d7;
+  --background: #16130f;
+  --foreground: #2a241e;
+  --paper: #fff3d7;
+  --paper-deep: #f2d9a8;
+  --panel: #241b15;
+  --panel-2: #35261c;
+  --line: #2a2018;
+  --accent: #c87838;
+  --accent-2: #305d73;
+  --accent-soft: #f7d08b;
+  --danger: #b3423c;
 }
 
 * {
@@ -16,6 +21,7 @@
 html {
   min-height: 100%;
   background: var(--background);
+  image-rendering: pixelated;
 }
 
 body {
@@ -23,9 +29,87 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  font-family: "Courier New", "DungGeunMo", "Apple SD Gothic Neo", "Noto Sans KR", monospace;
+  letter-spacing: 0;
 }
 
 a {
   color: inherit;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.pixel-shell {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    var(--background);
+  background-size: 18px 18px;
+}
+
+.pixel-panel {
+  border: 3px solid var(--line);
+  background: var(--paper);
+  box-shadow: 8px 8px 0 #0d0b09;
+  border-radius: 0;
+}
+
+.pixel-panel-dark {
+  border: 3px solid #0f0b08;
+  background: var(--panel);
+  box-shadow: 6px 6px 0 #080604;
+  border-radius: 0;
+}
+
+.pixel-button {
+  border: 3px solid #2a2018;
+  background: #fff3d7;
+  color: #2a201e;
+  box-shadow: 4px 4px 0 #2a2018;
+  border-radius: 0;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.pixel-button:hover:not(:disabled) {
+  background: #ffe0a2;
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 #2a2018;
+}
+
+.pixel-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.pixel-button-dark {
+  border: 3px solid #0f0b08;
+  background: #35261c;
+  color: #fff3d7;
+  box-shadow: 4px 4px 0 #0a0705;
+  border-radius: 0;
+}
+
+.pixel-input {
+  border: 3px solid #2a2018;
+  background: #fffaf0;
+  color: #2a241e;
+  border-radius: 0;
+  outline: none;
+}
+
+.pixel-input:focus {
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.novel-text {
+  word-break: keep-all;
+  line-height: 1.9;
 }

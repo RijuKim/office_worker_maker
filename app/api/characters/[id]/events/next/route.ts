@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import type { EventSource } from "@prisma/client";
 
 import { selectNextEvent } from "@/lib/game/event-engine";
+import { checkDailyAiLimit, generateAiEvent, incrementAiUsage } from "@/lib/game/openrouter";
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
 
@@ -17,7 +19,11 @@ export async function POST(_request: Request, context: RouteContext) {
   const character = await prisma.characterRun.findFirst({
     where: { id, userId },
     include: {
+      stats: true,
       hiddenState: true,
+      relationships: {
+        orderBy: { createdAt: "asc" },
+      },
       eventHistory: {
         orderBy: { createdAt: "desc" },
         take: 10,
@@ -38,24 +44,88 @@ export async function POST(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "캐릭터 데이터가 불완전합니다." }, { status: 500 });
   }
 
+  const activeEvent = character.events[0];
+  if (activeEvent) {
+    return NextResponse.json({
+      event: {
+        id: activeEvent.id,
+        title: activeEvent.title,
+        body: activeEvent.body,
+        choices: activeEvent.choices,
+        source: activeEvent.source,
+        forced: activeEvent.source === "FORCED",
+      },
+    });
+  }
+
   const recentTitles = character.eventHistory
     .map((h: { summary: string }) => h.summary)
     .filter(Boolean) as string[];
+  const currentFlags = (character.hiddenState.eventFlags as Record<string, unknown>) ?? {};
+  const storyArc = advanceStoryArc(currentFlags.storyArc, character.coreEventCount);
 
   const { type, event } = selectNextEvent(
     character.hiddenState,
     recentTitles,
   );
 
+  let selectedEvent = event;
+  let source: EventSource = type === "forced" ? "FORCED" : event.source;
+
+  if (type !== "forced" && character.stats) {
+    const limit = await checkDailyAiLimit(userId);
+    if (limit.allowed) {
+      const aiResult = await generateAiEvent({
+        name: character.name,
+        age: character.age,
+        major: character.major,
+        gradeYear: character.currentGradeYear,
+        coreEventCount: character.coreEventCount,
+        recentSummaries: recentTitles,
+        storyArc,
+        relationships: character.relationships.map((rel: { name: string; role: string; trust: number }) => ({
+          name: rel.name,
+          role: rel.role,
+          trust: rel.trust,
+        })),
+        stats: {
+          academic: character.stats.academic,
+          practical: character.stats.practical,
+          health: character.stats.health,
+          mental: character.stats.mental,
+          wealth: character.stats.wealth,
+          charm: character.stats.charm,
+          reputation: character.stats.reputation,
+        },
+      });
+
+      if (aiResult.success) {
+        await incrementAiUsage(userId);
+        selectedEvent = {
+          title: aiResult.event.title,
+          body: aiResult.event.body,
+          choices: aiResult.event.choices.map((choice) => ({
+            ...choice,
+            relationshipDelta: [],
+            flagDelta: { aiGenerated: true, storyPhase: storyArc.phase },
+          })),
+          tags: aiResult.event.tags,
+          source: "FALLBACK",
+        };
+        source = "AI";
+      }
+    }
+  }
+
   const newEvent = await prisma.event.create({
     data: {
       characterRunId: id,
-      title: event.title,
-      body: event.body,
-      source: type === "forced" ? "FORCED" : event.source,
+      title: selectedEvent.title,
+      body: selectedEvent.body,
+      source,
       status: "ACTIVE",
-      choices: event.choices as object[],
-      tags: event.tags,
+      choices: selectedEvent.choices as object[],
+      tags: selectedEvent.tags,
       safetyChecked: true,
     },
   });
@@ -65,6 +135,17 @@ export async function POST(_request: Request, context: RouteContext) {
     data: {
       currentEventId: newEvent.id,
       coreEventCount: { increment: 1 },
+    },
+  });
+
+  await prisma.hiddenState.update({
+    where: { characterRunId: id },
+    data: {
+      eventFlags: {
+        ...currentFlags,
+        storyArc,
+        lastEventSource: source,
+      },
     },
   });
 
@@ -78,4 +159,29 @@ export async function POST(_request: Request, context: RouteContext) {
       forced: type === "forced",
     },
   });
+}
+
+function advanceStoryArc(rawArc: unknown, coreEventCount: number) {
+  const base = typeof rawArc === "object" && rawArc !== null ? rawArc as Record<string, unknown> : {};
+  const phase = coreEventCount < 3 ? "발단" :
+    coreEventCount < 8 ? "전개" :
+    coreEventCount < 12 ? "위기" :
+    coreEventCount < 15 ? "절정" :
+    "결말";
+  const tensionBase = typeof base.tension === "number" ? base.tension : 18;
+  const tension = Math.max(10, Math.min(95, tensionBase + (phase === "위기" ? 9 : phase === "절정" ? 12 : 4)));
+
+  return {
+    title: typeof base.title === "string" ? base.title : "첫 학기와 보이지 않는 제안",
+    premise: typeof base.premise === "string" ? base.premise : "작은 대학 생활의 선택들이 취업, 관계, 휴학, 직업으로 이어진다.",
+    phase,
+    chapter: Math.floor(coreEventCount / 3) + 1,
+    tension,
+    foreshadowing: Array.isArray(base.foreshadowing) && base.foreshadowing.length > 0
+      ? base.foreshadowing
+      : ["아직 정체를 알 수 없는 커리어 제안", "처음 보는 듯 익숙한 아침의 위화감"],
+    openThreads: Array.isArray(base.openThreads) && base.openThreads.length > 0
+      ? base.openThreads
+      : ["이번 선택이 다음 학기의 방향을 바꿀 수 있다"],
+  };
 }

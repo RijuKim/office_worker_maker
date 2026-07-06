@@ -108,7 +108,7 @@ describe("account and character API foundation", () => {
     sessionMock.requireCurrentUserId.mockResolvedValueOnce(null);
 
     const response = await createCharacter(
-      jsonRequest({ name: "한서윤", age: 21, startGradeYear: 2, major: "사회학과" }),
+      jsonRequest({ name: "한서윤", age: 21, residence: "studio", preferredStats: ["academic", "mental"], startGradeYear: 2, major: "사회학과" }),
     );
     const body = await response.json();
 
@@ -144,7 +144,7 @@ describe("account and character API foundation", () => {
                 startGradeYear: 2,
                 currentGradeYear: 2,
                 major: "사회학과",
-                stats: { create: expect.objectContaining({ academic: 52, charm: 46 }) },
+                stats: { create: expect.objectContaining({ academic: expect.any(Number), charm: expect.any(Number) }) },
                 hiddenState: { create: expect.objectContaining({ burnoutRisk: 18 }) },
                 relationships: { create: expect.arrayContaining([expect.objectContaining({ name: "지민 선배" })]) },
               }),
@@ -174,7 +174,7 @@ describe("account and character API foundation", () => {
     );
 
     const response = await createCharacter(
-      jsonRequest({ name: "한서윤", age: 21, startGradeYear: 2, major: "사회학과" }),
+      jsonRequest({ name: "한서윤", age: 21, residence: "studio", preferredStats: ["academic", "mental"], startGradeYear: 2, major: "사회학과" }),
     );
     const body = await response.json();
 

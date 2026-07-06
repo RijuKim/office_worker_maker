@@ -29,6 +29,36 @@ interface EventData {
   forced?: boolean;
 }
 
+const statLabels: Record<string, string> = {
+  academic: "학업",
+  practical: "실무",
+  health: "건강",
+  mental: "멘탈",
+  wealth: "자산",
+  charm: "매력",
+  reputation: "평판",
+};
+
+const statIcons: Record<string, string> = {
+  academic: "BK",
+  practical: "TL",
+  health: "HP",
+  mental: "MP",
+  wealth: "CO",
+  charm: "CH",
+  reputation: "RP",
+};
+
+const residenceOptions = [
+  { id: "family_home", label: "본가", description: "가족의 규칙과 지원 사이에서 하루가 시작됩니다." },
+  { id: "studio", label: "자취방", description: "혼자 버티는 자유와 생활비의 압박이 함께 옵니다." },
+  { id: "dorm", label: "기숙사", description: "타인의 생활 리듬과 우연한 관계가 가까이 있습니다." },
+];
+
+function statLevel(value: number) {
+  return Math.max(1, Math.min(5, Math.ceil(value / 20)));
+}
+
 export default function AppPage() {
   const { status } = useSession();
   const [screen, setScreen] = useState<Screen>("auth");
@@ -38,6 +68,7 @@ export default function AppPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState<Record<string, unknown>[]>([]);
+  const [pendingNext, setPendingNext] = useState(false);
 
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
@@ -45,8 +76,8 @@ export default function AppPage() {
 
   const [charName, setCharName] = useState("");
   const [charAge, setCharAge] = useState("21");
-  const [charGrade, setCharGrade] = useState("2");
-  const [charMajor, setCharMajor] = useState("");
+  const [charResidence, setCharResidence] = useState("studio");
+  const [preferredStats, setPreferredStats] = useState<string[]>(["academic", "mental"]);
 
   const mountedRef = useRef(false);
   const activeScreen = status === "authenticated" && screen === "auth" ? "create" : screen;
@@ -71,12 +102,19 @@ export default function AppPage() {
 
   async function loadCharacterEvent(charId: string) {
     const { ok, data } = await doFetch(`/api/characters/${charId}`);
-    if (ok) setCurrentEvent(data.currentEvent ?? null);
+    if (ok) {
+      setCurrentChar(data.character ?? null);
+      setCurrentEvent(data.currentEvent ?? null);
+    }
   }
 
   async function fetchNextEvent(charId: string) {
     const { ok, data } = await doFetch(`/api/characters/${charId}/events/next`, "POST");
-    if (ok) setCurrentEvent(data.event);
+    if (ok) {
+      setCurrentEvent(data.event);
+      await loadCharacterEvent(charId);
+      setPendingNext(false);
+    }
   }
 
   const handleSignup = useCallback(async () => {
@@ -142,25 +180,27 @@ export default function AppPage() {
       const { ok, data } = await doFetch("/api/characters", "POST", {
         name: charName.trim(),
         age: Number(charAge),
-        startGradeYear: Number(charGrade),
-        major: charMajor.trim(),
+        residence: charResidence,
+        preferredStats,
       });
       if (!ok) {
         setError(data.error || "캐릭터 생성에 실패했습니다.");
         return;
       }
       setCurrentChar(data.character);
-      await fetchNextEvent(data.character.id);
+      setCurrentEvent(data.character.events?.[0] ?? null);
+      setPendingNext(false);
       setScreen("play");
     } catch {
       setError("서버 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
-  }, [charName, charAge, charGrade, charMajor]);
+  }, [charName, charAge, charResidence, preferredStats]);
 
   const pickCharacter = useCallback(async (char: CharacterData) => {
     setCurrentChar(char);
+    setPendingNext(false);
     if (char.currentEventId) {
       await loadCharacterEvent(char.id);
     } else {
@@ -177,12 +217,30 @@ export default function AppPage() {
         choiceIndex,
       });
       if (!ok) return;
-      await fetchNextEvent(currentChar.id);
       await loadCharacterEvent(currentChar.id);
+      setCurrentEvent(null);
+      setPendingNext(true);
     } finally {
       setLoading(false);
     }
   }, [currentChar, currentEvent]);
+
+  const togglePreferredStat = useCallback((key: string) => {
+    setPreferredStats((current) => {
+      if (current.includes(key)) {
+        return current.filter((item) => item !== key);
+      }
+      if (current.length >= 2) {
+        return [current[1], key];
+      }
+      return [...current, key];
+    });
+  }, []);
+
+  const continueToNextEvent = useCallback(async () => {
+    if (!currentChar || currentEvent || loading) return;
+    await fetchNextEvent(currentChar.id);
+  }, [currentChar, currentEvent, loading]);
 
   const loadRecords = useCallback(async () => {
     setLoading(true);
@@ -194,48 +252,32 @@ export default function AppPage() {
     }
   }, []);
 
-  const generateRecord = useCallback(async () => {
-    if (!currentChar) return;
-    setLoading(true);
-    setError("");
-    try {
-      const { ok } = await doFetch(`/api/characters/${currentChar.id}/records`, "POST");
-      if (!ok) {
-        setError("기록 생성에 실패했습니다.");
-        return;
-      }
-      setScreen("records");
-    } finally {
-      setLoading(false);
-    }
-  }, [currentChar]);
-
   if (status === "loading") {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#fbfaf6]">
-        <p className="text-[#706b62]">로딩 중...</p>
+      <main className="pixel-shell flex min-h-screen items-center justify-center">
+        <p className="pixel-panel px-6 py-4 text-[#2a241e]">로딩 중...</p>
       </main>
     );
   }
 
   if (status === "unauthenticated") {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#fbfaf6] p-4">
-        <div className="w-full max-w-sm rounded-lg border border-[#ded9ce] bg-white p-8">
-          <h1 className="mb-6 text-center text-2xl font-bold">일어나보니 대한민국 취준생</h1>
-          <p className="mb-6 text-center text-sm text-[#706b62]">문학형 커리어 텍스트 어드벤처</p>
-          {error && <p className="mb-4 rounded bg-red-50 p-2 text-sm text-red-600">{error}</p>}
+      <main className="pixel-shell flex min-h-screen items-center justify-center p-4">
+        <div className="pixel-panel w-full max-w-sm p-8">
+          <h1 className="mb-4 text-center text-2xl font-black leading-9">일어나보니<br />대한민국 취준생</h1>
+          <p className="mb-6 border-y-2 border-[#2a2018] py-2 text-center text-xs font-bold text-[#6d4a2f]">LITERARY CAREER ADVENTURE</p>
+          {error && <p className="mb-4 border-2 border-[#b3423c] bg-[#ffe1db] p-2 text-sm font-bold text-[#8d2f2a]">{error}</p>}
           <div className="space-y-4">
-            <input className="w-full rounded-lg border border-[#cbbfae] px-4 py-3 text-sm" placeholder="이메일" type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} />
-            <input className="w-full rounded-lg border border-[#cbbfae] px-4 py-3 text-sm" placeholder="비밀번호 (8자 이상)" type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} />
+            <input className="pixel-input w-full px-4 py-3 text-sm" placeholder="이메일" type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} />
+            <input className="pixel-input w-full px-4 py-3 text-sm" placeholder="비밀번호 (8자 이상)" type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} />
             {authMode === "login" ? (
               <div className="space-y-3">
-                <button className="w-full rounded-lg bg-[#232323] px-4 py-3 text-sm font-bold text-white hover:bg-[#3f3a34] disabled:opacity-50" disabled={loading} onClick={handleLogin}>로그인</button>
+                <button className="pixel-button-dark w-full px-4 py-3 text-sm font-bold disabled:opacity-50" disabled={loading} onClick={handleLogin}>로그인</button>
                 <p className="text-center text-xs text-[#706b62]">계정이 없으신가요? <button className="text-[#8a4f2d] underline" onClick={() => setAuthMode("signup")}>회원가입</button></p>
               </div>
             ) : (
               <div className="space-y-3">
-                <button className="w-full rounded-lg bg-[#232323] px-4 py-3 text-sm font-bold text-white hover:bg-[#3f3a34] disabled:opacity-50" disabled={loading} onClick={handleSignup}>회원가입</button>
+                <button className="pixel-button-dark w-full px-4 py-3 text-sm font-bold disabled:opacity-50" disabled={loading} onClick={handleSignup}>회원가입</button>
                 <p className="text-center text-xs text-[#706b62]">이미 계정이 있으신가요? <button className="text-[#8a4f2d] underline" onClick={() => setAuthMode("login")}>로그인</button></p>
               </div>
             )}
@@ -247,18 +289,18 @@ export default function AppPage() {
 
   if (activeScreen === "create" && !currentChar) {
     return (
-      <main className="flex min-h-screen items-start justify-center bg-[#fbfaf6] p-4 pt-16">
+      <main className="pixel-shell flex min-h-screen items-start justify-center p-4 pt-10">
         <div className="w-full max-w-lg">
-          <div className="mb-6 flex items-center justify-between">
-            <h1 className="text-2xl font-bold">캐릭터 선택</h1>
-            <button className="text-sm text-[#706b62] underline" onClick={() => signOut()}>로그아웃</button>
+          <div className="mb-6 flex items-center justify-between text-[#fff3d7]">
+            <h1 className="text-2xl font-black">LOAD / NEW</h1>
+            <button className="text-sm text-[#d9c9b5] underline" onClick={() => signOut()}>로그아웃</button>
           </div>
           {characters.length > 0 && (
             <div className="mb-8">
-              <h2 className="mb-3 text-sm font-bold text-[#706b62]">진행 중인 캐릭터</h2>
+              <h2 className="mb-3 text-sm font-bold text-[#d9c9b5]">진행 중인 캐릭터</h2>
               <div className="space-y-2">
                 {characters.map((c) => (
-                  <button className="w-full rounded-lg border border-[#ded9ce] bg-white px-4 py-3 text-left hover:border-[#8a4f2d]" key={c.id} onClick={() => pickCharacter(c)}>
+                  <button className="pixel-button w-full px-4 py-3 text-left" key={c.id} onClick={() => pickCharacter(c)}>
                     <span className="font-bold">{c.name}</span>
                     <span className="ml-2 text-sm text-[#706b62]">{c.major} · {c.currentGradeYear ?? c.startGradeYear}학년</span>
                   </button>
@@ -266,30 +308,55 @@ export default function AppPage() {
               </div>
             </div>
           )}
-          <h2 className="mb-3 text-sm font-bold text-[#706b62]">새 캐릭터</h2>
-          {error && <p className="mb-4 rounded bg-red-50 p-2 text-sm text-red-600">{error}</p>}
-          <div className="space-y-4 rounded-lg border border-[#ded9ce] bg-white p-6">
-            <div>
-              <label className="mb-1 block text-sm font-bold">이름</label>
-              <input className="w-full rounded-lg border border-[#cbbfae] px-4 py-3 text-sm" maxLength={24} placeholder="한서윤" value={charName} onChange={(e) => setCharName(e.target.value)} />
+          <h2 className="mb-3 text-sm font-bold text-[#d9c9b5]">새 이야기</h2>
+          {error && <p className="mb-4 border-2 border-[#b3423c] bg-[#ffe1db] p-2 text-sm font-bold text-[#8d2f2a]">{error}</p>}
+          <div className="pixel-panel space-y-5 p-6">
+            <div className="space-y-3 border-b border-[#eee8dd] pb-5 text-[15px] leading-7 text-[#3a332d]">
+              <p>눈을 뜨자 당신은 낯선 침대에서 깨어났습니다. 창밖은 대한민국의 평범한 아침인데, 휴대폰에는 수강 정정과 알바 공고와 읽지 않은 단체 채팅이 한꺼번에 쌓여 있습니다.</p>
+              <p>당신이 누구인지, 어디서 하루를 시작하는지, 어떤 능력에 조금 더 기대고 싶은지 떠올려 주세요. 나머지 전공, 학년, 첫 스탯과 사건은 이 세계가 알아서 당신에게 붙여줄 것입니다.</p>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-bold">나이</label>
-              <select className="w-full rounded-lg border border-[#cbbfae] px-4 py-3 text-sm" value={charAge} onChange={(e) => setCharAge(e.target.value)}>
+              <label className="mb-1 block text-sm font-bold">당신의 이름은?</label>
+              <input className="pixel-input w-full px-4 py-3 text-sm" maxLength={24} placeholder="한서윤" value={charName} onChange={(e) => setCharName(e.target.value)} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-bold">당신은 몇 살인가요?</label>
+              <select className="pixel-input w-full px-4 py-3 text-sm" value={charAge} onChange={(e) => setCharAge(e.target.value)}>
                 {Array.from({ length: 18 }, (_, i) => i + 18).map((age) => (<option key={age} value={age}>{age}세</option>))}
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-bold">학년</label>
-              <select className="w-full rounded-lg border border-[#cbbfae] px-4 py-3 text-sm" value={charGrade} onChange={(e) => setCharGrade(e.target.value)}>
-                {[1, 2, 3, 4].map((g) => (<option key={g} value={g}>{g}학년</option>))}
-              </select>
+              <p className="mb-2 block text-sm font-bold">당신은 어디에서 깨어났나요?</p>
+              <div className="grid gap-2">
+                {residenceOptions.map((option) => (
+                  <button
+                    className={`pixel-button px-4 py-3 text-left text-sm ${charResidence === option.id ? "bg-[#ffe0a2]" : ""}`}
+                    key={option.id}
+                    onClick={() => setCharResidence(option.id)}
+                  >
+                    <span className="block font-bold">{option.label}</span>
+                    <span className="mt-1 block text-xs leading-5 text-[#706b62]">{option.description}</span>
+                  </button>
+                ))}
+              </div>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-bold">전공</label>
-              <input className="w-full rounded-lg border border-[#cbbfae] px-4 py-3 text-sm" maxLength={40} placeholder="사회학과" value={charMajor} onChange={(e) => setCharMajor(e.target.value)} />
+              <p className="mb-2 block text-sm font-bold">당신이 믿고 싶은 능력 두 가지는?</p>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(statLabels).map(([key, label]) => (
+                  <button
+                    className={`pixel-button px-3 py-3 text-left text-sm ${preferredStats.includes(key) ? "bg-[#ffe0a2]" : ""}`}
+                    key={key}
+                    onClick={() => togglePreferredStat(key)}
+                  >
+                    <span className="mr-2 text-xs text-[#8a4f2d]">{statIcons[key]}</span>
+                    <span className="font-bold">{label}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-[#706b62]">선택한 두 능력은 최초 공개 스탯에 조금 더 높게 반영됩니다.</p>
             </div>
-            <button className="w-full rounded-lg bg-[#232323] px-4 py-3 text-sm font-bold text-white hover:bg-[#3f3a34] disabled:opacity-50" disabled={loading || !charName.trim() || !charMajor.trim()} onClick={createCharacter}>시작</button>
+            <button className="pixel-button-dark w-full px-4 py-3 text-sm font-bold disabled:opacity-50" disabled={loading || !charName.trim() || preferredStats.length !== 2} onClick={createCharacter}>눈을 뜬다</button>
           </div>
         </div>
       </main>
@@ -327,55 +394,57 @@ export default function AppPage() {
     );
   }
 
-  const statLabels: Record<string, string> = {
-    academic: "학업", practical: "실무", communication: "커뮤니케이션", creativity: "창의성",
-    health: "건강", mental: "멘탈", network: "네트워크", wealth: "자산", reputation: "평판", charm: "매력",
-  };
-
   return (
-    <div className="app-layout min-h-screen bg-[#fbfaf6] text-[#232323]">
-      <aside className="sidebar border-r border-[#ded9ce] bg-[#f2efe7] p-[22px] max-[900px]:border-0 max-[900px]:p-[18px]">
+    <div className="app-layout pixel-shell min-h-screen text-[#2a241e]">
+      <aside className="sidebar border-r border-[#3b3025] bg-[#231d17] p-[22px] text-[#f7efe2] max-[900px]:border-0 max-[900px]:p-[18px]">
         <h1 className="text-[22px] font-bold leading-tight">{currentChar?.name ?? "..."}</h1>
-        <p className="mt-2 text-[13px] leading-relaxed text-[#706b62]">{currentChar?.major} {currentChar?.currentGradeYear ?? currentChar?.startGradeYear}학년 · 이벤트 {currentChar?.coreEventCount}회</p>
+        <p className="mt-2 text-[13px] leading-relaxed text-[#c4b39c]">{currentChar?.major} {currentChar?.currentGradeYear ?? currentChar?.startGradeYear}학년 · 사건 {currentChar?.coreEventCount}회</p>
         <nav className="mt-[22px] grid gap-2">
-          <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "play" ? "border border-[#ded9ce] bg-white" : ""}`} onClick={() => setScreen("play")}>진행</button>
-          <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "character_detail" ? "border border-[#ded9ce] bg-white" : ""}`} onClick={() => setScreen("character_detail")}>캐릭터</button>
-          <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "relationships" ? "border border-[#ded9ce] bg-white" : ""}`} onClick={() => setScreen("relationships")}>관계</button>
-          <button className="rounded-lg px-2.5 py-2 text-left text-sm" onClick={() => { setScreen("records"); loadRecords(); }}>커리어와 엔딩 기록</button>
-          <button className="rounded-lg px-2.5 py-2 text-left text-sm text-[#706b62]" onClick={() => signOut()}>로그아웃</button>
+          <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "play" ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`} onClick={() => setScreen("play")}>진행</button>
+          <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "character_detail" ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`} onClick={() => setScreen("character_detail")}>캐릭터</button>
+          <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "relationships" ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`} onClick={() => setScreen("relationships")}>관계</button>
+          <button className="rounded-lg px-2.5 py-2 text-left text-sm text-[#d9c9b5]" onClick={() => { setScreen("records"); loadRecords(); }}>커리어와 엔딩 기록</button>
+          <button className="rounded-lg px-2.5 py-2 text-left text-sm text-[#a9967d]" onClick={() => signOut()}>로그아웃</button>
         </nav>
         {currentChar?.stats && (
-          <section className="mt-3.5 rounded-lg border border-[#ded9ce] bg-white p-3.5">
+          <section className="mt-3.5 rounded-lg border border-[#4d3d2f] bg-[#1b1612] p-3.5">
             <h2 className="text-base font-bold">공개 스탯</h2>
-            <dl className="mt-2">
+            <dl className="mt-2 grid gap-2">
               {Object.entries(statLabels).map(([key, label]) => (
-                <div className="flex justify-between gap-2 border-b border-[#eee8dd] py-[7px] text-[13px] last:border-b-0" key={key}>
-                  <dt>{label}</dt>
-                  <dd className="font-bold">{currentChar.stats?.[key] ?? 0}</dd>
+                <div className="rounded-md bg-[#2c231b] px-2.5 py-2 text-[13px]" key={key}>
+                  <dt className="flex items-center justify-between gap-2">
+                    <span><span className="mr-1.5 text-[11px] text-[#d79b52]">{statIcons[key]}</span>{label}</span>
+                    <span className="text-[#c4b39c]">{statLevel(currentChar.stats?.[key] ?? 0)}/5</span>
+                  </dt>
+                  <dd className="mt-1.5 flex gap-1" aria-label={`${label} ${statLevel(currentChar.stats?.[key] ?? 0)}점`}>
+                    {Array.from({ length: 5 }, (_, i) => (
+                      <span className={`h-2.5 flex-1 rounded-full ${i < statLevel(currentChar.stats?.[key] ?? 0) ? "bg-[#d79b52]" : "bg-[#4c4035]"}`} key={i} />
+                    ))}
+                  </dd>
                 </div>
               ))}
             </dl>
           </section>
         )}
-        <section className="mt-3.5 rounded-lg border border-[#ded9ce] bg-white p-3.5">
+        <section className="mt-3.5 rounded-lg border border-[#4d3d2f] bg-[#1b1612] p-3.5">
           <h2 className="font-bold">패러디 안내</h2>
-          <p className="mt-2 text-[13px] leading-relaxed text-[#706b62]">이 게임의 기업, 인물, 사건은 허구 및 패러디입니다.</p>
+          <p className="mt-2 text-[13px] leading-relaxed text-[#c4b39c]">이 게임의 기업, 인물, 사건은 허구 및 패러디입니다.</p>
         </section>
       </aside>
 
-      <main className="px-11 py-[34px] max-[900px]:px-[18px] max-[900px]:py-[22px]">
+      <main className="bg-[#f7efe2] px-11 py-[34px] max-[900px]:px-[18px] max-[900px]:py-[22px]">
         {activeScreen === "play" && (
           <section className="mx-auto max-w-[760px]">
             {error && <p className="mb-4 rounded bg-red-50 p-2 text-sm text-red-600">{error}</p>}
             {currentEvent && (
               <>
-                <p className="mb-4 text-[13px] font-bold text-[#8a4f2d]">{currentEvent.source === "FORCED" ? "⚡ 강제 이벤트 발생" : currentEvent.title}</p>
-                <div className="text-xl leading-[1.82] tracking-normal max-[900px]:text-[17px] max-[900px]:leading-[1.72]">
+                <p className="mb-4 text-[13px] font-bold text-[#8a4f2d]">{currentEvent.source === "FORCED" ? "강제 이벤트 발생" : currentEvent.source === "AI" ? `${currentEvent.title} · AI` : currentEvent.title}</p>
+                <div className="pixel-panel novel-text p-6 text-xl tracking-normal max-[900px]:text-[17px]">
                   {currentEvent.body.split("\n").map((p, i) => (<p className="mt-3 first:mt-0" key={i}>{p}</p>))}
                 </div>
                 <div className="mt-7 grid gap-2.5">
                   {currentEvent.choices.map((choice, idx) => (
-                    <button className="min-h-12 rounded-lg border border-[#cbbfae] bg-white px-4 py-3.5 text-left text-[15px] text-[#2f2b26] hover:border-[#8a4f2d] hover:bg-[#fff9f2] disabled:opacity-50" disabled={loading} key={choice.id} onClick={() => makeChoice(idx)}>
+                    <button className="pixel-button min-h-12 px-4 py-3.5 text-left text-[15px] disabled:opacity-50" disabled={loading} key={choice.id} onClick={() => makeChoice(idx)}>
                       {choice.label}
                     </button>
                   ))}
@@ -383,21 +452,31 @@ export default function AppPage() {
               </>
             )}
             {!currentEvent && (
-              <div className="text-center">
-                <p className="text-[#706b62]">새 이벤트를 준비 중입니다...</p>
-                <button className="mt-4 rounded-lg bg-[#232323] px-6 py-3 text-sm font-bold text-white" disabled={loading} onClick={() => currentChar && fetchNextEvent(currentChar.id)}>다음 이벤트</button>
+              <div
+                className="pixel-panel cursor-pointer p-8 text-center"
+                onClick={continueToNextEvent}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    continueToNextEvent();
+                  }
+                }}
+              >
+                <p className="text-lg leading-8 text-[#3a332d]">
+                  {pendingNext ? "선택의 여운이 잠시 방 안에 남습니다. 다음 문장을 읽으려면 이 화면을 누르세요." : "새 사건을 준비 중입니다. 계속하려면 이 화면을 누르세요."}
+                </p>
+                {loading && <p className="mt-3 text-sm text-[#706b62]">다음 장면을 불러오는 중...</p>}
               </div>
             )}
-            <div className="mt-8 flex justify-center gap-4">
-              <button className="rounded-lg border border-[#ded9ce] bg-white px-4 py-2 text-sm text-[#706b62] hover:border-[#8a4f2d]" onClick={generateRecord}>기록 생성</button>
-            </div>
           </section>
         )}
         {activeScreen === "character_detail" && currentChar && (
           <section className="mx-auto max-w-[760px]">
             <h2 className="text-xl font-bold">캐릭터 상세</h2>
             <div className="mt-4 space-y-3">
-              <div className="rounded-lg border border-[#ded9ce] bg-white p-4">
+              <div className="pixel-panel p-4">
                 <p><strong>이름:</strong> {currentChar.name}</p>
                 <p><strong>전공:</strong> {currentChar.major}</p>
                 <p><strong>학년:</strong> {currentChar.currentGradeYear ?? currentChar.startGradeYear}학년</p>
@@ -413,7 +492,7 @@ export default function AppPage() {
             <h2 className="text-xl font-bold">관계</h2>
             <div className="mt-4 space-y-3">
               {currentChar.relationships?.map((rel) => (
-                <div className="rounded-lg border border-[#ded9ce] bg-white p-4" key={rel.name}>
+                <div className="pixel-panel p-4" key={rel.name}>
                   <div className="flex items-center justify-between"><span className="font-bold">{rel.name}</span><span className="text-sm text-[#706b62]">{rel.role}</span></div>
                   <div className="mt-2 flex items-center gap-2">
                     <span className="text-sm">신뢰:</span>
@@ -429,20 +508,20 @@ export default function AppPage() {
         )}
       </main>
 
-      <aside className="right-sidebar border-l border-[#ded9ce] p-[22px] max-[900px]:border-0 max-[900px]:p-[18px]">
-        <h2 className="text-[22px] font-bold leading-tight">기억과 관계</h2>
-        <section className="mt-3.5 rounded-lg border border-[#ded9ce] bg-white p-3.5">
+      <aside className="right-sidebar border-l border-[#3b3025] bg-[#241b15] p-[22px] text-[#fff3d7] max-[900px]:border-0 max-[900px]:p-[18px]">
+        <h2 className="text-[22px] font-black leading-tight">기억과 관계</h2>
+        <section className="pixel-panel-dark mt-3.5 p-3.5">
           <h3 className="font-bold">주요 인물</h3>
           <div className="mt-2 space-y-1">
-            {currentChar?.relationships?.slice(0, 3).map((rel) => (<p className="text-[13px] leading-relaxed text-[#706b62]" key={rel.name}>{rel.name} · {rel.role} · 신뢰 {rel.trust}</p>))}
-            {(!currentChar?.relationships || currentChar.relationships.length === 0) && <p className="text-[13px] text-[#706b62]">정보 없음</p>}
+            {currentChar?.relationships?.slice(0, 3).map((rel) => (<p className="text-[13px] leading-relaxed text-[#d9c9b5]" key={rel.name}>{rel.name} · {rel.role} · 신뢰 {rel.trust}</p>))}
+            {(!currentChar?.relationships || currentChar.relationships.length === 0) && <p className="text-[13px] text-[#d9c9b5]">정보 없음</p>}
           </div>
         </section>
-        <section className="mt-3.5 rounded-lg border border-[#ded9ce] bg-white p-3.5">
+        <section className="pixel-panel-dark mt-3.5 p-3.5">
           <h3 className="font-bold">최근 기억</h3>
           <div className="mt-2 flex flex-wrap gap-1">
-            {currentChar?.eventHistory?.slice(0, 5).map((h, i) => (<span className="rounded-full bg-[#efe5d7] px-2 py-1 text-xs text-[#68412b]" key={i}>{h.summary.slice(0, 15)}</span>))}
-            {(!currentChar?.eventHistory || currentChar.eventHistory.length === 0) && <span className="text-xs text-[#706b62]">아직 기록 없음</span>}
+            {currentChar?.eventHistory?.slice(0, 5).map((h, i) => (<span className="border-2 border-[#0f0b08] bg-[#35261c] px-2 py-1 text-xs text-[#f7d08b]" key={i}>{h.summary.slice(0, 15)}</span>))}
+            {(!currentChar?.eventHistory || currentChar.eventHistory.length === 0) && <span className="text-xs text-[#d9c9b5]">아직 기록 없음</span>}
           </div>
         </section>
       </aside>

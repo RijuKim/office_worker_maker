@@ -6,8 +6,10 @@ import { requireCurrentUserId } from "@/lib/server/session";
 import {
   buildFirstEvent,
   buildInitialHiddenState,
+  buildInitialStats,
   buildStarterRelationships,
-  initialStats,
+  pickRandomGradeYear,
+  pickRandomMajor,
   serializeCharacterRun,
 } from "@/lib/game/character-foundation";
 import { characterCreateSchema } from "@/lib/game/validation";
@@ -69,21 +71,27 @@ export async function POST(request: Request) {
     );
   }
 
+  const createInput = {
+    ...parsed.data,
+    major: parsed.data.major ?? pickRandomMajor(),
+    startGradeYear: parsed.data.startGradeYear ?? pickRandomGradeYear(parsed.data.age),
+  };
+
   const character = await prisma.$transaction(async (tx) => {
     const created = await tx.characterRun.create({
       data: {
         userId,
-        name: parsed.data.name,
-        age: parsed.data.age,
-        startGradeYear: parsed.data.startGradeYear,
-        currentGradeYear: parsed.data.startGradeYear,
-        major: parsed.data.major,
+        name: createInput.name,
+        age: createInput.age,
+        startGradeYear: createInput.startGradeYear,
+        currentGradeYear: createInput.startGradeYear,
+        major: createInput.major,
         lifeStatus: [],
         stats: {
-          create: initialStats,
+          create: buildInitialStats(createInput.preferredStats),
         },
         hiddenState: {
-          create: buildInitialHiddenState(parsed.data),
+          create: buildInitialHiddenState(createInput),
         },
         relationships: {
           create: buildStarterRelationships(),
@@ -98,7 +106,7 @@ export async function POST(request: Request) {
 
     const firstEvent = await tx.event.create({
       data: {
-        ...buildFirstEvent(parsed.data),
+        ...buildFirstEvent(createInput),
         characterRunId: created.id,
       },
     });

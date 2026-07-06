@@ -7,21 +7,18 @@ const AI_TIMEOUT_MS = 10_000;
 
 const aiEventSchema = z.object({
   title: z.string().min(1).max(100),
-  body: z.string().min(1).max(2000),
+  body: z.string().min(300).max(4200),
   choices: z
     .array(
       z.object({
         id: z.string().min(1),
         label: z.string().min(1).max(200),
-        summary: z.string().min(1).max(300),
+        summary: z.string().min(1).max(360),
         statDelta: z.object({
           academic: z.number().int().min(-15).max(15).optional(),
           practical: z.number().int().min(-15).max(15).optional(),
-          communication: z.number().int().min(-15).max(15).optional(),
-          creativity: z.number().int().min(-15).max(15).optional(),
           health: z.number().int().min(-15).max(15).optional(),
           mental: z.number().int().min(-15).max(15).optional(),
-          network: z.number().int().min(-15).max(15).optional(),
           wealth: z.number().int().min(-15).max(15).optional(),
           reputation: z.number().int().min(-15).max(15).optional(),
           charm: z.number().int().min(-15).max(15).optional(),
@@ -39,25 +36,40 @@ const SYSTEM_PROMPT = `You are a creative writer for a Korean college life text-
 
 Generate ONE narrative event in JSON format. The event should:
 - Be in Korean
-- Be a slice-of-life college scenario (study, relationships, part-time jobs, clubs, career exploration)
+- Use "당신은" as the primary second-person narration voice. Do not use "너" or detached third-person narration.
+- Make body 2-4 paragraphs, 8-12 sentences total, with literary text-adventure pacing.
+- The event must be one small incident inside the provided larger story arc.
+- Follow the current story phase: 발단, 전개, 위기, 절정, 결말의 흐름. Do not resolve the whole life too early.
+- Keep continuity with recent choices, relationships, open threads, foreshadowing, and stats.
+- Be a slice-of-life college scenario that can organically lead to career outcomes: study, relationships, part-time jobs, clubs, career exploration, leave of absence, internship, exam prep, public sector, professional licenses, entrepreneurship, or self-employment.
 - Include 2-4 meaningful choices that affect character stats
+- Use only these public stats in statDelta: academic, practical, health, mental, wealth, charm, reputation
 - Each choice's statDelta must be within -15 to +15 range
 - No real company names, no real executives, no real controversies
 - Use fictional/parody names only
+- Choice labels should be natural actions, not system descriptions.
+- Each summary must start with "당신은".
 - Return ONLY valid JSON, no markdown wrapping`;
 
 export function buildUserPrompt(state: {
   name: string;
   major: string;
   gradeYear: number | null;
+  age: number;
+  coreEventCount: number;
   recentSummaries: string[];
   stats: Record<string, number>;
+  relationships: { name: string; role: string; trust: number }[];
+  storyArc: unknown;
 }): string {
-  return `Character: ${state.name}, ${state.major}, ${state.gradeYear ?? "?"}학년
-Recent events: ${state.recentSummaries.join("; ") || "새로운 시작"}
-Current stats: ${JSON.stringify(state.stats)}
+  return `주인공: ${state.name}, ${state.age}세, ${state.major}, ${state.gradeYear ?? "?"}학년
+진행된 핵심 사건 수: ${state.coreEventCount}
+큰 사건 아크: ${JSON.stringify(state.storyArc)}
+최근 선택과 기억: ${state.recentSummaries.join("; ") || "당신은 낯선 아침에 눈을 떴다."}
+현재 공개 스탯: ${JSON.stringify(state.stats)}
+주요 관계: ${JSON.stringify(state.relationships)}
 
-Generate a new event with choices. Respond in Korean. Use fictional names only.`;
+위 정보를 바탕으로 다음 작은 사건 하나를 생성하세요. 이번 사건은 이전 선택의 결과가 느껴져야 하며, 동시에 다음 장면을 궁금하게 만드는 미해결 감각을 남겨야 합니다.`;
 }
 
 export interface OpenRouterResult {
@@ -99,8 +111,8 @@ export async function generateAiEvent(
             { role: "user", content: buildUserPrompt(state) },
           ],
           response_format: { type: "json_object" },
-          max_tokens: 1024,
-          temperature: 0.9,
+          max_tokens: 2200,
+          temperature: 0.85,
         }),
         signal: controller.signal,
       },

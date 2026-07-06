@@ -27,7 +27,8 @@ describe("Home page scaffold", () => {
       root.render(<Home />);
     });
 
-    expect(container.textContent).toContain("일어나보니 대한민국 취준생");
+    expect(container.textContent).toContain("일어나보니");
+    expect(container.textContent).toContain("대한민국 취준생");
     expect(container.textContent).toContain("로그인");
 
     act(() => {
