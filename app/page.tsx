@@ -446,7 +446,7 @@ export default function AppPage() {
         <h1 className="text-[22px] font-bold leading-tight">{currentChar?.name ?? "..."}</h1>
         <p className="mt-2 text-[13px] leading-relaxed text-[#c4b39c]">{currentChar?.major} {currentChar?.currentGradeYear ?? currentChar?.startGradeYear}학년 · {storyPhase} · 사건 {currentChar?.coreEventCount}회</p>
         <div className="mt-3">
-          <div className="mb-1 flex justify-between text-[11px] text-[#c4b39c]"><span>엔딩까지</span><span>{endingProgress}%</span></div>
+          <div className="mb-1 flex justify-between text-[11px] text-[#c4b39c]"><span>15번째 사건 선택 시 엔딩</span><span>{currentChar?.coreEventCount ?? 0}/15</span></div>
           <div className="h-3 border-2 border-[#0f0b08] bg-[#4c4035]"><div className="h-full bg-[#d79b52]" style={{ width: `${endingProgress}%` }} /></div>
         </div>
         <nav className="mt-[22px] grid gap-2">

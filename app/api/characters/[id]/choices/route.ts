@@ -104,10 +104,11 @@ export async function POST(request: Request, context: RouteContext) {
       characterRunId: id,
       name: rel.name,
       role: inferRelationshipRole(rel.name, activeEvent.title),
-      trust: Math.max(0, Math.min(100, 45 + rel.trust)),
+      trust: Math.max(-100, Math.min(100, rel.trust >= 0 ? 35 + rel.trust : rel.trust)),
       tags: inferRelationshipTags(rel.name, activeEvent.title),
     }));
   const endingType = getImmediateBadEnding(updatedStats);
+  const shouldCreateFinalEnding = !endingType && character.coreEventCount >= 14;
   const endingRecord = endingType ? buildImmediateBadEndingRecord({
     userId,
     characterRunId: id,
@@ -117,6 +118,15 @@ export async function POST(request: Request, context: RouteContext) {
     stats: updatedStats,
     eventTitle: activeEvent.title,
     summary: choice.summary,
+  }) : shouldCreateFinalEnding ? buildFinalEndingRecord({
+    userId,
+    characterRunId: id,
+    characterName: character.name,
+    major: character.major,
+    stats: updatedStats,
+    eventTitle: activeEvent.title,
+    summary: choice.summary,
+    coreEventCount: character.coreEventCount + 1,
   }) : null;
 
   await prisma.$transaction([
@@ -156,7 +166,7 @@ export async function POST(request: Request, context: RouteContext) {
         where: { id },
         data: {
           currentEventId: null,
-          academicStatus: "DROPPED_OUT",
+          academicStatus: endingType ? "DROPPED_OUT" : "GRADUATED",
         },
       }),
     ] : []),
@@ -172,7 +182,7 @@ export async function POST(request: Request, context: RouteContext) {
       relationshipDelta: choice.relationshipDelta,
       eventResolved: true,
       endingTriggered: Boolean(endingRecord),
-      endingType,
+      endingType: endingType ?? (shouldCreateFinalEnding ? "커리어와 엔딩" : null),
     },
   });
 }
@@ -245,4 +255,54 @@ function buildImmediateBadEndingRecord(input: {
     tags: ["배드엔딩", input.endingType],
     similarityKey: `bad-${input.endingType}`,
   };
+}
+
+function buildFinalEndingRecord(input: {
+  userId: string;
+  characterRunId: string;
+  characterName: string;
+  major: string;
+  stats: Record<string, number>;
+  eventTitle: string;
+  summary: string;
+  coreEventCount: number;
+}) {
+  const careerPath = pickCareerPath(input.stats);
+  const satisfaction = Math.round((input.stats.health + input.stats.mental + input.stats.reputation) / 3);
+  const growthPotential = Math.round((input.stats.academic + input.stats.practical + input.stats.charm) / 3);
+  const workLifeBalance = Math.round((input.stats.health + input.stats.mental) / 2);
+  const healthState = input.stats.health >= 70 ? "좋음" : input.stats.health >= 35 ? "보통" : "불안";
+  const relationshipState = input.stats.reputation >= 70 ? "넓고 안정적" : input.stats.reputation >= 35 ? "좁지만 유지됨" : "불안정";
+
+  return {
+    userId: input.userId,
+    characterRunId: input.characterRunId,
+    title: `${input.characterName}의 ${careerPath}`,
+    summary: `${input.characterName}은 ${input.coreEventCount}개의 사건 끝에 ${careerPath} 방향으로 나아갔습니다.`,
+    longNarrative: `당신은 ${input.major}의 낯선 아침에서 시작해 ${input.coreEventCount}개의 사건을 통과했다. ${input.summary} 그 선택은 마지막 문장처럼 조용했지만, 그동안 쌓인 학업, 실무, 건강, 멘탈, 자산, 매력, 평판이 함께 당신을 밀어냈다. 결국 당신은 ${careerPath}라는 이름의 다음 계절로 걸어간다. 완벽한 결말은 아니지만, 이 기록은 당신이 어떤 비용을 치르고 어떤 가능성을 남겼는지 보여준다.`,
+    careerPath,
+    jobRole: null,
+    destinationName: null,
+    salaryBand: null,
+    workplaceTone: [],
+    statSnapshot: input.stats,
+    keyRelationships: [],
+    majorEvents: [{ eventTitle: input.eventTitle, summary: input.summary, choiceId: null }],
+    satisfaction,
+    growthPotential,
+    workLifeBalance,
+    healthState,
+    relationshipState,
+    tags: ["일반엔딩", careerPath],
+    similarityKey: `final-${careerPath}`,
+  };
+}
+
+function pickCareerPath(stats: Record<string, number>) {
+  if (stats.wealth >= 70 && stats.practical >= 60) return "창업 또는 자영업";
+  if (stats.academic >= 75 && stats.mental >= 55) return "전문직 시험 준비";
+  if (stats.reputation >= 70 && stats.practical >= 55) return "기업 취업";
+  if (stats.academic >= 65 && stats.health >= 45) return "공공기관 또는 공무원 준비";
+  if (stats.charm >= 70) return "마케팅·콘텐츠 직무";
+  return "불확실하지만 계속되는 취업 준비";
 }
