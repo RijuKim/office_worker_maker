@@ -530,6 +530,7 @@ export default function AppPage() {
             <div className="space-y-3">
               <p className="text-center text-sm leading-6 text-[#3a332d]">현재 진행은 계정에 저장됩니다.</p>
               <button className="pixel-button-dark w-full px-4 py-3 text-sm font-bold" onClick={() => setScreen(currentChar ? "play" : "create")}>돌아가기</button>
+              <button className="pixel-button w-full px-4 py-3 text-sm font-bold" onClick={startNewCharacter}>새 게임</button>
               <button className="pixel-button w-full px-4 py-3 text-sm font-bold" onClick={() => { setScreen("records"); loadRecords(); }}>기록 보기</button>
               <button className="pixel-button w-full px-4 py-3 text-sm font-bold" onClick={() => signOut()}>로그아웃</button>
             </div>
