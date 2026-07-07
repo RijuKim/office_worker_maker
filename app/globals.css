@@ -134,6 +134,25 @@ button {
   color: #2a241e;
 }
 
+.variant-jimin { --hair-color: #5c3a1e; --body-color: #305d73; }
+.variant-minha { --hair-color: #1a1a1a; --body-color: #d85f87; }
+.variant-seoyeon { --hair-color: #c87838; --body-color: #4a9f70; }
+.variant-parents { --hair-color: #706b62; --body-color: #35261c; }
+.variant-hyunwoo { --hair-color: #2a1a0a; --body-color: #3a7a7a; }
+.variant-eunji { --hair-color: #b3423c; --body-color: #6a3f7a; }
+.variant-doyoon { --hair-color: #1a1a1a; --body-color: #24384f; }
+.variant-jaeseok { --hair-color: #1a1a1a; --body-color: #4a4a4a; }
+.variant-sujin { --hair-color: #d85f87; --body-color: #d85f87; }
+.variant-yujin { --hair-color: #5c3a1e; --body-color: #6f7f52; }
+.variant-junho { --hair-color: #1a1a1a; --body-color: #5c3a1e; }
+.variant-donggyu { --hair-color: #1a1a1a; --body-color: #b3423c; }
+.variant-oldman { --hair-color: #d8c8b4; --body-color: #35261c; }
+.variant-broker { --hair-color: #1a1a1a; --body-color: #4a4a4a; }
+.variant-taesu { --hair-color: #5c3a1e; --body-color: #c87838; }
+.variant-hyejin { --hair-color: #6a3f7a; --body-color: #d85f87; }
+.variant-myeongsu { --hair-color: #706b62; --body-color: #24384f; }
+.variant-sanghyuk { --hair-color: #1a1a1a; --body-color: #305d73; }
+
 .pixel-portrait {
   position: relative;
   width: 68px;
@@ -156,8 +175,8 @@ button {
   top: 10px;
   width: 38px;
   height: 18px;
-  background: #35261c;
-  box-shadow: -8px 8px 0 #35261c, 8px 8px 0 #35261c;
+  background: var(--hair-color, #35261c);
+  box-shadow: -8px 8px 0 var(--hair-color, #35261c), 8px 8px 0 var(--hair-color, #35261c);
 }
 
 .pixel-portrait-compact .portrait-hair {
@@ -165,7 +184,7 @@ button {
   top: 7px;
   width: 28px;
   height: 12px;
-  box-shadow: -6px 6px 0 #35261c, 6px 6px 0 #35261c;
+  box-shadow: -6px 6px 0 var(--hair-color, #35261c), 6px 6px 0 var(--hair-color, #35261c);
 }
 
 .portrait-face {
@@ -200,7 +219,7 @@ button {
   height: 26px;
   border: 3px solid #0f0b08;
   border-bottom: 0;
-  background: #d85f87;
+  background: var(--body-color, #d85f87);
 }
 
 .pixel-portrait-compact .portrait-body {
@@ -413,6 +432,155 @@ button {
 
 .scene-burnout .scene-person {
   transform: rotate(6deg);
+}
+
+.scene-intro {
+  background: linear-gradient(to bottom, #305d73, #8bc0d6);
+}
+.scene-intro .scene-sky {
+  background: 
+    radial-gradient(circle at 50% 20%, rgba(255,250,240,0.8) 1px, transparent 1px) 0 0 / 40px 40px,
+    radial-gradient(circle at 20% 80%, rgba(255,243,215,0.6) 2px, transparent 2px) 0 0 / 80px 80px;
+}
+.scene-intro .scene-sun {
+  display: none;
+}
+.scene-intro .scene-building {
+  display: none;
+}
+.scene-intro .scene-desk,
+.scene-intro .scene-screen,
+.scene-intro .scene-paper,
+.scene-intro .scene-spark {
+  display: none;
+}
+.scene-intro::after {
+  content: "";
+  position: absolute;
+  bottom: -20px;
+  left: 40px;
+  right: 40px;
+  height: 80px;
+  background: #35261c;
+  transform: perspective(60px) rotateX(40deg);
+  border: 3px solid #0f0b08;
+}
+.scene-intro .scene-person {
+  left: 102px;
+  bottom: 20px;
+  z-index: 10;
+}
+
+.scene-ending {
+  background: linear-gradient(to bottom, #d85f87, #c87838);
+}
+.scene-ending .scene-sun {
+  top: 140px;
+  right: 110px;
+  background: #fffaf0;
+  box-shadow: 0 0 0 10px rgba(255, 250, 240, 0.2);
+}
+.scene-ending .scene-building {
+  display: none;
+}
+.scene-ending .scene-desk,
+.scene-ending .scene-screen,
+.scene-ending .scene-paper,
+.scene-ending .scene-spark {
+  display: none;
+}
+.scene-ending::after {
+  content: "";
+  position: absolute;
+  bottom: -40px;
+  left: 80px;
+  right: 80px;
+  height: 120px;
+  background: #2a2018;
+  transform: perspective(40px) rotateX(30deg);
+  border: 3px solid #0f0b08;
+}
+.scene-ending .scene-person {
+  left: 110px;
+  bottom: 80px;
+  transform: scale(0.6);
+  z-index: 10;
+}
+.scene-ending .scene-body { background: #35261c; }
+
+.scene-spec {
+  background: #d5edf6;
+}
+.scene-spec .scene-sun {
+  display: none;
+}
+.scene-spec .scene-building {
+  display: none;
+}
+.scene-spec .scene-desk {
+  background: #6f7f52;
+}
+.scene-spec .scene-screen {
+  background: #fffaf0;
+  box-shadow: inset 0 0 0 6px #c87838;
+}
+.scene-spec .scene-paper {
+  background: #fffaf0;
+  border-color: #305d73;
+}
+.scene-spec .scene-spark {
+  background: #4a9f70;
+}
+
+.scene-job {
+  background: #e6f3f7;
+}
+.scene-job .scene-sun {
+  background: #305d73;
+  box-shadow: none;
+}
+.scene-job .scene-building-left {
+  background: #4a4a4a;
+  height: 140px;
+}
+.scene-job .scene-building-right {
+  background: #24384f;
+  height: 110px;
+}
+.scene-job .scene-desk {
+  background: #706b62;
+}
+.scene-job .scene-screen,
+.scene-job .scene-paper,
+.scene-job .scene-spark {
+  display: none;
+}
+
+.scene-career {
+  background: #ffe1db;
+}
+.scene-career .scene-sun {
+  background: #d85f87;
+  box-shadow: none;
+}
+.scene-career .scene-building {
+  display: none;
+}
+.scene-career .scene-desk,
+.scene-career .scene-screen,
+.scene-career .scene-paper,
+.scene-career .scene-spark {
+  display: none;
+}
+.scene-career::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: #4a9f70;
+  border-top: 3px solid #2a2018;
 }
 
 .event-frame {

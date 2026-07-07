@@ -95,11 +95,14 @@ function trustHearts(trust: number) {
 function getEventScene(event: EventData) {
   const text = `${event.title} ${event.body}`.toLowerCase();
   if (event.source === "FORCED" || text.includes("번아웃") || text.includes("건강") || text.includes("병원")) return "burnout";
-  if (text.includes("면접") || text.includes("채용") || text.includes("인턴") || text.includes("회사")) return "interview";
+  if (text.includes("스펙") || text.includes("토익") || text.includes("자격증") || text.includes("인턴") || text.includes("공모전")) return "spec";
+  if (text.includes("취업") || text.includes("서류") || text.includes("면접") || text.includes("코딩테스트") || text.includes("합격")) return "job";
+  if (text.includes("진로") || text.includes("워홀") || text.includes("임용") || text.includes("회계사") || text.includes("로스쿨")) return "career";
   if (text.includes("연애") || text.includes("고백") || text.includes("호감") || text.includes("동아리")) return "social";
   if (text.includes("돈") || text.includes("알바") || text.includes("월세") || text.includes("빚")) return "money";
   if (text.includes("발표") || text.includes("프로젝트") || text.includes("mvp") || text.includes("앱")) return "project";
   if (text.includes("수업") || text.includes("시험") || text.includes("과제") || text.includes("도서관")) return "study";
+  if (text.includes("회사") || text.includes("채용")) return "job";
   return "campus";
 }
 
@@ -152,11 +155,32 @@ function recordText(record: Record<string, unknown>, key: string, fallback = "")
   return stripRouteGradeText(record[key]) || fallback;
 }
 
-function PixelPortrait({ name, compact = false }: { name?: string; compact?: boolean }) {
-  const initial = name?.trim().slice(0, 1) || "?";
+function PixelPortrait({ name, compact = false, variant }: { name?: string; compact?: boolean; variant?: string }) {
+  const refName = variant || name || "";
+  const initial = refName.trim().slice(0, 1) || "?";
+
+  let variantClass = "";
+  if (refName.includes("지민 선배") || refName.includes("지민")) variantClass = "variant-jimin";
+  else if (refName.includes("민하")) variantClass = "variant-minha";
+  else if (refName.includes("서연")) variantClass = "variant-seoyeon";
+  else if (refName.includes("부모님")) variantClass = "variant-parents";
+  else if (refName.includes("현우")) variantClass = "variant-hyunwoo";
+  else if (refName.includes("은지")) variantClass = "variant-eunji";
+  else if (refName.includes("도윤")) variantClass = "variant-doyoon";
+  else if (refName.includes("재석")) variantClass = "variant-jaeseok";
+  else if (refName.includes("수진")) variantClass = "variant-sujin";
+  else if (refName.includes("유진")) variantClass = "variant-yujin";
+  else if (refName.includes("준호")) variantClass = "variant-junho";
+  else if (refName.includes("동규")) variantClass = "variant-donggyu";
+  else if (refName.includes("노인")) variantClass = "variant-oldman";
+  else if (refName.includes("중개자")) variantClass = "variant-broker";
+  else if (refName.includes("태수")) variantClass = "variant-taesu";
+  else if (refName.includes("혜진")) variantClass = "variant-hyejin";
+  else if (refName.includes("명수")) variantClass = "variant-myeongsu";
+  else if (refName.includes("상혁")) variantClass = "variant-sanghyuk";
 
   return (
-    <div className={`pixel-portrait ${compact ? "pixel-portrait-compact" : ""}`} aria-hidden="true">
+    <div className={`pixel-portrait ${compact ? "pixel-portrait-compact" : ""} ${variantClass}`} aria-hidden="true">
       <div className="portrait-hair" />
       <div className="portrait-face">
         <span>{initial}</span>
@@ -744,36 +768,52 @@ export default function AppPage() {
           </button>
         </nav>
         {currentChar?.stats && (
-          <section className={`sidebar-stats mt-3.5 rounded-lg border border-[#4d3d2f] bg-[#1b1612] p-3.5 ${mobileStatsOpen ? "sidebar-stats-open" : ""}`}>
-            <h2 className="text-base font-bold">능력치</h2>
-            <dl className="mt-2 grid gap-2">
-              {Object.entries(statLabels).map(([key, label]) => (
-                <div className="rounded-md bg-[#2c231b] px-2.5 py-2 text-[13px]" key={key}>
-                  <dt className="flex items-center justify-between gap-2">
-                    <span><span className="mr-1.5 text-[11px] text-[#d79b52]">{statIcons[key]}</span>{label}</span>
-                    {key === "wealth" ? (
-                      <span className="text-[#c4b39c]">{formatWealth(statLevel(currentChar.stats?.[key] ?? 0))}</span>
-                    ) : (
+          <>
+            <section className={`sidebar-stats mt-3.5 rounded-lg border border-[#4d3d2f] bg-[#1b1612] p-3.5 ${mobileStatsOpen ? "sidebar-stats-open" : ""}`}>
+              <h2 className="text-base font-bold">자산</h2>
+              <div className="mt-2 rounded-md bg-[#2c231b] px-2.5 py-2 text-[13px]">
+                <dt className="flex items-center justify-between gap-2">
+                  <span><span className="mr-1.5 text-[11px] text-[#d79b52]">CO</span>자산</span>
+                  <span className="text-[#c4b39c]">{formatWealth(statLevel(currentChar.stats?.wealth ?? 0))}</span>
+                </dt>
+              </div>
+            </section>
+            <section className={`sidebar-stats mt-3.5 rounded-lg border border-[#4d3d2f] bg-[#1b1612] p-3.5 ${mobileStatsOpen ? "sidebar-stats-open" : ""}`}>
+              <h2 className="text-base font-bold">능력치</h2>
+              <dl className="mt-2 grid gap-2">
+                {Object.entries(statLabels).filter(([key]) => key !== "wealth").map(([key, label]) => (
+                  <div className="rounded-md bg-[#2c231b] px-2.5 py-2 text-[13px]" key={key}>
+                    <dt className="flex items-center justify-between gap-2">
+                      <span><span className="mr-1.5 text-[11px] text-[#d79b52]">{statIcons[key]}</span>{label}</span>
                       <span className="text-[#c4b39c]">{statLevel(currentChar.stats?.[key] ?? 0)}/10</span>
-                    )}
                     </dt>
-                    {key !== "wealth" && (
-                      <dd className="mt-1.5 flex gap-1" aria-label={`${label} ${statLevel(currentChar.stats?.[key] ?? 0)}`}>
-                        {Array.from({ length: 10 }, (_, i) => (
+                    <dd className="mt-1.5 flex gap-1" aria-label={`${label} ${statLevel(currentChar.stats?.[key] ?? 0)}`}>
+                      {Array.from({ length: 10 }, (_, i) => (
                         <span className={`h-1.5 flex-1 rounded-full ${i < statLevel(currentChar.stats?.[key] ?? 0) ? "bg-[#d79b52]" : "bg-[#4c4035]"}`} key={i} />
                       ))}
                     </dd>
-                    )}
+                  </div>
+                ))}
+              </dl>
+            </section>
+            {specs.length > 0 && (
+              <section className={`sidebar-stats mt-3.5 rounded-lg border border-[#4d3d2f] bg-[#1b1612] p-3.5 ${mobileStatsOpen ? "sidebar-stats-open" : ""}`}>
+                <h2 className="text-base font-bold">스펙</h2>
+                <div className="mt-2 space-y-1">
+                  {specs.filter(s => s.status === "COMPLETED" || s.status === "IN_PROGRESS").map((spec, i) => (
+                    <div className="rounded-md bg-[#2c231b] px-2.5 py-2 text-[12px]" key={i}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[#c4b39c]">{spec.specName}</span>
+                        <span className={`text-[11px] font-bold ${spec.status === "COMPLETED" ? "text-[#4a9f70]" : spec.status === "FAILED" ? "text-[#b3423c]" : "text-[#f7d08b]"}`}>
+                          {spec.status === "COMPLETED" ? spec.score ?? "완료" : spec.status === "FAILED" ? "실패" : "진행중"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-              <div className="rounded-md bg-[#2c231b] px-2.5 py-2 text-[13px]" data-testid="spec-score">
-                <dt className="flex items-center justify-between gap-2">
-                  <span><span className="mr-1.5 text-[11px] text-[#d79b52]">★</span>스펙 점수</span>
-                  <span className="text-[#c4b39c]">{currentChar.stats?.specScore ?? 0}</span>
-                </dt>
-              </div>
-            </dl>
-          </section>
+              </section>
+            )}
+          </>
         )}
         <section className="sidebar-notice mt-3.5 rounded-lg border border-[#4d3d2f] bg-[#1b1612] p-3.5">
           <h2 className="font-bold">패러디 안내</h2>
