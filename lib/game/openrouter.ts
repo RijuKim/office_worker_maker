@@ -153,8 +153,9 @@ export async function generateAiEvent(
             { role: "user", content: buildUserPrompt(state) },
           ],
           response_format: { type: "json_object" },
-          max_tokens: 3000,
+          max_tokens: 4000,
           temperature: 0.85,
+          reasoning: { effort: "none" },
         }),
         signal: controller.signal,
       },
@@ -219,12 +220,12 @@ export async function generateAiEnding(state: {
         "HTTP-Referer": "https://office-worker-maker.local",
         "X-Title": "일어나보니 대한민국 취준생",
       },
-      body: JSON.stringify({
-        model: model(),
-        messages: [
-          {
-            role: "system",
-            content: `You write final result records for a Korean literary career text-adventure. Return ONLY valid JSON.
+        body: JSON.stringify({
+          model: model(),
+          messages: [
+            {
+              role: "system",
+              content: `You write final result records for a Korean literary career text-adventure. Return ONLY valid JSON.
 The result must be Korean prose, second-person "당신은" voice, and longNarrative must be at least 500 Korean characters.
 Use public stats, hidden state, every major event, and relationships. Include career life and what happened afterward.
 The result must be layered, surprising, and novelistic: success can contain private loss, failure can contain quiet dignity, bad relationships can return as reversals.
@@ -241,10 +242,10 @@ Mention at least three concrete past event titles or relationship names from the
 Do not write route grades such as A/B/C, GOOD ROUTE, MIXED ROUTE, or HARD ROUTE.
 Use fictional/parody company or institution names only. No real defamatory claims.
 If the character has a relationship life state (single, dating, cohabitation, married, divorced, widowed) or parenting state (expecting, newborn, toddler, school_age), reflect it naturally in the narrative. A marriage ending should feel earned from prior relationship history, not sudden. A parenting ending should show how the child changed the character's daily life and priorities. A single/independent ending should feel like a conscious choice, not a failure.`,
-          },
-          {
-            role: "user",
-            content: `주인공: ${state.name}, ${state.age}세, ${state.major}
+            },
+            {
+              role: "user",
+              content: `주인공: ${state.name}, ${state.age}세, ${state.major}
 공개 스탯: ${JSON.stringify(state.stats)}
 숨은 상태: ${JSON.stringify(state.hiddenState)}
 관계도: ${JSON.stringify(state.relationships)}
@@ -253,12 +254,13 @@ If the character has a relationship life state (single, dating, cohabitation, ma
 ${state.relationshipLife ? `관계 생활 상태: ${state.relationshipLife.relationshipLife}${state.relationshipLife.parenting.hasChildren ? `, 자녀: ${state.relationshipLife.parenting.childCount}명 (${state.relationshipLife.parenting.parentingStage})` : ""}` : ""}
 
 JSON fields: title, summary, longNarrative, careerPath, jobRole, destinationName, salaryBand, workplaceTone, satisfaction, growthPotential, workLifeBalance, healthState, relationshipState, tags.`,
-          },
-        ],
-        response_format: { type: "json_object" },
-        max_tokens: 2600,
-        temperature: 0.9,
-      }),
+            },
+          ],
+          response_format: { type: "json_object" },
+          max_tokens: 4000,
+          temperature: 0.9,
+          reasoning: { effort: "none" },
+        }),
       signal: controller.signal,
     });
 
@@ -532,13 +534,13 @@ export async function generateAiBranchProposals(state: {
         "HTTP-Referer": "https://college-career-sim.local",
         "X-Title": "College Career Sim",
       },
-      body: JSON.stringify({
-        model: model(),
-        messages: [
-          { role: "system", content: BRANCH_PROPOSAL_SYSTEM_PROMPT },
-          {
-            role: "user",
-            content: `주인공: ${state.name}, ${state.age}세, ${state.major}, ${state.gradeYear ?? "?"}학년
+        body: JSON.stringify({
+          model: model(),
+          messages: [
+            { role: "system", content: BRANCH_PROPOSAL_SYSTEM_PROMPT },
+            {
+              role: "user",
+              content: `주인공: ${state.name}, ${state.age}세, ${state.major}, ${state.gradeYear ?? "?"}학년
 생활 단계: ${state.lifeStage}
 졸업 상태: ${state.graduation}
 진행된 핵심 사건 수: ${state.coreEventCount}
@@ -548,12 +550,13 @@ export async function generateAiBranchProposals(state: {
 스토리 아크: ${JSON.stringify(state.storyArc)}
 
 위 정보를 바탕으로 2-4개의 미래 분기 방향을 생성하세요.`,
-          },
-        ],
-        response_format: { type: "json_object" },
-        max_tokens: 2000,
-        temperature: 0.8,
-      }),
+            },
+          ],
+          response_format: { type: "json_object" },
+          max_tokens: 2000,
+          temperature: 0.8,
+          reasoning: { effort: "none" },
+        }),
       signal: controller.signal,
     });
 
