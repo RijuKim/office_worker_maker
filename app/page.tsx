@@ -220,6 +220,10 @@ export default function AppPage() {
   const [choiceFeedback, setChoiceFeedback] = useState<ChoiceFeedback | null>(null);
   const [mobileStatsOpen, setMobileStatsOpen] = useState(false);
 
+  const [specs, setSpecs] = useState<{ specType: string; specName: string; status: string; score?: string }[]>([]);
+  const [jobApps, setJobApps] = useState<{ companyName: string; currentStage: string; isActive: boolean }[]>([]);
+  const [careerPaths, setCareerPaths] = useState<{ pathType: string; pathName: string; status: string }[]>([]);
+
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
@@ -264,6 +268,17 @@ export default function AppPage() {
     }
   }
 
+  async function loadSpecData(charId: string) {
+    const [specsRes, jobAppsRes, pathsRes] = await Promise.all([
+      doFetch(`/api/characters/${charId}/specs`),
+      doFetch(`/api/characters/${charId}/job-applications`),
+      doFetch(`/api/characters/${charId}/career-paths`),
+    ]);
+    if (specsRes.ok) setSpecs(Array.isArray(specsRes.data) ? specsRes.data : specsRes.data?.specs ?? []);
+    if (jobAppsRes.ok) setJobApps(Array.isArray(jobAppsRes.data) ? jobAppsRes.data : jobAppsRes.data?.jobApplications ?? []);
+    if (pathsRes.ok) setCareerPaths(Array.isArray(pathsRes.data) ? pathsRes.data : pathsRes.data?.careerPaths ?? []);
+  }
+
   async function fetchNextEvent(charId: string, options: { preserveFeedback?: boolean } = {}) {
     if (!options.preserveFeedback) {
       setChoiceFeedback(null);
@@ -278,6 +293,7 @@ export default function AppPage() {
         if (ok) setCurrentEvent(data.event);
       }
       await loadCharacterEvent(charId);
+      await loadSpecData(charId);
       setPendingNext(false);
     } finally {
       setStreamingEventBody("");
@@ -416,8 +432,10 @@ export default function AppPage() {
     setEndingNotice("");
     if (char.currentEventId) {
       await loadCharacterEvent(char.id);
+      await loadSpecData(char.id);
     } else if (isCompletedRun(char)) {
       setEndingNotice("선택의 결과가 기록되었습니다. 새 이야기를 시작할 수 있습니다.");
+      await loadSpecData(char.id);
     } else {
       await fetchNextEvent(char.id);
     }
@@ -432,6 +450,9 @@ export default function AppPage() {
     setPendingNext(false);
     setEndingNotice("");
     setError("");
+    setSpecs([]);
+    setJobApps([]);
+    setCareerPaths([]);
     setScreen("create");
   }, []);
 
@@ -447,6 +468,7 @@ export default function AppPage() {
         setCurrentChar((char) => char ? { ...char, stats: data.result.stats } : char);
       }
       await loadCharacterEvent(currentChar.id);
+      await loadSpecData(currentChar.id);
       setChoiceFeedback({
         statDelta: data.result?.statDelta ?? {},
         relationshipDelta: data.result?.relationshipDelta ?? [],
@@ -743,6 +765,12 @@ export default function AppPage() {
                     )}
                 </div>
               ))}
+              <div className="rounded-md bg-[#2c231b] px-2.5 py-2 text-[13px]" data-testid="spec-score">
+                <dt className="flex items-center justify-between gap-2">
+                  <span><span className="mr-1.5 text-[11px] text-[#d79b52]">★</span>스펙 점수</span>
+                  <span className="text-[#c4b39c]">{currentChar.stats?.specScore ?? 0}</span>
+                </dt>
+              </div>
             </dl>
           </section>
         )}
@@ -913,6 +941,60 @@ export default function AppPage() {
           <div className="mt-2 flex flex-wrap gap-1">
             {currentChar?.eventHistory?.slice(0, 5).map((h, i) => (<span className="border-2 border-[#0f0b08] bg-[#35261c] px-2 py-1 text-xs text-[#f7d08b]" key={i}>{h.summary.slice(0, 15)}</span>))}
             {(!currentChar?.eventHistory || currentChar.eventHistory.length === 0) && <span className="text-xs text-[#d9c9b5]">아직 기록 없음</span>}
+          </div>
+        </section>
+        <section className="pixel-panel-dark mt-3.5 p-3.5" data-testid="spec-panel">
+          <h3 className="font-bold">스펙</h3>
+          <div className="mt-2 space-y-2">
+            {specs.map((spec, i) => (
+              <div key={i} className="flex items-center justify-between text-[13px]">
+                <div>
+                  <span className="text-[#a9967d] mr-1">[{spec.specType}]</span>
+                  <span className="text-[#d9c9b5]">{spec.specName}</span>
+                </div>
+                <span className={`text-[11px] px-1.5 py-0.5 rounded font-bold ${
+                  spec.status === 'COMPLETED' ? 'bg-[#2d4a22] text-[#8fce74]' :
+                  spec.status === 'FAILED' ? 'bg-[#4a2222] text-[#ce7474]' :
+                  'bg-[#4a3d22] text-[#ceb074]'
+                }`}>
+                  {spec.status}
+                </span>
+              </div>
+            ))}
+            {specs.length === 0 && <p className="text-[13px] text-[#d9c9b5]">정보 없음</p>}
+          </div>
+        </section>
+        <section className="pixel-panel-dark mt-3.5 p-3.5" data-testid="job-application-panel">
+          <h3 className="font-bold">취업 전형</h3>
+          <div className="mt-2 space-y-2">
+            {jobApps.map((app, i) => (
+              <div key={i} className="text-[13px]">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#d9c9b5] font-bold">{app.companyName}</span>
+                  <span className="text-[#a9967d] text-[11px]">{app.currentStage}</span>
+                </div>
+                <p className="mt-0.5 text-[#8a7f72] text-[11px]">서류 → 인적성 → 면접 → 최종</p>
+              </div>
+            ))}
+            {jobApps.length === 0 && <p className="text-[13px] text-[#d9c9b5]">진행 중인 전형 없음</p>}
+          </div>
+        </section>
+        <section className="pixel-panel-dark mt-3.5 p-3.5" data-testid="career-path-panel">
+          <h3 className="font-bold">진로 트랙</h3>
+          <div className="mt-2 space-y-2">
+            {careerPaths.map((path, i) => (
+              <div key={i} className="flex items-center justify-between text-[13px]">
+                <span className="text-[#d9c9b5]">{path.pathName}</span>
+                <span className={`text-[11px] px-1.5 py-0.5 rounded font-bold ${
+                  path.status === 'COMPLETED' ? 'bg-[#2d4a22] text-[#8fce74]' :
+                  path.status === 'FAILED' ? 'bg-[#4a2222] text-[#ce7474]' :
+                  'bg-[#4a3d22] text-[#ceb074]'
+                }`}>
+                  {path.status}
+                </span>
+              </div>
+            ))}
+            {careerPaths.length === 0 && <p className="text-[13px] text-[#d9c9b5]">정보 없음</p>}
           </div>
         </section>
       </aside>
