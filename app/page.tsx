@@ -73,6 +73,10 @@ function statLevel(value: number) {
   return Math.max(1, Math.min(10, Math.round(value)));
 }
 
+function formatWealth(value: number) {
+  return `${value}만원`;
+}
+
 function relationshipState(trust: number) {
   if (trust >= 80) return "연애";
   if (trust >= 45) return "호감";
@@ -127,6 +131,11 @@ function formatAcademicStatus(status: string) {
   if (status === "DROPPED_OUT") return "자퇴";
   if (status === "GRADUATED") return "졸업";
   return status;
+}
+
+function isCompletedRun(character: CharacterData | null) {
+  if (!character) return false;
+  return !character.currentEventId && character.academicStatus === "GRADUATED";
 }
 
 function stripRouteGradeText(value: unknown) {
@@ -197,10 +206,11 @@ function RecordPoster({ record }: { record: Record<string, unknown> }) {
 
 export default function AppPage() {
   const { status } = useSession();
-  const [screen, setScreen] = useState<Screen>("auth");
-  const [characters, setCharacters] = useState<CharacterData[]>([]);
+  const [screen, setScreen] = useState<Screen>("create");
   const [currentChar, setCurrentChar] = useState<CharacterData | null>(null);
   const [currentEvent, setCurrentEvent] = useState<EventData | null>(null);
+  const [streamingEventBody, setStreamingEventBody] = useState("");
+  const [streamingNextEvent, setStreamingNextEvent] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState<Record<string, unknown>[]>([]);
@@ -220,12 +230,13 @@ export default function AppPage() {
   const [preferredStats, setPreferredStats] = useState<string[]>(["academic", "mental"]);
 
   const mountedRef = useRef(false);
-  const activeScreen = status === "authenticated" && screen === "auth" ? "create" : screen;
+  const activeScreen = screen;
 
   async function doFetch(url: string, method = "GET", body?: unknown) {
     const opts: RequestInit = { method, headers: { "Content-Type": "application/json" } };
     if (body !== undefined) opts.body = JSON.stringify(body);
-    const res = await fetch(url, opts);
+    const requestUrl = typeof window === "undefined" ? url : new URL(url, window.location.origin).toString();
+    const res = await fetch(requestUrl, opts);
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok, status: res.status, data };
   }
@@ -234,7 +245,12 @@ export default function AppPage() {
     setLoading(true);
     try {
       const { ok, data } = await doFetch("/api/characters");
-      if (ok) setCharacters(data.characters ?? []);
+      if (ok) {
+        const loadedCharacters = data.characters ?? [];
+        if (!currentChar && loadedCharacters.length > 0) {
+          await resumeCharacter(loadedCharacters[0]);
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -248,14 +264,69 @@ export default function AppPage() {
     }
   }
 
-  async function fetchNextEvent(charId: string) {
-    setChoiceFeedback(null);
-    const { ok, data } = await doFetch(`/api/characters/${charId}/events/next`, "POST");
-    if (ok) {
-      setCurrentEvent(data.event);
+  async function fetchNextEvent(charId: string, options: { preserveFeedback?: boolean } = {}) {
+    if (!options.preserveFeedback) {
+      setChoiceFeedback(null);
+    }
+    setStreamingEventBody("");
+    setStreamingNextEvent(true);
+    setLoading(true);
+    try {
+      const streamed = await fetchNextEventStream(charId);
+      if (!streamed) {
+        const { ok, data } = await doFetch(`/api/characters/${charId}/events/next`, "POST");
+        if (ok) setCurrentEvent(data.event);
+      }
       await loadCharacterEvent(charId);
       setPendingNext(false);
+    } finally {
+      setStreamingEventBody("");
+      setStreamingNextEvent(false);
+      setLoading(false);
     }
+  }
+
+  async function fetchNextEventStream(charId: string) {
+    const response = await fetch(`/api/characters/${charId}/events/next/stream`, {
+      method: "POST",
+      headers: { Accept: "text/event-stream" },
+    }).catch(() => null);
+    if (!response?.ok || !response.body) return false;
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let receivedFinalEvent = false;
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const messages = buffer.split("\n\n");
+      buffer = messages.pop() ?? "";
+
+      for (const message of messages) {
+        const eventName = message.split("\n").find((line) => line.startsWith("event:"))?.slice(6).trim();
+        const dataLine = message.split("\n").find((line) => line.startsWith("data:"));
+        if (!eventName || !dataLine) continue;
+        const payload = JSON.parse(dataLine.slice(5).trim());
+        if (eventName === "body_delta" && typeof payload.text === "string") {
+          setStreamingEventBody((current) => current + payload.text);
+        }
+        if (eventName === "status") {
+          setStreamingNextEvent(true);
+        }
+        if (eventName === "event" && payload.event) {
+          setCurrentEvent(payload.event);
+          receivedFinalEvent = true;
+        }
+        if (eventName === "error") {
+          setError(payload.error ?? "다음 사건을 생성하지 못했습니다.");
+        }
+      }
+    }
+
+    return receivedFinalEvent;
   }
 
   const handleSignup = useCallback(async () => {
@@ -305,10 +376,7 @@ export default function AppPage() {
   }, [authEmail, authPassword]);
 
   useEffect(() => {
-    if (status !== "authenticated") {
-      mountedRef.current = false;
-      return;
-    }
+    if (status === "loading") return;
     if (mountedRef.current) return;
     mountedRef.current = true;
     loadCharacters();
@@ -339,12 +407,17 @@ export default function AppPage() {
     }
   }, [charName, charAge, charResidence, preferredStats]);
 
-  const pickCharacter = useCallback(async (char: CharacterData) => {
+  const resumeCharacter = useCallback(async (char: CharacterData) => {
     setCurrentChar(char);
+    setCurrentEvent(null);
+    setStreamingEventBody("");
+    setStreamingNextEvent(false);
     setPendingNext(false);
     setEndingNotice("");
     if (char.currentEventId) {
       await loadCharacterEvent(char.id);
+    } else if (isCompletedRun(char)) {
+      setEndingNotice("선택의 결과가 기록되었습니다. 새 이야기를 시작할 수 있습니다.");
     } else {
       await fetchNextEvent(char.id);
     }
@@ -354,6 +427,7 @@ export default function AppPage() {
   const startNewCharacter = useCallback(() => {
     setCurrentChar(null);
     setCurrentEvent(null);
+    setStreamingEventBody("");
     setChoiceFeedback(null);
     setPendingNext(false);
     setEndingNotice("");
@@ -383,7 +457,8 @@ export default function AppPage() {
         setPendingNext(false);
         setEndingNotice("선택의 결과가 기록되었습니다. 선택의 결과 기록에서 확인할 수 있습니다.");
       } else {
-        setPendingNext(true);
+        setPendingNext(false);
+        await fetchNextEvent(currentChar.id, { preserveFeedback: true });
       }
     } finally {
       setLoading(false);
@@ -418,37 +493,44 @@ export default function AppPage() {
   }, []);
 
   const academicProgressLabel = getAcademicProgressLabel(currentChar);
+  const runCompleted = Boolean(endingNotice);
 
-  if (status === "loading") {
-    return (
-      <main className="pixel-shell flex min-h-screen items-center justify-center">
-        <p className="pixel-panel px-6 py-4 text-[#2a241e]">로딩 중...</p>
-      </main>
-    );
-  }
-
-  if (status === "unauthenticated") {
+  if (activeScreen === "auth") {
     return (
       <main className="pixel-shell flex min-h-screen items-center justify-center p-4">
         <div className="pixel-panel w-full max-w-sm p-8">
-          <h1 className="mb-4 text-center text-2xl font-black leading-9">일어나보니<br />대한민국 취준생</h1>
-          <p className="mb-6 border-y-2 border-[#2a2018] py-2 text-center text-xs font-bold text-[#6d4a2f]">LITERARY CAREER ADVENTURE</p>
+          <h1 className="mb-4 text-center text-2xl font-black leading-9">{status === "authenticated" ? "저장된 계정" : "진행 저장하기"}</h1>
+          <p className="mb-6 border-y-2 border-[#2a2018] py-2 text-center text-xs font-bold text-[#6d4a2f]">
+            {status === "authenticated" ? "SIGNED IN" : "LOGIN TO KEEP YOUR RUN"}
+          </p>
           {error && <p className="mb-4 border-2 border-[#b3423c] bg-[#ffe1db] p-2 text-sm font-bold text-[#8d2f2a]">{error}</p>}
-          <div className="space-y-4">
-            <input className="pixel-input w-full px-4 py-3 text-sm" placeholder="이메일" type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} />
-            <input className="pixel-input w-full px-4 py-3 text-sm" placeholder="비밀번호 (8자 이상)" type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} />
-            {authMode === "login" ? (
-              <div className="space-y-3">
-                <button className="pixel-button-dark w-full px-4 py-3 text-sm font-bold disabled:opacity-50" disabled={loading} onClick={handleLogin}>로그인</button>
-                <p className="text-center text-xs text-[#706b62]">계정이 없으신가요? <button className="text-[#8a4f2d] underline" onClick={() => setAuthMode("signup")}>회원가입</button></p>
+          {status === "authenticated" ? (
+            <div className="space-y-3">
+              <p className="text-center text-sm leading-6 text-[#3a332d]">현재 진행은 계정에 저장됩니다.</p>
+              <button className="pixel-button-dark w-full px-4 py-3 text-sm font-bold" onClick={() => setScreen(currentChar ? "play" : "create")}>돌아가기</button>
+              <button className="pixel-button w-full px-4 py-3 text-sm font-bold" onClick={() => { setScreen("records"); loadRecords(); }}>기록 보기</button>
+              <button className="pixel-button w-full px-4 py-3 text-sm font-bold" onClick={() => signOut()}>로그아웃</button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <input className="pixel-input w-full px-4 py-3 text-sm" placeholder="이메일" type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} />
+              <input className="pixel-input w-full px-4 py-3 text-sm" placeholder="비밀번호 (8자 이상)" type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} />
+              {authMode === "login" ? (
+                <div className="space-y-3">
+                  <button className="pixel-button-dark w-full px-4 py-3 text-sm font-bold disabled:opacity-50" disabled={loading} onClick={handleLogin}>로그인</button>
+                  <p className="text-center text-xs text-[#706b62]">처음 저장하시나요? <button className="text-[#8a4f2d] underline" onClick={() => setAuthMode("signup")}>회원가입하고 현재 진행 저장</button></p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <button className="pixel-button-dark w-full px-4 py-3 text-sm font-bold disabled:opacity-50" disabled={loading} onClick={handleSignup}>회원가입하고 저장</button>
+                  <p className="text-center text-xs text-[#706b62]">이미 계정이 있으신가요? <button className="text-[#8a4f2d] underline" onClick={() => setAuthMode("login")}>로그인</button></p>
+                </div>
+              )}
+              <div className="border-t border-[#eee8dd] pt-3">
+                <button className="w-full text-center text-xs text-[#706b62] underline" onClick={() => setScreen(currentChar ? "play" : "create")}>나중에 저장하기</button>
               </div>
-            ) : (
-              <div className="space-y-3">
-                <button className="pixel-button-dark w-full px-4 py-3 text-sm font-bold disabled:opacity-50" disabled={loading} onClick={handleSignup}>회원가입</button>
-                <p className="text-center text-xs text-[#706b62]">이미 계정이 있으신가요? <button className="text-[#8a4f2d] underline" onClick={() => setAuthMode("login")}>로그인</button></p>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </main>
     );
@@ -459,28 +541,24 @@ export default function AppPage() {
       <main className="pixel-shell flex min-h-screen items-start justify-center p-4 pt-10">
         <div className="w-full max-w-lg">
           <div className="mb-6 flex items-center justify-between text-[#fff3d7]">
-            <h1 className="text-2xl font-black">LOAD / NEW</h1>
-            <button className="text-sm text-[#d9c9b5] underline" onClick={() => signOut()}>로그아웃</button>
-          </div>
-          {characters.length > 0 && (
-            <div className="mb-8">
-              <h2 className="mb-3 text-sm font-bold text-[#d9c9b5]">진행 중인 캐릭터</h2>
-              <div className="space-y-2">
-                {characters.map((c) => (
-                  <button className="pixel-button w-full px-4 py-3 text-left" key={c.id} onClick={() => pickCharacter(c)}>
-                    <span className="font-bold">{c.name}</span>
-                    <span className="ml-2 text-sm text-[#706b62]">{c.major} · {getAcademicProgressLabel(c)}</span>
-                  </button>
-                ))}
-              </div>
+            <h1 className="text-2xl font-black">NEW RUN</h1>
+            <div className="flex gap-3">
+              {status === "authenticated" && (
+                <button className="text-sm text-[#d9c9b5] underline" onClick={() => { setScreen("records"); loadRecords(); }}>
+                  기록
+                </button>
+              )}
+              <button className="text-sm text-[#d9c9b5] underline" onClick={() => setScreen("auth")}>
+                {status === "authenticated" ? "계정" : "로그인/저장"}
+              </button>
             </div>
-          )}
+          </div>
           <h2 className="mb-3 text-sm font-bold text-[#d9c9b5]">새 이야기</h2>
           {error && <p className="mb-4 border-2 border-[#b3423c] bg-[#ffe1db] p-2 text-sm font-bold text-[#8d2f2a]">{error}</p>}
           <div className="pixel-panel space-y-5 p-6">
             <div className="space-y-3 border-b border-[#eee8dd] pb-5 text-[15px] leading-7 text-[#3a332d]">
-              <p>눈을 뜨자 당신은 낯선 침대에서 깨어났습니다. 창밖은 대한민국의 평범한 아침인데, 휴대폰에는 수강 정정과 알바 공고와 읽지 않은 단체 채팅이 한꺼번에 쌓여 있습니다.</p>
-              <p>당신이 누구인지, 어디서 하루를 시작하는지, 어떤 능력에 조금 더 기대고 싶은지 떠올려 주세요. 나머지 전공, 학년, 첫 스탯과 사건은 이 세계가 알아서 당신에게 붙여줄 것입니다.</p>
+              <p>새벽 6시 47분, 모르는 번호에서 메시지가 도착했습니다. “오늘 고른 첫 선택이 졸업식까지 따라갑니다.” 장난 같지만, 휴대폰 화면에는 수강 정정, 알바 면접, 학과 단체 채팅, 누군가의 부재중 전화가 동시에 떠 있습니다.</p>
+              <p>당신은 아직 자신이 어떤 학생으로 기억될지 모릅니다. 이름과 나이, 오늘 눈뜬 장소, 끝까지 믿고 싶은 능력만 정하면 나머지 전공, 학년, 첫 사건은 이 세계가 당신에게 붙여줄 것입니다.</p>
             </div>
             <div>
               <label className="mb-1 block text-sm font-bold">당신의 이름은?</label>
@@ -544,7 +622,9 @@ export default function AppPage() {
             </div>
             <div className="flex gap-3 max-[720px]:mt-4">
               <button className="pixel-button bg-white px-4 py-2 text-sm font-bold text-[#2a241e]" onClick={loadRecords}>새로고침</button>
-              <button className="pixel-button bg-white px-4 py-2 text-sm font-bold text-[#2a241e]" onClick={() => { setScreen("play"); }}>진행으로</button>
+              <button className="pixel-button bg-white px-4 py-2 text-sm font-bold text-[#2a241e]" onClick={runCompleted ? startNewCharacter : () => { setScreen("play"); }}>
+                {runCompleted ? "새로 시작" : "진행으로"}
+              </button>
             </div>
           </div>
           <div className="grid gap-5">
@@ -628,7 +708,6 @@ export default function AppPage() {
           <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "character_detail" ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`} onClick={() => setScreen("character_detail")}>캐릭터</button>
           <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "relationships" ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`} onClick={() => setScreen("relationships")}>관계</button>
           <button className="rounded-lg px-2.5 py-2 text-left text-sm text-[#d9c9b5]" onClick={() => { setScreen("records"); loadRecords(); }}>기록</button>
-          <button className="rounded-lg px-2.5 py-2 text-left text-sm text-[#f7d08b]" onClick={startNewCharacter}>새로 시작</button>
           <button
             aria-expanded={mobileStatsOpen}
             className={`mobile-stats-toggle rounded-lg px-2.5 py-2 text-left text-sm ${mobileStatsOpen ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`}
@@ -637,7 +716,9 @@ export default function AppPage() {
           >
             능력치
           </button>
-          <button className="rounded-lg px-2.5 py-2 text-left text-sm text-[#a9967d]" onClick={() => signOut()}>로그아웃</button>
+          <button className="rounded-lg px-2.5 py-2 text-left text-sm text-[#a9967d]" onClick={() => setScreen("auth")}>
+            {status === "authenticated" ? "계정" : "로그인/저장"}
+          </button>
         </nav>
         {currentChar?.stats && (
           <section className={`sidebar-stats mt-3.5 rounded-lg border border-[#4d3d2f] bg-[#1b1612] p-3.5 ${mobileStatsOpen ? "sidebar-stats-open" : ""}`}>
@@ -647,13 +728,19 @@ export default function AppPage() {
                 <div className="rounded-md bg-[#2c231b] px-2.5 py-2 text-[13px]" key={key}>
                   <dt className="flex items-center justify-between gap-2">
                     <span><span className="mr-1.5 text-[11px] text-[#d79b52]">{statIcons[key]}</span>{label}</span>
-<span className="text-[#c4b39c]">{statLevel(currentChar.stats?.[key] ?? 0)}/10</span>
+                    {key === "wealth" ? (
+                      <span className="text-[#c4b39c]">{formatWealth(statLevel(currentChar.stats?.[key] ?? 0))}</span>
+                    ) : (
+                      <span className="text-[#c4b39c]">{statLevel(currentChar.stats?.[key] ?? 0)}/10</span>
+                    )}
                     </dt>
-                    <dd className="mt-1.5 flex gap-1" aria-label={`${label} ${statLevel(currentChar.stats?.[key] ?? 0)}`}>
-                      {Array.from({ length: 10 }, (_, i) => (
-                      <span className={`h-1.5 flex-1 rounded-full ${i < statLevel(currentChar.stats?.[key] ?? 0) ? "bg-[#d79b52]" : "bg-[#4c4035]"}`} key={i} />
-                    ))}
-                  </dd>
+                    {key !== "wealth" && (
+                      <dd className="mt-1.5 flex gap-1" aria-label={`${label} ${statLevel(currentChar.stats?.[key] ?? 0)}`}>
+                        {Array.from({ length: 10 }, (_, i) => (
+                        <span className={`h-1.5 flex-1 rounded-full ${i < statLevel(currentChar.stats?.[key] ?? 0) ? "bg-[#d79b52]" : "bg-[#4c4035]"}`} key={i} />
+                      ))}
+                    </dd>
+                    )}
                 </div>
               ))}
             </dl>
@@ -676,7 +763,7 @@ export default function AppPage() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   {Object.entries(choiceFeedback.statDelta).map(([key, delta]) => (
                     <span className={`border-2 px-2 py-1 text-xs font-bold ${delta > 0 ? "border-[#305d73] bg-[#d5edf6] text-[#244c5e]" : "border-[#b3423c] bg-[#ffe1db] text-[#7b2d29]"}`} key={key}>
-                      {statLabels[key] ?? key} {delta > 0 ? "+" : ""}{delta}
+                      {statLabels[key] ?? key} {key === "wealth" ? `${delta > 0 ? "+" : ""}${delta}만원` : `${delta > 0 ? "+" : ""}${delta}`}
                     </span>
                   ))}
                   {choiceFeedback.relationshipDelta.map((rel) => (
@@ -697,7 +784,26 @@ export default function AppPage() {
                     <p className="text-xs font-black text-[#8a4f2d]">RESULT UNLOCKED</p>
                     <p className="mt-1 text-2xl font-black">선택의 결과</p>
                     <p className="mt-2 text-sm leading-6">{endingNotice}</p>
-                    <button className="pixel-button mt-4 px-4 py-2 text-sm font-bold" onClick={() => { setScreen("records"); loadRecords(); }}>기록 보기</button>
+                    <button className="pixel-button mt-4 px-4 py-2 text-sm font-bold" onClick={startNewCharacter}>새로 시작하기</button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {streamingNextEvent && !currentEvent && !endingNotice && (
+              <div className="event-frame pixel-panel overflow-hidden">
+                <div className="grid grid-cols-[220px_minmax(0,1fr)] max-[720px]:grid-cols-1">
+                  <PixelScene scene="campus" label="생성 중인 장면" />
+                  <div className="p-6">
+                    <div className="mb-4 flex flex-wrap items-center gap-2">
+                      <span className="border-2 border-[#2a2018] bg-[#f7d08b] px-2 py-1 text-xs font-black text-[#2a2018]">새 장면</span>
+                      <h2 className="text-xl font-black leading-tight text-[#2a241e]">선택의 시간이 다가오고 있습니다...</h2>
+                    </div>
+                    <div className="novel-text text-lg tracking-normal max-[900px]:text-[16px]">
+                      {streamingEventBody
+                        ? streamingEventBody.split("\n").filter(Boolean).map((p, i) => (<p className="mt-3 first:mt-0" key={i}>{p}</p>))
+                        : <p className="mt-3 first:mt-0 text-[#706b62]">장면이 문장으로 떠오르는 중입니다.</p>}
+                    </div>
+                    <p className="mt-5 text-sm font-bold text-[#8a4f2d]">선택지는 장면이 완성되면 나타납니다.</p>
                   </div>
                 </div>
               </div>
@@ -730,7 +836,7 @@ export default function AppPage() {
                 </div>
               </>
             )}
-            {!currentEvent && !endingNotice && (
+            {!currentEvent && !endingNotice && !streamingNextEvent && (
               <div
                 className="pixel-panel cursor-pointer p-8 text-center"
                 onClick={continueToNextEvent}
@@ -744,9 +850,9 @@ export default function AppPage() {
                 }}
               >
                 <p className="text-lg leading-8 text-[#3a332d]">
-                  {pendingNext ? "선택의 여운이 잠시 방 안에 남습니다. 다음 문장을 읽으려면 이 화면을 누르세요." : "새 사건을 준비 중입니다. 계속하려면 이 화면을 누르세요."}
+                  {pendingNext ? "다음 사건을 준비 중입니다." : "새 사건을 준비 중입니다."}
                 </p>
-                {loading && <p className="mt-3 text-sm text-[#706b62]">다음 장면을 불러오는 중...</p>}
+                {loading && <p className="mt-3 text-sm text-[#706b62]">선택의 시간이 다가오고 있습니다...</p>}
               </div>
             )}
           </section>
@@ -904,9 +1010,6 @@ export default function AppPage() {
           }
           .mobile-stats-toggle {
             display: block;
-          }
-          .sidebar-nav button:last-child {
-            display: none;
           }
           .sidebar-stats {
             display: none;
