@@ -6,7 +6,12 @@ import {
   applyStatDeltas,
   validateChoiceIndex,
 } from "@/lib/game/game-rules";
-import { applyLifeStageTransition } from "@/lib/game/life-stage";
+import {
+  applyLifeStageTransition,
+  deriveRelationshipLifeState,
+  getParentingEndingType,
+  getRelationshipEndingType,
+} from "@/lib/game/life-stage";
 import { generateAiEnding } from "@/lib/game/openrouter";
 import { gateConcreteResultFields } from "@/lib/game/result-gating";
 import { prisma } from "@/lib/server/prisma";
@@ -163,6 +168,13 @@ export async function POST(request: Request, context: RouteContext) {
     burnoutRisk: updatedBurnoutRisk,
   };
   const endingType = getImmediateBadEnding(updatedStats);
+  const relationshipLife = deriveRelationshipLifeState(finalEventFlags);
+  const relationshipEndingType = getRelationshipEndingType(
+    relationshipLife.relationshipLife,
+    updatedStats,
+    [...character.relationships, ...newRelationships].map((rel) => ({ name: rel.name, trust: rel.trust })),
+  );
+  const parentingEndingType = getParentingEndingType(relationshipLife.parenting);
   const shouldCreateFinalEnding = !endingType &&
     lifeStageTransition.state.lifeStage === "post_graduation" &&
     lifeStageTransition.state.graduation === "graduated";
@@ -179,6 +191,7 @@ export async function POST(request: Request, context: RouteContext) {
     eventHistory: character.eventHistory,
     eventTitle: activeEvent.title,
     summary: resolvedSummary,
+    relationshipLife,
   }) : shouldCreateFinalEnding ? await buildFinalEndingRecord({
     userId,
     characterRunId: id,
@@ -192,6 +205,9 @@ export async function POST(request: Request, context: RouteContext) {
     eventTitle: activeEvent.title,
     summary: resolvedSummary,
     coreEventCount: character.coreEventCount + 1,
+    relationshipLife,
+    relationshipEndingType,
+    parentingEndingType,
   }) : null;
 
   await prisma.$transaction([
@@ -547,6 +563,7 @@ async function buildImmediateBadEndingRecord(input: {
   eventHistory: { event: { title: string }; summary: string; statDelta: unknown; relationshipDelta: unknown; flagDelta: unknown }[];
   eventTitle: string;
   summary: string;
+  relationshipLife?: { relationshipLife: string; parenting: { hasChildren: boolean; childCount: number; parentingStage: string } };
 }) {
   const reason = input.endingType === "건강 붕괴" ? "몸이 더는 버티지 못했다" :
     input.endingType === "멘탈 붕괴" ? "마음이 완전히 소진되었다" :
@@ -567,6 +584,7 @@ async function buildImmediateBadEndingRecord(input: {
       flagDelta: history.flagDelta,
     })),
     finalChoiceSummary: input.summary,
+    relationshipLife: input.relationshipLife,
   });
   const generated = aiEnding.success ? aiEnding.ending : null;
   const concreteResult = gateConcreteResultFields(generated, input.hiddenState);
@@ -608,14 +626,31 @@ async function buildFinalEndingRecord(input: {
   eventTitle: string;
   summary: string;
   coreEventCount: number;
+  relationshipLife?: { relationshipLife: string; parenting: { hasChildren: boolean; childCount: number; parentingStage: string } };
+  relationshipEndingType?: string | null;
+  parentingEndingType?: string | null;
 }) {
   const gate = getCareerGate(input.hiddenState);
-  const careerPath = pickCareerPath(input.stats, gate);
+  const relationshipEndingLabel = input.relationshipEndingType ?? null;
+  const parentingEndingLabel = input.parentingEndingType ?? null;
+  const careerPath = relationshipEndingLabel && (!gate || gate.status !== "passed")
+    ? relationshipEndingLabel
+    : parentingEndingLabel && (!gate || gate.status !== "passed")
+      ? parentingEndingLabel
+      : pickCareerPath(input.stats, gate);
   const satisfaction = toPercentScore((input.stats.health + input.stats.mental + input.stats.reputation) / 3);
   const growthPotential = toPercentScore((input.stats.academic + input.stats.practical + input.stats.charm) / 3);
   const workLifeBalance = toPercentScore((input.stats.health + input.stats.mental) / 2);
   const healthState = input.stats.health >= 7 ? "좋음" : input.stats.health >= 4 ? "보통" : "불안";
-  const relationshipState = input.stats.reputation >= 7 ? "넓고 안정적" : input.stats.reputation >= 4 ? "좁지만 유지됨" : "불안정";
+  const relationshipState = input.relationshipLife?.relationshipLife === "married"
+    ? "결혼 생활"
+    : input.relationshipLife?.relationshipLife === "cohabitation"
+      ? "동거 생활"
+      : input.relationshipLife?.relationshipLife === "divorced"
+        ? "이별 후 재정비"
+        : input.relationshipLife?.relationshipLife === "dating"
+          ? "연애 중"
+          : input.stats.reputation >= 7 ? "넓고 안정적" : input.stats.reputation >= 4 ? "좁지만 유지됨" : "불안정";
   const aiEnding = await generateAiEnding({
     name: input.characterName,
     age: input.age,
@@ -631,6 +666,7 @@ async function buildFinalEndingRecord(input: {
       flagDelta: history.flagDelta,
     })),
     finalChoiceSummary: input.summary,
+    relationshipLife: input.relationshipLife,
   });
   const generated = aiEnding.success ? aiEnding.ending : null;
   const concreteResult = gateConcreteResultFields(generated, input.hiddenState);

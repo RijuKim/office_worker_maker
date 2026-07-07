@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const apiKey = () => process.env.OPENROUTER_API_KEY ?? null;
-const model = () => process.env.OPENROUTER_MODEL ?? "google/gemma-4-31b-it:free";
+const model = () => process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-v4-flash:cloud";
 
 const AI_TIMEOUT_MS = 25_000;
 
@@ -202,6 +202,7 @@ export async function generateAiEnding(state: {
   relationships: { name: string; role: string; trust: number; tags: unknown }[];
   eventHistory: { title: string; summary: string; statDelta: unknown; relationshipDelta: unknown; flagDelta: unknown }[];
   finalChoiceSummary: string;
+  relationshipLife?: { relationshipLife: string; parenting: { hasChildren: boolean; childCount: number; parentingStage: string } };
 }): Promise<OpenRouterEndingResult | OpenRouterFailure> {
   const key = apiKey();
   if (!key) return { success: false, reason: "no_key" };
@@ -238,7 +239,8 @@ The longNarrative must be 700-1400 Korean characters when possible. It must cove
 5. A final image, not a generic lesson.
 Mention at least three concrete past event titles or relationship names from the supplied history when they matter. Avoid generic summaries that could fit any playthrough.
 Do not write route grades such as A/B/C, GOOD ROUTE, MIXED ROUTE, or HARD ROUTE.
-Use fictional/parody company or institution names only. No real defamatory claims.`,
+Use fictional/parody company or institution names only. No real defamatory claims.
+If the character has a relationship life state (single, dating, cohabitation, married, divorced, widowed) or parenting state (expecting, newborn, toddler, school_age), reflect it naturally in the narrative. A marriage ending should feel earned from prior relationship history, not sudden. A parenting ending should show how the child changed the character's daily life and priorities. A single/independent ending should feel like a conscious choice, not a failure.`,
           },
           {
             role: "user",
@@ -248,6 +250,7 @@ Use fictional/parody company or institution names only. No real defamatory claim
 관계도: ${JSON.stringify(state.relationships)}
 전체 사건 기록: ${JSON.stringify(state.eventHistory)}
 마지막 선택: ${state.finalChoiceSummary}
+${state.relationshipLife ? `관계 생활 상태: ${state.relationshipLife.relationshipLife}${state.relationshipLife.parenting.hasChildren ? `, 자녀: ${state.relationshipLife.parenting.childCount}명 (${state.relationshipLife.parenting.parentingStage})` : ""}` : ""}
 
 JSON fields: title, summary, longNarrative, careerPath, jobRole, destinationName, salaryBand, workplaceTone, satisfaction, growthPotential, workLifeBalance, healthState, relationshipState, tags.`,
           },
@@ -441,6 +444,140 @@ function normalizeRelationshipDelta(raw: unknown) {
       };
     })
     .filter((item): item is { name: string; trust: number } => Boolean(item));
+}
+
+const aiBranchProposalSchema = z.object({
+  proposals: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(60),
+        label: z.string().min(1).max(200),
+        summary: z.string().min(1).max(500),
+        suggestedDestinationKind: z.string().min(1).max(60).optional(),
+        statRequirements: z
+          .object({
+            academic: z.number().int().min(1).max(10).optional(),
+            practical: z.number().int().min(1).max(10).optional(),
+            health: z.number().int().min(1).max(10).optional(),
+            mental: z.number().int().min(1).max(10).optional(),
+            wealth: z.number().int().min(1).max(10).optional(),
+            reputation: z.number().int().min(1).max(10).optional(),
+            charm: z.number().int().min(1).max(10).optional(),
+          })
+          .optional(),
+        relationshipRequirements: z
+          .array(
+            z.object({
+              name: z.string().min(1).max(60),
+              minTrust: z.number().int().min(-100).max(100),
+            }),
+          )
+          .optional(),
+      }),
+    )
+    .min(2)
+    .max(4),
+});
+
+export type AiBranchProposalResponse = z.infer<typeof aiBranchProposalSchema>;
+
+const BRANCH_PROPOSAL_SYSTEM_PROMPT = `You are a creative director for a Korean college life text-adventure game.
+
+Generate 2-4 possible future branch directions for the character. Each branch represents a possible life path the character could pursue.
+
+For each branch, provide:
+- id: A unique short identifier (e.g., "career_company", "romance_marriage", "academic_grad_school")
+- label: A short Korean label describing the branch (e.g., "대기업 취업 준비", "연애와 결혼", "대학원 진학")
+- summary: A 1-3 sentence Korean description of what this branch entails
+- suggestedDestinationKind (optional): The kind of destination this branch leads to (company, public_sector, professional_exam, startup, self_employment, graduate_school, overseas, lab)
+- statRequirements (optional): Minimum stat levels needed for this branch
+- relationshipRequirements (optional): Relationship trust levels needed
+
+Consider:
+- The character's current stats, relationships, and story arc
+- Existing destination candidates the character has
+- The character's academic plan and life stage
+- Make branches feel connected to past events and choices
+- Include a mix of career, academic, relationship, and life-style branches
+- At least one branch should be achievable given current state
+- Do not suggest branches that contradict established character state
+
+Return ONLY valid JSON with a "proposals" array.`;
+
+export async function generateAiBranchProposals(state: {
+  name: string;
+  age: number;
+  major: string;
+  gradeYear: number | null;
+  coreEventCount: number;
+  stats: Record<string, number>;
+  relationships: { name: string; role: string; trust: number }[];
+  lifeStage: string;
+  graduation: string;
+  destinationCandidates: { id: string; kind: string; name: string; status: string }[];
+  storyArc: unknown;
+}): Promise<{ success: true; proposals: AiBranchProposalResponse["proposals"] } | { success: false; reason: string }> {
+  const key = apiKey();
+  if (!key) return { success: false, reason: "no_key" };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://college-career-sim.local",
+        "X-Title": "College Career Sim",
+      },
+      body: JSON.stringify({
+        model: model(),
+        messages: [
+          { role: "system", content: BRANCH_PROPOSAL_SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: `주인공: ${state.name}, ${state.age}세, ${state.major}, ${state.gradeYear ?? "?"}학년
+생활 단계: ${state.lifeStage}
+졸업 상태: ${state.graduation}
+진행된 핵심 사건 수: ${state.coreEventCount}
+현재 공개 스탯: ${JSON.stringify(state.stats)}
+주요 관계: ${JSON.stringify(state.relationships)}
+기존 목적지 후보: ${JSON.stringify(state.destinationCandidates)}
+스토리 아크: ${JSON.stringify(state.storyArc)}
+
+위 정보를 바탕으로 2-4개의 미래 분기 방향을 생성하세요.`,
+          },
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 2000,
+        temperature: 0.8,
+      }),
+      signal: controller.signal,
+    });
+
+    if (response.status === 429) return { success: false, reason: "rate_limited" };
+    if (!response.ok) return { success: false, reason: "api_error" };
+
+    const data = await response.json();
+    const content = data?.choices?.[0]?.message?.content;
+    if (!content) return { success: false, reason: "invalid_response" };
+
+    const parsed = extractJson(content);
+    const validated = aiBranchProposalSchema.safeParse(parsed);
+
+    if (!validated.success) return { success: false, reason: "invalid_response" };
+
+    return { success: true, proposals: validated.data.proposals };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return { success: false, reason: "timeout" };
+    }
+    return { success: false, reason: "api_error" };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function checkDailyAiLimit(userId: string): Promise<{
