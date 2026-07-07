@@ -774,7 +774,7 @@ export default function AppPage() {
               <div className="mt-2 rounded-md bg-[#2c231b] px-2.5 py-2 text-[13px]">
                 <dt className="flex items-center justify-between gap-2">
                   <span><span className="mr-1.5 text-[11px] text-[#d79b52]">CO</span>자산</span>
-                  <span className="text-[#c4b39c]">{formatWealth(statLevel(currentChar.stats?.wealth ?? 0))}</span>
+                  <span className="text-[#c4b39c]">{formatWealth(currentChar.stats?.wealth ?? 0)}</span>
                 </dt>
               </div>
             </section>
