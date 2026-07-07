@@ -175,9 +175,12 @@ export async function POST(request: Request, context: RouteContext) {
     [...character.relationships, ...newRelationships].map((rel) => ({ name: rel.name, trust: rel.trust })),
   );
   const parentingEndingType = getParentingEndingType(relationshipLife.parenting);
-  const shouldCreateFinalEnding = !endingType &&
-    lifeStageTransition.state.lifeStage === "post_graduation" &&
-    lifeStageTransition.state.graduation === "graduated";
+  const coreEventCount = character.coreEventCount + 1;
+  const shouldCreateFinalEnding = !endingType && (
+    (lifeStageTransition.state.lifeStage === "post_graduation" &&
+     lifeStageTransition.state.graduation === "graduated") ||
+    coreEventCount >= 14
+  );
   const endingRecord = endingType ? await buildImmediateBadEndingRecord({
     userId,
     characterRunId: id,

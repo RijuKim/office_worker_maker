@@ -385,7 +385,7 @@ export function applyLifeStageTransition(input: LifeStageTransitionInput): LifeS
       graduation: "gate_ready",
     };
     reasons.push("graduation_gate_ready");
-  } else if (next.stageEventCount >= 2 && next.graduation !== "gate_ready") {
+  } else if (next.stageEventCount >= 1 && next.graduation !== "gate_ready") {
     const advancedTerm = advanceTerm(next.term);
     next = {
       ...next,
