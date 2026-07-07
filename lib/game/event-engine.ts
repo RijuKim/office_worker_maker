@@ -225,7 +225,7 @@ export const STATIC_EVENTS: StaticEvent[] = [
 
 말도 안 되는 우연이라고 생각하면서도 당신은 그 문장을 자꾸 다시 읽는다. 안정적인 직업이라는 말은 때로 구명줄처럼 보이지만, 그 줄을 잡는 순간 다른 길에서 멀어질 수도 있다. 당신은 오늘 저녁 그 스터디에 나갈지 말지 결정해야 한다.`,
     choices: [
-      { id: "join_public_study", label: "공기업 필기 스터디에 나간다.", summary: "당신은 안정적인 진로 가능성을 붙잡기 위해 새 스터디에 들어갔다.", statDelta: { academic: 4, reputation: 1, mental: -2, wealth: -10 }, relationshipDelta: [{ name: "현우", trust: 6 }], flagDelta: { publicSectorThread: "study" } },
+      { id: "join_public_study", label: "공기업 필기 스터디에 나간다.", summary: "당신은 안정적인 진로 가능성을 붙잡기 위해 새 스터디에 들어갔다.", statDelta: { academic: 4, reputation: 1, mental: -2, wealth: -10 }, relationshipDelta: [{ name: "현우", trust: 6 }], flagDelta: { publicSectorThread: "study", careerPathChosen: true } },
       { id: "ignore_note", label: "메모를 접어두고 원래 하던 준비를 계속한다.", summary: "당신은 흔들리는 마음을 접고 기존 계획을 유지했다.", statDelta: { mental: 2, academic: 1, practical: -2 }, relationshipDelta: [], flagDelta: { publicSectorThread: "ignored" } },
     ],
     tags: ["공무원", "공기업", "자격증"],
@@ -249,7 +249,7 @@ export const STATIC_EVENTS: StaticEvent[] = [
 
 하지만 비행기표는 싸지 않고, 돌아왔을 때 이력서의 빈칸을 어떻게 설명할지도 알 수 없다. 당신은 지금의 답답함을 벗어나고 싶은 마음과, 여기서 버텨야 한다는 마음 사이에 선다.`,
     choices: [
-      { id: "prepare_working_holiday", label: "워홀 자금을 모으고 영어 공부를 시작한다.", summary: "당신은 해외에서 다른 삶을 시험해보기로 마음먹었다.", statDelta: { charm: 3, practical: 3, wealth: -30, mental: -1 }, relationshipDelta: [], flagDelta: { overseasThread: "working_holiday" } },
+      { id: "prepare_working_holiday", label: "워홀 자금을 모으고 영어 공부를 시작한다.", summary: "당신은 해외에서 다른 삶을 시험해보기로 마음먹었다.", statDelta: { charm: 3, practical: 3, wealth: -30, mental: -1 }, relationshipDelta: [], flagDelta: { overseasThread: "working_holiday", careerPathChosen: true } },
       { id: "stay_and_apply", label: "포스터를 접어두고 국내 인턴 지원서를 쓴다.", summary: "당신은 떠나는 상상 대신 지금의 경쟁에 남기로 했다.", statDelta: { practical: 3, reputation: 2, mental: -3, health: -1 }, relationshipDelta: [], flagDelta: { overseasThread: "stayed" } },
     ],
     tags: ["해외", "워홀", "진로"],
@@ -475,7 +475,7 @@ export const STATIC_EVENTS: StaticEvent[] = [
 
 친구는 정보를 나눠줄 수 있다고 했다. 함께 준비하면 부담은 줄지만, 진로는 그만큼 크게 흔들린다. 여기서 다시 생각해보면 안정은 지키겠지만, 마음 한쪽은 계속 그쪽을 바라볼 것이다.`,
     choices: [
-      { id: "wh_prepare", label: "정보를 공유받고 함께 준비한다.", summary: "당신은 워킹홀리데이 준비에 마음을 열고 첫걸음을 뗐다.", statDelta: { practical: 2, charm: 1 }, relationshipDelta: [], flagDelta: { careerPathInit: { pathType: "WORKING_HOLIDAY" } } },
+      { id: "wh_prepare", label: "정보를 공유받고 함께 준비한다.", summary: "당신은 워킹홀리데이 준비에 마음을 열고 첫걸음을 뗐다.", statDelta: { practical: 2, charm: 1 }, relationshipDelta: [], flagDelta: { careerPathInit: { pathType: "WORKING_HOLIDAY" }, careerPathChosen: true } },
       { id: "wh_reconsider", label: "내 상황을 다시 생각해본다.", summary: "당신은 지금의 안정을 지키기 위해 결정을 미뤘다.", statDelta: { mental: 2 }, relationshipDelta: [], flagDelta: { whReconsidered: true } },
     ],
     tags: ["해외", "워홀", "진로"],
@@ -487,7 +487,7 @@ export const STATIC_EVENTS: StaticEvent[] = [
 
 몇 년을 걸어야 하는 길이라는 걸 서로 잘 알고 있다. 조언을 구하면 현실적인 그림이 그려질 것이고, 지금의 진로와 비교하면 결심이 생기거나 흔들릴 것이다. 어느 쪽이든 오늘 이 대화는 오래 기억에 남을 것 같다.`,
     choices: [
-      { id: "gosi_ask", label: "선배에게 조언을 구한다.", summary: "당신은 고시 준비 선배에게 진지한 조언을 구했다.", statDelta: { academic: 2 }, relationshipDelta: [{ name: "선배", trust: 4 }], flagDelta: { gosiInterest: "asked" } },
+      { id: "gosi_ask", label: "선배에게 조언을 구한다.", summary: "당신은 고시 준비 선배에게 진지한 조언을 구했다.", statDelta: { academic: 2 }, relationshipDelta: [{ name: "선배", trust: 4 }], flagDelta: { gosiInterest: "asked", careerPathChosen: true } },
       { id: "gosi_compare", label: "내 진로와 비교해본다.", summary: "당신은 자신의 진로를 다시 정리하며 방향을 고민했다.", statDelta: { mental: 2 }, relationshipDelta: [], flagDelta: { gosiCompared: true } },
     ],
     tags: ["진로", "고시", "시험"],
@@ -1047,9 +1047,11 @@ export interface StaticEvent {
 
 export function pickRandomStaticEvent(excludeTitles?: string[], context?: EventSelectionContext): StaticEvent {
   const arc = getStoryArc(context?.coreEventCount ?? 0);
+  const hasChosenCareerPath = context?.eventFlags?.careerPathChosen === true;
   const conditionalPool = context ? CONDITIONAL_STATIC_EVENTS
     .filter((event) => event.arcIds.includes(arc.id))
     .filter((event) => !excludeTitles?.includes(event.title))
+    .filter((event) => !hasChosenCareerPath || !event.tags.includes("진로"))
     .map((event) => ({ event, score: scoreConditionalEvent(event, context) }))
     .filter(({ score }) => score > 0)
     .sort((a, b) => b.score - a.score) : [];
@@ -1063,7 +1065,8 @@ export function pickRandomStaticEvent(excludeTitles?: string[], context?: EventS
   const filteredPool = (excludeTitles?.length
     ? STATIC_EVENTS.filter((e) => !excludeTitles.includes(e.title))
     : STATIC_EVENTS)
-    .filter((event) => !context || isEventAllowedForLifeStage(event, context));
+    .filter((event) => !context || isEventAllowedForLifeStage(event, context))
+    .filter((event) => !hasChosenCareerPath || !event.tags.includes("진로"));
   const pool = filteredPool.length > 0 ? filteredPool : STATIC_EVENTS;
   return pickWeightedStaticEvent(pool, context);
 }
