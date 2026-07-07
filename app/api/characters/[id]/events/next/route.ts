@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { EventSource } from "@prisma/client";
 
 import { getStoryArc, selectNextEvent } from "@/lib/game/event-engine";
-import { applyLifeStageTransition, deriveLifeStageState } from "@/lib/game/life-stage";
+import { deriveLifeStageState } from "@/lib/game/life-stage";
 import { checkDailyAiLimit, generateAiEvent, incrementAiUsage } from "@/lib/game/openrouter";
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
@@ -76,27 +76,8 @@ export async function POST(_request: Request, context: RouteContext) {
     coreEventCount: character.coreEventCount,
     major: character.major,
   });
-  const forcedTransition = character.stats ? applyLifeStageTransition({
-    eventFlags: currentFlags,
-    currentGradeYear: character.currentGradeYear,
-    academicStatus: character.academicStatus,
-    coreEventCount: character.coreEventCount,
-    major: character.major,
-    burnoutRisk: character.hiddenState.burnoutRisk,
-    stats: {
-      academic: character.stats.academic,
-      practical: character.stats.practical,
-      health: character.stats.health,
-      mental: character.stats.mental,
-      reputation: character.stats.reputation,
-    },
-  }) : null;
-  const transitionReasons = forcedTransition?.reasons ?? [];
-  const shouldPersistForcedState = transitionReasons.includes("dropout_threshold") || transitionReasons.includes("leave_threshold");
-  const selectionLifeStage = shouldPersistForcedState && forcedTransition ? forcedTransition.state : lifeStage;
-  const selectionFlags = shouldPersistForcedState && forcedTransition
-    ? { ...currentFlags, ...forcedTransition.flagDelta }
-    : currentFlags;
+  const selectionLifeStage = lifeStage;
+  const selectionFlags = currentFlags;
   const storyArc = advanceStoryArc(currentFlags.storyArc, character.coreEventCount, currentFlags);
 
   const { type, event } = selectNextEvent(
@@ -203,12 +184,6 @@ export async function POST(_request: Request, context: RouteContext) {
     where: { id },
     data: {
       currentEventId: newEvent.id,
-      ...(shouldPersistForcedState && forcedTransition ? {
-        currentGradeYear: forcedTransition.state.term.gradeYear,
-        academicStatus: forcedTransition.state.lifeStage === "dropout" ? "DROPPED_OUT" as const :
-          forcedTransition.state.lifeStage === "leave" ? "LEAVE" as const :
-            character.academicStatus,
-      } : {}),
     },
   });
 

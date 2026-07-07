@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { buildBurnoutEvent } from "@/lib/game/event-engine";
 import { checkForcedEvent } from "@/lib/game/game-rules";
+import { applyLifeStageTransition, getDropoutReason, getLeaveReason, readRiskDebt } from "@/lib/game/life-stage";
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
 
@@ -18,6 +19,7 @@ export async function POST(_request: Request, context: RouteContext) {
   const character = await prisma.characterRun.findFirst({
     where: { id, userId },
     include: {
+      stats: true,
       hiddenState: true,
       events: {
         where: { status: "ACTIVE" },
@@ -35,7 +37,19 @@ export async function POST(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "캐릭터 데이터가 불완전합니다." }, { status: 500 });
   }
 
-  const forced = checkForcedEvent(character.hiddenState);
+  const currentFlags = (character.hiddenState.eventFlags as Record<string, unknown>) ?? {};
+  const riskDebt = readRiskDebt(currentFlags);
+  const stats = character.stats ? {
+    academic: character.stats.academic,
+    practical: character.stats.practical,
+    health: character.stats.health,
+    mental: character.stats.mental,
+    reputation: character.stats.reputation,
+  } : undefined;
+  const dropoutReason = stats ? getDropoutReason(stats, riskDebt) : false;
+  const leaveReason = stats ? getLeaveReason(stats, character.hiddenState.burnoutRisk) : false;
+  const forcedByLifeStage = dropoutReason || leaveReason;
+  const forced = forcedByLifeStage ? { type: "burnout" as const } : checkForcedEvent(character.hiddenState);
 
   if (!forced) {
     return NextResponse.json({ forced: false });
@@ -64,10 +78,42 @@ export async function POST(_request: Request, context: RouteContext) {
     },
   });
 
-  await prisma.characterRun.update({
-    where: { id },
-    data: { currentEventId: newEvent.id },
-  });
+  const lifeStageTransition = character.stats ? applyLifeStageTransition({
+    eventFlags: currentFlags,
+    currentGradeYear: character.currentGradeYear,
+    academicStatus: character.academicStatus,
+    coreEventCount: character.coreEventCount,
+    major: character.major,
+    burnoutRisk: character.hiddenState.burnoutRisk,
+    stats,
+  }) : null;
+
+  await prisma.$transaction([
+    prisma.characterRun.update({
+      where: { id },
+      data: {
+        currentEventId: newEvent.id,
+        ...(forcedByLifeStage && lifeStageTransition ? {
+          currentGradeYear: lifeStageTransition.state.term.gradeYear,
+          academicStatus: dropoutReason ? "DROPPED_OUT" as const :
+            leaveReason ? "LEAVE" as const :
+              character.academicStatus,
+        } : {}),
+      },
+    }),
+    ...(forcedByLifeStage && lifeStageTransition ? [
+      prisma.hiddenState.update({
+        where: { characterRunId: id },
+        data: {
+          eventFlags: {
+            ...currentFlags,
+            ...lifeStageTransition.flagDelta,
+            lifeStage: { id: dropoutReason ? "dropout" as const : "leave" as const },
+          },
+        },
+      }),
+    ] : []),
+  ]);
 
   return NextResponse.json({
     forced: true,

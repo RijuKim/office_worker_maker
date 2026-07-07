@@ -341,26 +341,10 @@ export function applyLifeStageTransition(input: LifeStageTransitionInput): LifeS
   const currentCoreEventCount = clampNonNegativeInteger(input.coreEventCount, 0);
   const riskDebt = readRiskDebt(input.eventFlags);
 
-  const dropoutReason = getDropoutReason(input.stats, riskDebt);
-  if (dropoutReason) {
-    const state = {
-      ...current,
-      lifeStage: "dropout" as const,
-      graduation: "delayed" as const,
-      stageEventCount: 0,
-    };
-    return buildTransitionResult(state, ["dropout_threshold"], currentCoreEventCount);
-  }
-
-  const leaveReason = getLeaveReason(input.stats, input.burnoutRisk);
-  if (leaveReason) {
-    const state = {
-      ...current,
-      lifeStage: "leave" as const,
-      stageEventCount: 0,
-    };
-    return buildTransitionResult(state, ["leave_threshold"], currentCoreEventCount);
-  }
+  // Dropout/leave are NOT forced here. They are detected and flagged,
+  // but the actual transition happens only through the forced-check route
+  // which presents a narrative event first. This function only handles
+  // normal academic progression (semester advance, graduation gate, etc.)
 
   if (current.lifeStage === "leave" || current.lifeStage === "dropout" || current.lifeStage === "post_graduation") {
     return buildTransitionResult(current, ["no_transition"], currentCoreEventCount);
@@ -385,7 +369,7 @@ export function applyLifeStageTransition(input: LifeStageTransitionInput): LifeS
       graduation: "gate_ready",
     };
     reasons.push("graduation_gate_ready");
-  } else if (next.stageEventCount >= 1 && next.graduation !== "gate_ready") {
+  } else if (next.stageEventCount >= 2 && next.graduation !== "gate_ready") {
     const advancedTerm = advanceTerm(next.term);
     next = {
       ...next,
@@ -595,7 +579,7 @@ function shouldRequireExtraSemester(
     hasRequirementBlocker;
 }
 
-function getDropoutReason(
+export function getDropoutReason(
   stats: LifeStageTransitionInput["stats"] | undefined,
   riskDebt: number,
 ): boolean {
@@ -605,7 +589,7 @@ function getDropoutReason(
     riskDebt >= 8;
 }
 
-function getLeaveReason(
+export function getLeaveReason(
   stats: LifeStageTransitionInput["stats"] | undefined,
   burnoutRisk?: number | null,
 ): boolean {
@@ -614,7 +598,7 @@ function getLeaveReason(
     (burnoutRisk !== undefined && burnoutRisk !== null && burnoutRisk >= 80);
 }
 
-function readRiskDebt(eventFlags: unknown): number {
+export function readRiskDebt(eventFlags: unknown): number {
   const flags = asRecord(eventFlags);
   return typeof flags.riskDebt === "number" && Number.isFinite(flags.riskDebt) ? Math.floor(flags.riskDebt) : 0;
 }
