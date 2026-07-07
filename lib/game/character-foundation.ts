@@ -46,7 +46,7 @@ export function buildInitialStats(
     health: randomStat(6),
     mental: randomStat(5),
     network: randomStat(4),
-    wealth: randomStat(3) * 10, // 원화: 10~90만원
+    wealth: 50, // 초기 자산 50만원
     reputation: randomStat(5),
     charm: randomStat(5),
   };
