@@ -1402,6 +1402,23 @@ export function isEventAllowedForLifeStage(event: Pick<StaticEvent, "title" | "t
       title.includes("지원서");
   }
 
+  if (lifeStage === "college_early") {
+    return !hasAny(tags, ["기업", "면접", "공공", "전문직", "창업", "지원서", "스펙", "취업"]);
+  }
+
+  if (lifeStage === "college_mid") {
+    if (hasAny(tags, ["기업", "면접", "공공", "전문직", "창업", "지원서"])) return false;
+    if (hasAny(tags, ["스펙", "취업", "인턴", "어학", "자격증"])) return true;
+    return !hasAny(tags, ["시작", "신입", "환영"]);
+  }
+
+  if (lifeStage === "college_late") {
+    if (hasAny(tags, ["시작", "신입", "환영", "중간고사", "동아리", "MT"])) return false;
+    if (hasAny(tags, ["스펙", "취업", "인턴", "어학", "자격증", "기업", "면접", "공공", "전문직", "창업", "지원서", "진로", "시험", "합격", "불합격"])) return true;
+    if (hasAny(tags, ["해외", "워홀", "고시"])) return true;
+    return hasAny(tags, ["돈", "가족", "멘탈", "건강", "알바", "자산", "관계", "연애", "범죄", "위험"]);
+  }
+
   if (hasAny(tags, ["해외", "워홀"]) && !hasCandidateOrThread(candidates, context.eventFlags, "overseas", ["overseasThread"])) {
     return lifeStage === "college_mid" || lifeStage === "college_late";
   }
