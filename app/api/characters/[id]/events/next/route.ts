@@ -184,7 +184,7 @@ export async function POST(_request: Request, context: RouteContext) {
         if (aiResult.providerId === "ollama") {
           await incrementAiUsage(userId);
         }
-        selectedEvent = {
+        const aiEvent = {
           title: aiResult.event.title,
           body: aiResult.event.body,
           choices: aiResult.event.choices.map((choice) => ({
@@ -193,9 +193,12 @@ export async function POST(_request: Request, context: RouteContext) {
             flagDelta: { aiGenerated: true, storyPhase: storyArc.phase },
           })),
           tags: aiResult.event.tags,
-          source: "FALLBACK",
+          source: "FALLBACK" as const,
         };
-        source = "AI";
+        if (isEventAllowedForLifeStage({ title: aiEvent.title, tags: aiEvent.tags }, selectionContext)) {
+          selectedEvent = aiEvent;
+          source = "AI";
+        }
       }
     }
   }
