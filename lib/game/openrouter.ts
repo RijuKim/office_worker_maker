@@ -1,9 +1,9 @@
 import { z } from "zod";
 
 const apiKey = () => process.env.OPENROUTER_API_KEY ?? null;
-const model = () => process.env.OPENROUTER_MODEL ?? "openai/gpt-4o-mini";
+const model = () => process.env.OPENROUTER_MODEL ?? "google/gemma-4-31b-it:free";
 
-const AI_TIMEOUT_MS = 10_000;
+const AI_TIMEOUT_MS = 25_000;
 
 const aiEventSchema = z.object({
   title: z.string().min(1).max(100),
@@ -223,17 +223,21 @@ export async function generateAiEnding(state: {
         messages: [
           {
             role: "system",
-            content: `You write endings for a Korean literary career text-adventure. Return ONLY valid JSON.
-The ending must be Korean prose, second-person "당신은" voice, and longNarrative must be at least 500 Korean characters.
+            content: `You write final result records for a Korean literary career text-adventure. Return ONLY valid JSON.
+The result must be Korean prose, second-person "당신은" voice, and longNarrative must be at least 500 Korean characters.
 Use public stats, hidden state, every major event, and relationships. Include career life and what happened afterward.
-The ending must be layered, surprising, and novelistic: success can contain private loss, failure can contain quiet dignity, bad relationships can return as reversals.
-Possible endings are not limited to office jobs. They may include romance, marriage, living alone, overseas working holiday, police/public safety, private investigator, lawyer/accountant/professional, founder, self-employed owner, artist/marketer, civil servant, criminal downfall, whistleblower, quiet rural life, or a lonely but peaceful life.
+The result must be layered, surprising, and novelistic: success can contain private loss, failure can contain quiet dignity, bad relationships can return as reversals.
+Possible results are not limited to office jobs. They may include romance, marriage, living alone, overseas working holiday, police/public safety, private investigator, lawyer/accountant/professional, founder, self-employed owner, artist/marketer, civil servant, criminal downfall, whistleblower, quiet rural life, or a lonely but peaceful life.
+Do not use the word "엔딩" in title, summary, tags, or longNarrative. Call it "선택의 결과", "기록", or describe the concrete life result.
+Do not grant a licensed profession, specific company job, public safety role, or startup selection unless hiddenState.eventFlags.careerGate.status is "passed" for that path. If the gate is failed or absent, write about preparation, rejection, retrying, or a different unspecific path.
 The longNarrative must be 700-1400 Korean characters when possible. It must cover:
 1. What career/life path happened right after university.
 2. A turning point caused by at least one past event or relationship.
 3. How love, marriage, solitude, family, money, health, or reputation changed afterward.
 4. A reversal or irony based on mismatched stats/relationships, such as high academic + bad relationship, high wealth + low mental, high charm + low reputation.
 5. A final image, not a generic lesson.
+Mention at least three concrete past event titles or relationship names from the supplied history when they matter. Avoid generic summaries that could fit any playthrough.
+Do not write route grades such as A/B/C, GOOD ROUTE, MIXED ROUTE, or HARD ROUTE.
 Use fictional/parody company or institution names only. No real defamatory claims.`,
           },
           {
@@ -313,7 +317,7 @@ function normalizeAiEnding(raw: unknown, state: { name: string; major: string; s
     workLifeBalance: clampScore(ending.workLifeBalance, Math.round((state.stats.health + state.stats.mental) / 2)),
     healthState: typeof ending.healthState === "string" ? ending.healthState : state.stats.health >= 60 ? "버틸 만함" : "쉽게 지침",
     relationshipState: typeof ending.relationshipState === "string" ? ending.relationshipState : "관계의 빛과 그림자가 함께 남음",
-    tags: Array.isArray(ending.tags) && ending.tags.length > 0 ? ending.tags.filter((tag) => typeof tag === "string").slice(0, 10) : ["AI엔딩", careerPath],
+    tags: Array.isArray(ending.tags) && ending.tags.length > 0 ? ending.tags.filter((tag) => typeof tag === "string").slice(0, 10) : ["선택의 결과", careerPath],
   };
 }
 
@@ -323,10 +327,10 @@ function clampScore(value: unknown, fallback: number) {
 }
 
 function pickFallbackCareerPath(stats: Record<string, number>) {
-  if (stats.academic >= 78 && stats.reputation < 40) return "전문직이 되었으나 관계의 역풍을 맞은 삶";
-  if (stats.practical >= 70 && stats.wealth >= 60) return "창업과 자영업 사이의 독립";
-  if (stats.reputation >= 70 && stats.charm >= 60) return "기업 조직의 핵심 실무자";
-  if (stats.academic >= 68) return "공공기관 또는 자격시험의 긴 길";
+  if (stats.academic >= 8 && stats.reputation < 4) return "전문직을 준비했으나 관계의 역풍을 맞은 삶";
+  if (stats.practical >= 7 && stats.wealth >= 6) return "창업과 자영업 사이의 독립";
+  if (stats.reputation >= 7 && stats.charm >= 6) return "기업 조직의 핵심 실무자";
+  if (stats.academic >= 7) return "공공기관 또는 자격시험의 긴 길";
   return "불확실한 취업 준비 이후의 조용한 생존";
 }
 
@@ -339,9 +343,9 @@ function buildFallbackLongEnding(input: {
   relationshipState: string;
 }) {
   const strength = input.stats.academic >= input.stats.practical ? "공부로 버티는 법" : "현장에서 배우는 법";
-  const weakness = input.stats.health < 45 ? "몸을 너무 늦게 돌본 대가" :
-    input.stats.mental < 45 ? "마음을 오래 방치한 대가" :
-    input.stats.reputation < 45 ? "사람들 사이에 남은 오해" :
+  const weakness = input.stats.health < 5 ? "몸을 너무 늦게 돌본 대가" :
+    input.stats.mental < 5 ? "마음을 오래 방치한 대가" :
+    input.stats.reputation < 5 ? "사람들 사이에 남은 오해" :
     "끝내 놓지 못한 미련";
   return `당신은 ${input.major}의 강의실에서 시작한 여러 사건 끝에 ${input.careerPath}라는 이름의 문 앞에 섰다. 마지막에 남은 선택은 단순한 합격이나 취업이 아니라, 그동안 쌓인 모든 태도의 계산서에 가까웠다. ${input.finalChoiceSummary} 그 문장은 이력서에는 쓰이지 않았지만, 훗날 당신이 중요한 결정을 앞두고 잠시 말을 멈추게 만드는 기억이 되었다. 당신은 ${strength}을 알고 있었고, 그래서 남들보다 늦게 무너질 수 있었다. 하지만 ${weakness}는 예상하지 못한 순간에 되돌아왔다. 한때 좋았던 관계는 추천서가 되기도 했고, 틀어진 관계는 가장 중요한 면접장이나 협상 자리에서 차가운 표정으로 다시 나타나기도 했다. 그래서 당신의 커리어는 곧장 상승하는 선이 아니라, 몇 번의 후퇴와 우회로 이루어진 긴 문장에 가까웠다. 시간이 지나 당신은 처음 꿈꾸던 모습과는 조금 다른 사람이 되었다. 돈을 더 벌 때도 있었고, 조용히 물러서야 할 때도 있었으며, 누군가에게는 성공한 사람으로, 누군가에게는 조금 차가워진 사람으로 기억되었다. 그래도 당신은 완전히 실패하지 않았다. ${input.relationshipState}이라는 결론 속에서, 당신은 자신이 무엇을 얻었고 무엇을 잃었는지 알고 살아가는 사람이 되었다.`;
 }
