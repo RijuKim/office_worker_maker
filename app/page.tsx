@@ -580,7 +580,7 @@ export default function AppPage() {
           {error && <p className="mb-4 border-2 border-[#b3423c] bg-[#ffe1db] p-2 text-sm font-bold text-[#8d2f2a]">{error}</p>}
           <div className="pixel-panel space-y-5 p-6">
             <div className="space-y-3 border-b border-[#eee8dd] pb-5 text-[15px] leading-7 text-[#3a332d]">
-              <p>새벽 6시 47분, 모르는 번호에서 메시지가 도착했습니다. “오늘 고른 첫 선택이 졸업식까지 따라갑니다.” 장난 같지만, 휴대폰 화면에는 수강 정정, 알바 면접, 학과 단체 채팅, 누군가의 부재중 전화가 동시에 떠 있습니다.</p>
+              <p>눈을 뜨니 새벽 6시 47분. 휴대폰에는 읽지 않은 메시지가 수북하다. 수강 정정 알림, 학과 단체 채팅, 아르바이트 면접 확인, 그리고 저장되지 않은 번호의 짧은 문장. “오늘 고른 첫 선택이 졸업식까지 따라갑니다.” 장난 같지만, 왠지 모르게 진짜일 것 같은 예감이 든다.</p>
               <p>당신은 아직 자신이 어떤 학생으로 기억될지 모릅니다. 이름과 나이, 오늘 눈뜬 장소, 끝까지 믿고 싶은 능력만 정하면 나머지 전공, 학년, 첫 사건은 이 세계가 당신에게 붙여줄 것입니다.</p>
             </div>
             <div>
