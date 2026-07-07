@@ -1,7 +1,7 @@
-export const STAT_MIN = 0;
-export const STAT_MAX = 100;
-export const MAX_STAT_DELTA_PER_CHOICE = 15;
-export const BURNOUT_THRESHOLD = 85;
+export const STAT_MIN = 1;
+export const STAT_MAX = 10;
+export const MAX_STAT_DELTA_PER_CHOICE = 3;
+export const BURNOUT_THRESHOLD = 80;
 
 export const TRUST_MIN = -100;
 export const TRUST_MAX = 100;
@@ -14,7 +14,8 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-export function clampPublicStat(value: number): number {
+export function clampPublicStat(value: number, stat?: string): number {
+  if (stat === "wealth") return value; // wealth is unbounded (원화 scale)
   return clamp(value, STAT_MIN, STAT_MAX);
 }
 
@@ -30,9 +31,11 @@ export function applyStatDeltas(
 
   for (const [stat, delta] of Object.entries(deltas)) {
     if (typeof delta !== "number") continue;
-    const clampedDelta = clamp(delta, -MAX_STAT_DELTA_PER_CHOICE, MAX_STAT_DELTA_PER_CHOICE);
-    const current = result[stat] ?? 50;
-    result[stat] = clampPublicStat(current + clampedDelta);
+    const current = result[stat] ?? 5;
+    const clamped = stat === "wealth"
+      ? Math.round(delta)
+      : clamp(Math.round(delta), -MAX_STAT_DELTA_PER_CHOICE, MAX_STAT_DELTA_PER_CHOICE);
+    result[stat] = clampPublicStat(current + clamped, stat);
   }
 
   return result;
