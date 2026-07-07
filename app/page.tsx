@@ -945,21 +945,24 @@ export default function AppPage() {
             <h2 className="text-xl font-bold">관계</h2>
             <div className="mt-4 space-y-3">
               {currentChar.relationships?.map((rel) => (
-                <div className="pixel-panel p-4" key={rel.name}>
-                  <div className="flex items-center justify-between"><span className="font-bold">{rel.name}</span><span className="text-sm text-[#706b62]">{rel.role}</span></div>
-                  <div className="mt-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>{relationshipState(rel.trust)}</span>
-                      <span className="font-bold">{trustHearts(rel.trust)}</span>
+                <div className="pixel-panel flex items-start gap-4 p-4" key={rel.name}>
+                  <PixelPortrait name={rel.name} variant={rel.name} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between"><span className="font-bold">{rel.name}</span><span className="text-sm text-[#706b62]">{rel.role}</span></div>
+                    <div className="mt-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span>{relationshipState(rel.trust)}</span>
+                        <span className="font-bold">{trustHearts(rel.trust)}</span>
+                      </div>
+                      <div className="mt-2 h-3 border-2 border-[#2a2018] bg-[#d8c8b4]">
+                        <div
+                          className={`${rel.trust >= 0 ? "bg-[#d85f87]" : "bg-[#3f5f9f]"} h-full`}
+                          style={{ width: `${Math.min(100, Math.abs(rel.trust))}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="mt-2 h-3 border-2 border-[#2a2018] bg-[#d8c8b4]">
-                      <div
-                        className={`${rel.trust >= 0 ? "bg-[#d85f87]" : "bg-[#3f5f9f]"} h-full`}
-                        style={{ width: `${Math.min(100, Math.abs(rel.trust))}%` }}
-                      />
-                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1">{(rel.tags ?? []).map((tag: string) => (<span className="rounded-full bg-[#efe5d7] px-2 py-1 text-xs text-[#68412b]" key={tag}>{tag}</span>))}</div>
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-1">{(rel.tags ?? []).map((tag: string) => (<span className="rounded-full bg-[#efe5d7] px-2 py-1 text-xs text-[#68412b]" key={tag}>{tag}</span>))}</div>
                 </div>
               ))}
               {(!currentChar.relationships || currentChar.relationships.length === 0) && <p className="text-sm text-[#706b62]">아직 관계 정보가 없습니다.</p>}
