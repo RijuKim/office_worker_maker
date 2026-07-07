@@ -126,8 +126,7 @@ export async function POST(_request: Request, context: RouteContext) {
   const usedEventTitles = character.eventHistory
     .map((h: { event?: { title?: string } }) => h.event?.title)
     .filter(Boolean) as string[];
-  const recentlySeenUserEventTitles = await getRecentlySeenUserEventTitles(userId, id);
-  const excludedEventTitles = [...new Set([...usedEventTitles, ...recentlySeenUserEventTitles])];
+  const excludedEventTitles = [...new Set([...usedEventTitles])];
   const storyArc = advanceStoryArc(currentFlags.storyArc, character.coreEventCount, currentFlags);
 
   const { type, event } = selectNextEvent(

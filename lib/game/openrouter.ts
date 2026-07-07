@@ -1,10 +1,42 @@
 import { z } from "zod";
 
-const apiKey = () => process.env.OLLAMA_API_KEY ?? null;
-const model = () => "deepseek-v4-flash:cloud";
-const AI_BASE_URL = "https://ollama.com/v1";
+type AiProvider = {
+  id: "ollama" | "openrouter";
+  label: string;
+  baseUrl: string;
+  key: string | null;
+  model: string;
+  headers?: Record<string, string>;
+};
 
-const AI_TIMEOUT_MS = 60_000;
+type AiProviderOptions = {
+  skipPrimary?: boolean;
+};
+
+const primaryProvider = (): AiProvider => ({
+  id: "ollama",
+  label: "Ollama DeepSeek",
+  baseUrl: "https://ollama.com/v1",
+  key: process.env.OLLAMA_API_KEY ?? null,
+  model: "deepseek-v4-flash:cloud",
+});
+
+const fallbackProvider = (): AiProvider => ({
+  id: "openrouter",
+  label: "OpenRouter Qwen",
+  baseUrl: "https://openrouter.ai/api/v1",
+  key: process.env.OPENROUTER_API_KEY ?? null,
+  model: process.env.OPENROUTER_MODEL ?? "qwen/qwen3-30b-a3b:free",
+  headers: {
+    "HTTP-Referer": process.env.NEXTAUTH_URL ?? "https://sano-officeworker.vercel.app",
+    "X-Title": "Sano Officeworker",
+  },
+});
+
+const aiProviders = (options: AiProviderOptions = {}) =>
+  options.skipPrimary ? [fallbackProvider()] : [primaryProvider(), fallbackProvider()];
+
+const AI_TIMEOUT_MS = 10_000;
 
 const aiEventSchema = z.object({
   title: z.string().min(1).max(100),
@@ -63,6 +95,8 @@ const SYSTEM_PROMPT = `You are a creative writer for a Korean college life text-
 Generate ONE narrative event in JSON format. Use these exact field names: "title", "body", "choices", "tags". Each choice must have: "id", "label", "summary", "statDelta", "relationshipDelta". The event should:
 - Be in Korean
 - Use "당신은" as the primary second-person narration voice. Do not use "너" or detached third-person narration.
+- Treat the protagonist as a woman by default unless the prompt explicitly says otherwise.
+- Do not have anyone call the protagonist "오빠", "형", "00군", or other male-coded terms. Use "언니", "선배", "씨", or the protagonist's name when a direct address is necessary.
 - Make body 2-4 paragraphs, 8-14 sentences total, with literary text-adventure pacing and sensory detail.
 - The event must be one small incident inside the provided larger story arc.
 - Follow the current story phase: 발단, 전개, 위기, 절정, 결말의 흐름. Do not resolve the whole life too early.
@@ -70,6 +104,8 @@ Generate ONE narrative event in JSON format. Use these exact field names: "title
 - Be a slice-of-life college scenario that can organically lead to career/life outcomes: study, relationships, romance, family, revenge, betrayal, part-time jobs, clubs, career exploration, leave of absence, internship, exam prep, public sector, police track, professional licenses, entrepreneurship, self-employment, overseas working holiday, detective-like investigation, crime temptation, marriage, solitude, or recovery.
 - Pick a clear event category and emotional valence internally: academic / romance / family / money / career / revenge / mystery / crime / health / friendship / overseas, and positive / negative / mixed. Reflect it in tags.
 - At least one element must come from previous choices, existing relationships, or open threads. Never feel like an isolated random encounter.
+- If the player already accepted, declined, ignored, deferred, joined, skipped, refused, or withdrew from a proposal, do not ask the same proposal again. Write consequences, aftermath, or a new different problem instead.
+- Respect cooldown guidance. Avoid overusing the same event category or the same supporting characters unless the prompt explicitly says they are required for a gate or closure.
 - If a relationship appears, the scene must show why that person's trust changes. Do not adjust trust without a narrated interaction.
 - Each event should leave a concrete seed for a possible future event: a promise, threat, debt, clue, invitation, rumor, missed call, application result, family pressure, or romantic ambiguity.
 - Include 2-4 meaningful choices that affect character stats
@@ -87,7 +123,7 @@ Generate ONE narrative event in JSON format. Use these exact field names: "title
 - Make every choice morally or emotionally distinct. Avoid generic "study/rest/talk" choices unless the context makes them specific.
 - Return ONLY valid JSON, no markdown wrapping`;
 
-export function buildUserPrompt(state: {
+export type AiEventPromptState = {
   name: string;
   major: string;
   gradeYear: number | null;
@@ -98,21 +134,62 @@ export function buildUserPrompt(state: {
   stats: Record<string, number>;
   relationships: { name: string; role: string; trust: number }[];
   storyArc: unknown;
-}): string {
+  eventFlags?: Record<string, unknown>;
+  lifeStage?: string;
+  graduation?: string;
+  academicPlan?: unknown;
+  destinationCandidates?: unknown;
+  avoidCategories?: string[];
+  preferCategories?: string[];
+  avoidPeople?: string[];
+};
+
+export function buildUserPrompt(state: AiEventPromptState): string {
   return `주인공: ${state.name}, ${state.age}세, ${state.major}, ${state.gradeYear ?? "?"}학년
+주인공 성별/호칭: 여성. 다른 인물이 주인공을 부를 때 "오빠", "형", "군"을 쓰지 말 것. 필요하면 "언니", "선배", "씨", 또는 이름을 쓸 것.
+생활 단계: ${state.lifeStage ?? "unknown"}
+졸업/학사 상태: ${state.graduation ?? "normal"}
 진행된 핵심 사건 수: ${state.coreEventCount}
 큰 사건 아크: ${JSON.stringify(state.storyArc)}
 최근 선택과 기억: ${state.recentSummaries.join("; ") || "당신은 낯선 아침에 눈을 떴다."}
 이미 사용한 사건 제목: ${state.usedEventTitles.join("; ") || "없음"}
+이미 처리된 제안과 닫힌 갈림길: ${buildResolvedOfferPrompt(state.eventFlags)}
+이번 사건에서 피해야 할 반복 범주: ${state.avoidCategories?.join(", ") || "없음"}
+이번 사건에서 우선 고려할 덜 나온 범주: ${state.preferCategories?.join(", ") || "없음"}
+이번 사건에서 가능하면 쉬게 할 인물: ${state.avoidPeople?.join(", ") || "없음"}
 현재 공개 스탯: ${JSON.stringify(state.stats)}
 주요 관계: ${JSON.stringify(state.relationships)}
+학업 계획: ${JSON.stringify(state.academicPlan ?? null)}
+목적지 후보: ${JSON.stringify(state.destinationCandidates ?? [])}
 
-위 정보를 바탕으로 다음 작은 사건 하나를 생성하세요. 이미 사용한 사건 제목과 같은 상황, 같은 장소, 같은 갈등을 반복하지 마세요. 이번 사건은 이전 선택의 결과가 느껴져야 하며, 동시에 다음 장면을 궁금하게 만드는 미해결 감각을 남겨야 합니다.`;
+위 정보를 바탕으로 다음 작은 사건 하나를 생성하세요. 이미 사용한 사건 제목과 같은 상황, 같은 장소, 같은 갈등을 반복하지 마세요. 이미 수락하거나 거절한 제안을 다시 묻지 말고, 그 선택의 결과나 새로운 문제로 이어가세요. 최근에 같은 범주나 같은 인물이 반복되었다면 이번에는 다른 생활권, 다른 갈등, 다른 인물을 우선하세요. 이번 사건은 이전 선택의 결과가 느껴져야 하며, 동시에 다음 장면을 궁금하게 만드는 미해결 감각을 남겨야 합니다.`;
+}
+
+function buildResolvedOfferPrompt(flags: Record<string, unknown> | undefined) {
+  if (!flags) return "없음";
+  const resolved: string[] = [];
+  if (flags.contestJoined !== undefined) resolved.push("공모전 팀 제안 수락됨");
+  if (flags.contestSkipped !== undefined) resolved.push("공모전 팀 제안 거절됨");
+  if (flags.studentCouncil !== undefined) resolved.push(`학생회 제안 처리됨(${String(flags.studentCouncil)})`);
+  if (flags.startupThread !== undefined) resolved.push(`앱/창업 아이디어 선택됨(${String(flags.startupThread)})`);
+  if (flags.publicSectorThread !== undefined) resolved.push(`공공/공기업 스터디 제안 처리됨(${String(flags.publicSectorThread)})`);
+  if (flags.overseasThread !== undefined) resolved.push(`해외/워홀 갈림길 처리됨(${String(flags.overseasThread)})`);
+  if (flags.crimeThread !== undefined) resolved.push(`회색지대 돈 제안 처리됨(${String(flags.crimeThread)})`);
+  if (flags.pyramidRefused !== undefined || flags.pyramidHeard !== undefined) resolved.push("다단계 제안 처리됨");
+  if (flags.underworldRefused !== undefined || flags.underworldEntered !== undefined) resolved.push("밤거리 위험 제안 처리됨");
+  if (flags.gamblingRefused !== undefined || flags.gamblingTried !== undefined) resolved.push("도박 제안 처리됨");
+  if (flags.usbInvestigation !== undefined) resolved.push(`USB 사건 처리됨(${String(flags.usbInvestigation)})`);
+  if (flags.eunjiInterview !== undefined) resolved.push(`은지 면접 부탁 처리됨(${String(flags.eunjiInterview)})`);
+  if (flags.studyShare !== undefined) resolved.push(`취업 스터디 경쟁자 제안 처리됨(${String(flags.studyShare)})`);
+  if (flags.personalTraining !== undefined) resolved.push(`개인 운동 제안 처리됨(${String(flags.personalTraining)})`);
+  return resolved.length > 0 ? resolved.join("; ") : "없음";
 }
 
 export interface OpenRouterResult {
   success: true;
   event: AiEventResponse;
+  providerId?: AiProvider["id"];
+  providerLabel?: string;
 }
 
 export interface OpenRouterFailure {
@@ -123,38 +200,46 @@ export interface OpenRouterFailure {
 export interface OpenRouterEndingResult {
   success: true;
   ending: AiEndingResponse;
+  providerId?: AiProvider["id"];
+  providerLabel?: string;
 }
 
 export async function generateAiEvent(
-  state: Parameters<typeof buildUserPrompt>[0],
+  state: AiEventPromptState,
+  options: AiProviderOptions = {},
 ): Promise<OpenRouterResult | OpenRouterFailure> {
-  const key = apiKey();
-  if (!key) {
-    return { success: false, reason: "no_key" };
+  let lastFailure: OpenRouterFailure = { success: false, reason: "no_key" };
+
+  for (const provider of aiProviders(options)) {
+    const result = await generateAiEventWithProvider(provider, state);
+    if (result.success) return result;
+    lastFailure = result;
+    console.warn("AI event provider failed", { provider: provider.label, reason: result.reason });
   }
+
+  return lastFailure;
+}
+
+async function generateAiEventWithProvider(
+  provider: AiProvider,
+  state: AiEventPromptState,
+): Promise<OpenRouterResult | OpenRouterFailure> {
+  if (!provider.key) return { success: false, reason: "no_key" };
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
 
   try {
     const response = await fetch(
-      `${AI_BASE_URL}/chat/completions`,
+      `${provider.baseUrl}/chat/completions`,
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${key}`,
+          Authorization: `Bearer ${provider.key}`,
           "Content-Type": "application/json",
+          ...provider.headers,
         },
-        body: JSON.stringify({
-          model: model(),
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: buildUserPrompt(state) },
-          ],
-          response_format: { type: "json_object" },
-          max_tokens: 8000,
-          temperature: 0.85,
-        }),
+        body: JSON.stringify(buildAiEventRequestBody(state, provider)),
         signal: controller.signal,
       },
     );
@@ -174,14 +259,12 @@ export async function generateAiEvent(
       return { success: false, reason: "invalid_response" };
     }
 
-    const parsed = extractJson(content);
-    const validated = aiEventSchema.safeParse(normalizeAiEvent(parsed));
-
-    if (!validated.success) {
+    const event = parseAiEventContent(content);
+    if (!event) {
       return { success: false, reason: "invalid_response" };
     }
 
-    return { success: true, event: validated.data };
+    return { success: true, event, providerId: provider.id, providerLabel: provider.label };
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return { success: false, reason: "timeout" };
@@ -189,6 +272,149 @@ export async function generateAiEvent(
     return { success: false, reason: "api_error" };
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+export async function generateAiEventStream(
+  state: AiEventPromptState,
+  onBodyDelta: (delta: string) => void,
+  options: AiProviderOptions = {},
+): Promise<OpenRouterResult | OpenRouterFailure> {
+  let lastFailure: OpenRouterFailure = { success: false, reason: "no_key" };
+
+  for (const provider of aiProviders(options)) {
+    let providerSentBody = false;
+    const result = await generateAiEventStreamWithProvider(provider, state, (delta) => {
+      providerSentBody = true;
+      onBodyDelta(delta);
+    });
+    if (result.success) return result;
+    lastFailure = result;
+    console.warn("AI event stream provider failed", { provider: provider.label, reason: result.reason });
+    if (providerSentBody) break;
+  }
+
+  return lastFailure;
+}
+
+async function generateAiEventStreamWithProvider(
+  provider: AiProvider,
+  state: AiEventPromptState,
+  onBodyDelta: (delta: string) => void,
+): Promise<OpenRouterResult | OpenRouterFailure> {
+  if (!provider.key) return { success: false, reason: "no_key" };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${provider.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${provider.key}`,
+        "Content-Type": "application/json",
+        ...provider.headers,
+      },
+      body: JSON.stringify(buildAiEventStreamRequestBody(state, provider)),
+      signal: controller.signal,
+    });
+
+    if (response.status === 429) return { success: false, reason: "rate_limited" };
+    if (!response.ok || !response.body) return { success: false, reason: "api_error" };
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let content = "";
+    let rawResponse = "";
+    let sentBody = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      const decoded = decoder.decode(value, { stream: true });
+      rawResponse += decoded;
+      buffer += decoded;
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data:")) continue;
+        const payload = trimmed.slice(5).trim();
+        if (!payload || payload === "[DONE]") continue;
+        const parsed = safeJson(payload);
+        const token = extractChatToken(parsed);
+        if (typeof token !== "string") continue;
+
+        content += token;
+        const bodyPreview = extractStreamingBody(content);
+        if (bodyPreview.length > sentBody.length) {
+          const nextDelta = bodyPreview.slice(sentBody.length);
+          sentBody = bodyPreview;
+          onBodyDelta(nextDelta);
+        }
+      }
+    }
+
+    if (buffer.trim()) {
+      const parsed = safeJson(buffer.trim());
+      const token = extractChatToken(parsed);
+      if (typeof token === "string") {
+        content += token;
+      }
+    }
+
+    const event = parseAiEventContent(content) ?? parseChatCompletionEvent(rawResponse);
+    return event ? { success: true, event, providerId: provider.id, providerLabel: provider.label } : { success: false, reason: "invalid_response" };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return { success: false, reason: "timeout" };
+    }
+    return { success: false, reason: "api_error" };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function buildAiEventRequestBody(state: AiEventPromptState, provider: AiProvider) {
+  return {
+    model: provider.model,
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: buildUserPrompt(state) },
+    ],
+    response_format: { type: "json_object" },
+    max_tokens: 8000,
+    temperature: 0.85,
+  };
+}
+
+function buildAiEventStreamRequestBody(state: AiEventPromptState, provider: AiProvider) {
+  return {
+    model: provider.model,
+    messages: [
+      {
+        role: "system",
+        content: `${SYSTEM_PROMPT}
+
+For streaming responsiveness, output the JSON object in this field order exactly: "title", "body", "choices", "tags". Start the "body" field immediately after the title. Do not delay the body text until after choices.`,
+      },
+      { role: "user", content: buildUserPrompt(state) },
+    ],
+    max_tokens: 8000,
+    temperature: 0.85,
+    stream: true,
+  };
+}
+
+export function parseAiEventContent(content: string) {
+  try {
+    const parsed = extractJson(content);
+    const validated = aiEventSchema.safeParse(normalizeAiEvent(parsed));
+    return validated.success ? validated.data : null;
+  } catch {
+    return null;
   }
 }
 
@@ -203,26 +429,53 @@ export async function generateAiEnding(state: {
   finalChoiceSummary: string;
   relationshipLife?: { relationshipLife: string; parenting: { hasChildren: boolean; childCount: number; parentingStage: string } };
 }): Promise<OpenRouterEndingResult | OpenRouterFailure> {
-  const key = apiKey();
-  if (!key) return { success: false, reason: "no_key" };
+  let lastFailure: OpenRouterFailure = { success: false, reason: "no_key" };
+
+  for (const provider of aiProviders()) {
+    const result = await generateAiEndingWithProvider(provider, state);
+    if (result.success) return result;
+    lastFailure = result;
+    console.warn("AI ending provider failed", { provider: provider.label, reason: result.reason });
+  }
+
+  return lastFailure;
+}
+
+async function generateAiEndingWithProvider(
+  provider: AiProvider,
+  state: {
+    name: string;
+    age: number;
+    major: string;
+    stats: Record<string, number>;
+    hiddenState: unknown;
+    relationships: { name: string; role: string; trust: number; tags: unknown }[];
+    eventHistory: { title: string; summary: string; statDelta: unknown; relationshipDelta: unknown; flagDelta: unknown }[];
+    finalChoiceSummary: string;
+    relationshipLife?: { relationshipLife: string; parenting: { hasChildren: boolean; childCount: number; parentingStage: string } };
+  },
+): Promise<OpenRouterEndingResult | OpenRouterFailure> {
+  if (!provider.key) return { success: false, reason: "no_key" };
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
 
   try {
-    const response = await fetch(AI_BASE_URL + "/chat/completions", {
+    const response = await fetch(provider.baseUrl + "/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${key}`,
+        Authorization: `Bearer ${provider.key}`,
         "Content-Type": "application/json",
+        ...provider.headers,
       },
         body: JSON.stringify({
-          model: model(),
+          model: provider.model,
           messages: [
             {
               role: "system",
               content: `You write final result records for a Korean literary career text-adventure. Return ONLY valid JSON.
 The result must be Korean prose, second-person "당신은" voice, and longNarrative must be at least 500 Korean characters.
+Treat the protagonist as a woman by default. Do not call the protagonist "오빠", "형", "군", or use male-coded address. Use "언니", "선배", "씨", or the protagonist's name if needed.
 Use public stats, hidden state, every major event, and relationships. Include career life and what happened afterward.
 The result must be layered, surprising, and novelistic: success can contain private loss, failure can contain quiet dignity, bad relationships can return as reversals.
 Possible results are not limited to office jobs. They may include romance, marriage, living alone, overseas working holiday, police/public safety, private investigator, lawyer/accountant/professional, founder, self-employed owner, artist/marketer, civil servant, criminal downfall, whistleblower, quiet rural life, or a lonely but peaceful life.
@@ -242,6 +495,7 @@ If the character has a relationship life state (single, dating, cohabitation, ma
             {
               role: "user",
               content: `주인공: ${state.name}, ${state.age}세, ${state.major}
+주인공 성별/호칭: 여성. "오빠", "형", "군" 금지. 필요하면 "언니", "선배", "씨", 이름 사용.
 공개 스탯: ${JSON.stringify(state.stats)}
 숨은 상태: ${JSON.stringify(state.hiddenState)}
 관계도: ${JSON.stringify(state.relationships)}
@@ -270,7 +524,7 @@ JSON fields: title, summary, longNarrative, careerPath, jobRole, destinationName
     const validated = aiEndingSchema.safeParse(normalizeAiEnding(parsed, state));
     if (!validated.success) return { success: false, reason: "invalid_response" };
 
-    return { success: true, ending: validated.data };
+    return { success: true, ending: validated.data, providerId: provider.id, providerLabel: provider.label };
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return { success: false, reason: "timeout" };
@@ -360,6 +614,82 @@ function extractJson(content: string) {
     }
     return JSON.parse(match[0]);
   }
+}
+
+function extractStreamingBody(content: string) {
+  const match = content.match(/"body"\s*:\s*"/);
+  if (!match || match.index === undefined) return "";
+  let output = "";
+  let escaped = false;
+  const start = match.index + match[0].length;
+
+  for (let i = start; i < content.length; i += 1) {
+    const char = content[i];
+    if (escaped) {
+      output += decodeJsonEscape(char);
+      escaped = false;
+      continue;
+    }
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (char === "\"") break;
+    output += char;
+  }
+
+  return output;
+}
+
+function decodeJsonEscape(char: string) {
+  if (char === "n") return "\n";
+  if (char === "r") return "\r";
+  if (char === "t") return "\t";
+  if (char === "\"") return "\"";
+  if (char === "\\") return "\\";
+  return char;
+}
+
+function safeJson(content: string) {
+  try {
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
+}
+
+function extractChatToken(payload: unknown) {
+  const choices = readRecord(payload)?.choices;
+  if (!Array.isArray(choices)) return null;
+  const choice = readRecord(choices[0]);
+  const deltaContent = readRecord(choice?.delta)?.content;
+  if (typeof deltaContent === "string") return deltaContent;
+  const messageContent = readRecord(choice?.message)?.content;
+  return typeof messageContent === "string" ? messageContent : null;
+}
+
+function parseChatCompletionEvent(rawResponse: string) {
+  const candidates = rawResponse
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.startsWith("data:") ? line.slice(5).trim() : line)
+    .filter((line) => line !== "[DONE]");
+
+  for (const candidate of candidates.reverse()) {
+    const content = extractChatToken(safeJson(candidate));
+    if (typeof content !== "string") continue;
+    const event = parseAiEventContent(content);
+    if (event) return event;
+  }
+
+  const direct = safeJson(rawResponse.trim());
+  const directContent = extractChatToken(direct);
+  if (typeof directContent === "string") {
+    return parseAiEventContent(directContent);
+  }
+
+  return null;
 }
 
 function normalizeAiEvent(raw: unknown) {
@@ -481,6 +811,7 @@ export type AiBranchProposalResponse = z.infer<typeof aiBranchProposalSchema>;
 const BRANCH_PROPOSAL_SYSTEM_PROMPT = `You are a creative director for a Korean college life text-adventure game.
 
 Generate 2-4 possible future branch directions for the character. Each branch represents a possible life path the character could pursue.
+Treat the protagonist as a woman by default. Do not use male-coded address such as "오빠", "형", or "군".
 
 For each branch, provide:
 - id: A unique short identifier (e.g., "career_company", "romance_marriage", "academic_grad_school")
@@ -514,21 +845,49 @@ export async function generateAiBranchProposals(state: {
   destinationCandidates: { id: string; kind: string; name: string; status: string }[];
   storyArc: unknown;
 }): Promise<{ success: true; proposals: AiBranchProposalResponse["proposals"] } | { success: false; reason: string }> {
-  const key = apiKey();
-  if (!key) return { success: false, reason: "no_key" };
+  let lastFailure: { success: false; reason: string } = { success: false, reason: "no_key" };
+
+  for (const provider of aiProviders()) {
+    const result = await generateAiBranchProposalsWithProvider(provider, state);
+    if (result.success) return result;
+    lastFailure = result;
+    console.warn("AI branch provider failed", { provider: provider.label, reason: result.reason });
+  }
+
+  return lastFailure;
+}
+
+async function generateAiBranchProposalsWithProvider(
+  provider: AiProvider,
+  state: {
+    name: string;
+    age: number;
+    major: string;
+    gradeYear: number | null;
+    coreEventCount: number;
+    stats: Record<string, number>;
+    relationships: { name: string; role: string; trust: number }[];
+    lifeStage: string;
+    graduation: string;
+    destinationCandidates: { id: string; kind: string; name: string; status: string }[];
+    storyArc: unknown;
+  },
+): Promise<{ success: true; proposals: AiBranchProposalResponse["proposals"] } | { success: false; reason: string }> {
+  if (!provider.key) return { success: false, reason: "no_key" };
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
 
   try {
-    const response = await fetch(AI_BASE_URL + "/chat/completions", {
+    const response = await fetch(provider.baseUrl + "/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${key}`,
+        Authorization: `Bearer ${provider.key}`,
         "Content-Type": "application/json",
+        ...provider.headers,
       },
         body: JSON.stringify({
-          model: model(),
+          model: provider.model,
           messages: [
             { role: "system", content: BRANCH_PROPOSAL_SYSTEM_PROMPT },
             {
@@ -578,12 +937,11 @@ export async function generateAiBranchProposals(state: {
 export async function checkDailyAiLimit(userId: string): Promise<{
   allowed: boolean;
   count: number;
-  limit: number;
+  limit: null;
 }> {
   const { prisma } = await import("@/lib/server/prisma");
 
   const today = new Date().toISOString().slice(0, 10);
-  const limit = 30;
 
   const usage = await prisma.aiUsage.findUnique({
     where: { userId_date: { userId, date: today } },
@@ -591,7 +949,7 @@ export async function checkDailyAiLimit(userId: string): Promise<{
 
   const count = usage?.count ?? 0;
 
-  return { allowed: count < limit, count, limit };
+  return { allowed: true, count, limit: null };
 }
 
 export async function incrementAiUsage(userId: string): Promise<void> {
