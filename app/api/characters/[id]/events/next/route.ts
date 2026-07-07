@@ -170,7 +170,7 @@ export async function POST(_request: Request, context: RouteContext) {
           body: aiResult.event.body,
           choices: aiResult.event.choices.map((choice) => ({
             ...choice,
-            relationshipDelta: [],
+            relationshipDelta: choice.relationshipDelta ?? [],
             flagDelta: { aiGenerated: true, storyPhase: storyArc.phase },
           })),
           tags: aiResult.event.tags,

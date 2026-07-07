@@ -1,13 +1,14 @@
 import { z } from "zod";
 
-const apiKey = () => process.env.OPENROUTER_API_KEY ?? null;
-const model = () => process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-v4-flash:cloud";
+const apiKey = () => process.env.OLLAMA_API_KEY ?? null;
+const model = () => "deepseek-v4-flash:cloud";
+const AI_BASE_URL = "https://ollama.com/v1";
 
-const AI_TIMEOUT_MS = 25_000;
+const AI_TIMEOUT_MS = 60_000;
 
 const aiEventSchema = z.object({
   title: z.string().min(1).max(100),
-  body: z.string().min(450).max(5200),
+  body: z.string().min(100).max(5200),
   choices: z
     .array(
       z.object({
@@ -59,7 +60,7 @@ const allowedStats = ["academic", "practical", "health", "mental", "wealth", "re
 
 const SYSTEM_PROMPT = `You are a creative writer for a Korean college life text-adventure game.
 
-Generate ONE narrative event in JSON format. The event should:
+Generate ONE narrative event in JSON format. Use these exact field names: "title", "body", "choices", "tags". Each choice must have: "id", "label", "summary", "statDelta", "relationshipDelta". The event should:
 - Be in Korean
 - Use "당신은" as the primary second-person narration voice. Do not use "너" or detached third-person narration.
 - Make body 2-4 paragraphs, 8-14 sentences total, with literary text-adventure pacing and sensory detail.
@@ -137,14 +138,12 @@ export async function generateAiEvent(
 
   try {
     const response = await fetch(
-      "https://openrouter.ai/api/v1/chat/completions",
+      `${AI_BASE_URL}/chat/completions`,
       {
         method: "POST",
         headers: {
           Authorization: `Bearer ${key}`,
           "Content-Type": "application/json",
-          "HTTP-Referer": "https://college-career-sim.local",
-          "X-Title": "College Career Sim",
         },
         body: JSON.stringify({
           model: model(),
@@ -153,9 +152,8 @@ export async function generateAiEvent(
             { role: "user", content: buildUserPrompt(state) },
           ],
           response_format: { type: "json_object" },
-          max_tokens: 4000,
+          max_tokens: 8000,
           temperature: 0.85,
-          reasoning: { effort: "none" },
         }),
         signal: controller.signal,
       },
@@ -212,13 +210,11 @@ export async function generateAiEnding(state: {
   const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
 
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch(AI_BASE_URL + "/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${key}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://office-worker-maker.local",
-        "X-Title": "일어나보니 대한민국 취준생",
       },
         body: JSON.stringify({
           model: model(),
@@ -259,7 +255,6 @@ JSON fields: title, summary, longNarrative, careerPath, jobRole, destinationName
           response_format: { type: "json_object" },
           max_tokens: 4000,
           temperature: 0.9,
-          reasoning: { effort: "none" },
         }),
       signal: controller.signal,
     });
@@ -392,7 +387,7 @@ function normalizeAiEvent(raw: unknown) {
 
 function normalizeChoice(raw: unknown, index: number) {
   const choice = typeof raw === "object" && raw !== null ? raw as Record<string, unknown> : {};
-  const rawDelta = readRecord(choice.statDelta) ?? readRecord(choice.statChanges) ?? {};
+  const rawDelta = readRecord(choice.statDelta) ?? readRecord(choice.statChanges) ?? readRecord(choice.effects) ?? {};
   const statDelta = Object.fromEntries(
     Object.entries(rawDelta)
       .map(([key, value]) => [key, Number(value)] as const)
@@ -526,13 +521,11 @@ export async function generateAiBranchProposals(state: {
   const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
 
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch(AI_BASE_URL + "/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${key}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://college-career-sim.local",
-        "X-Title": "College Career Sim",
       },
         body: JSON.stringify({
           model: model(),
@@ -555,7 +548,6 @@ export async function generateAiBranchProposals(state: {
           response_format: { type: "json_object" },
           max_tokens: 2000,
           temperature: 0.8,
-          reasoning: { effort: "none" },
         }),
       signal: controller.signal,
     });
