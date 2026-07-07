@@ -1316,7 +1316,7 @@ function pickWeightedStaticEvent(events: StaticEvent[], context?: EventSelection
   if (!context) return events[Math.floor(Math.random() * events.length)];
   const weighted = events.map((event) => ({
     event,
-    weight: Math.max(1, 10 + scoreEventDiversity(event, context)),
+    weight: Math.max(1, 10 + scoreEventDiversity(event, context) + scoreLifeStageBonus(event, context)),
   }));
   const total = weighted.reduce((sum, item) => sum + item.weight, 0);
   let cursor = Math.random() * total;
@@ -1327,6 +1327,30 @@ function pickWeightedStaticEvent(events: StaticEvent[], context?: EventSelection
   }
 
   return weighted[weighted.length - 1].event;
+}
+
+function scoreLifeStageBonus(event: Pick<StaticEvent, "tags">, context: EventSelectionContext) {
+  const tags = new Set(event.tags);
+  const lifeStage = context.lifeStage;
+
+  if (lifeStage === "college_late") {
+    if (tags.has("스펙") || tags.has("취업") || tags.has("면접") || tags.has("진로") ||
+        tags.has("합격") || tags.has("불합격") || tags.has("기업") || tags.has("공공") ||
+        tags.has("전문직") || tags.has("창업") || tags.has("지원서") || tags.has("시험") ||
+        tags.has("인턴") || tags.has("어학") || tags.has("자격증")) return 8;
+    if (tags.has("해외") || tags.has("워홀") || tags.has("고시")) return 6;
+    if (tags.has("돈") || tags.has("가족") || tags.has("멘탈") || tags.has("건강") ||
+        tags.has("알바") || tags.has("자산") || tags.has("범죄") || tags.has("위험")) return 3;
+    return 0;
+  }
+
+  if (lifeStage === "college_mid") {
+    if (tags.has("스펙") || tags.has("인턴") || tags.has("어학") || tags.has("자격증")) return 4;
+    if (tags.has("취업") || tags.has("면접") || tags.has("기업")) return -2;
+    return 0;
+  }
+
+  return 0;
 }
 
 function scoreEventDiversity(event: Pick<StaticEvent, "title" | "tags" | "choices">, context: EventSelectionContext) {
@@ -1406,19 +1430,6 @@ export function isEventAllowedForLifeStage(event: Pick<StaticEvent, "title" | "t
     return !hasAny(tags, ["기업", "면접", "공공", "전문직", "창업", "지원서", "스펙", "취업"]);
   }
 
-  if (lifeStage === "college_mid") {
-    if (hasAny(tags, ["기업", "면접", "공공", "전문직", "창업", "지원서"])) return false;
-    if (hasAny(tags, ["스펙", "취업", "인턴", "어학", "자격증"])) return true;
-    return !hasAny(tags, ["시작", "신입", "환영"]);
-  }
-
-  if (lifeStage === "college_late") {
-    if (hasAny(tags, ["시작", "신입", "환영", "중간고사", "동아리", "MT"])) return false;
-    if (hasAny(tags, ["스펙", "취업", "인턴", "어학", "자격증", "기업", "면접", "공공", "전문직", "창업", "지원서", "진로", "시험", "합격", "불합격"])) return true;
-    if (hasAny(tags, ["해외", "워홀", "고시"])) return true;
-    return hasAny(tags, ["돈", "가족", "멘탈", "건강", "알바", "자산", "관계", "연애", "범죄", "위험"]);
-  }
-
   if (hasAny(tags, ["해외", "워홀"]) && !hasCandidateOrThread(candidates, context.eventFlags, "overseas", ["overseasThread"])) {
     return lifeStage === "college_mid" || lifeStage === "college_late";
   }
@@ -1427,7 +1438,7 @@ export function isEventAllowedForLifeStage(event: Pick<StaticEvent, "title" | "t
     return false;
   }
 
-  if (lifeStage && hasAny(tags, ["교수", "연구실", "대학원", "졸업"]) && lifeStage === "college_early" && !title.includes("교수님과의 면담")) {
+  if (lifeStage && hasAny(tags, ["교수", "연구실", "대학원", "졸업"]) && (lifeStage as string) === "college_early" && !title.includes("교수님과의 면담")) {
     return false;
   }
 
