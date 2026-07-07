@@ -32,6 +32,32 @@ enum DestinationType {
   LICENSED_PROFESSION
   ENTREPRENEURSHIP
   SELF_EMPLOYMENT
+  UNEMPLOYED
+  INHERITANCE
+}
+
+enum SpecType {
+  INTERNSHIP
+  LANGUAGE_SCORE
+  PORTFOLIO
+  CERTIFICATION
+  EXAM_PREP
+  CAREER_PATH
+}
+
+enum SpecStatus {
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum ApplicationStage {
+  DOCUMENT
+  PERSONALITY_TEST
+  CODING_TEST
+  FIRST_INTERVIEW
+  SECOND_INTERVIEW
+  FINAL_RESULT
 }
 
 model User {
@@ -57,6 +83,7 @@ model CharacterRun {
   lifeStatus       Json                 @default("[]")
   majorEventCount  Int                  @default(0)
   coreEventCount   Int                  @default(0)
+  specScore        Int                  @default(0)
   currentEventId   String?
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
@@ -67,6 +94,9 @@ model CharacterRun {
   events           Event[]
   eventHistory     EventHistory[]
   records          CareerEndingRecord[]
+  specs            Spec[]
+  jobApplications  JobApplication[]
+  careerPaths      CareerPath[]
 }
 
 model CharacterStats {
@@ -188,4 +218,49 @@ model AiUsage {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, date])
+}
+
+model Spec {
+  id             String       @id @default(uuid())
+  characterRunId String
+  specType       SpecType
+  specName       String
+  status         SpecStatus   @default(IN_PROGRESS)
+  score          String?
+  startedAt      DateTime     @default(now())
+  completedAt    DateTime?
+  eventFlags     Json         @default("{}")
+  characterRun   CharacterRun @relation(fields: [characterRunId], references: [id], onDelete: Cascade)
+}
+
+model JobApplication {
+  id                     String            @id @default(uuid())
+  characterRunId         String
+  companyName            String
+  companyType            String
+  currentStage           ApplicationStage  @default(DOCUMENT)
+  stageResults           Json              @default("[]")
+  specScore              Int               @default(0)
+  documentPassed         Boolean?
+  personalityPassed      Boolean?
+  codingTestPassed       Boolean?
+  firstInterviewPassed   Boolean?
+  secondInterviewPassed  Boolean?
+  finalResult            Boolean?
+  isActive               Boolean           @default(true)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  characterRun           CharacterRun      @relation(fields: [characterRunId], references: [id], onDelete: Cascade)
+}
+
+model CareerPath {
+  id              String       @id @default(uuid())
+  characterRunId  String
+  pathType        String
+  pathName        String
+  status          String
+  startedAt       DateTime     @default(now())
+  completedAt     DateTime?
+  eventFlags      Json         @default("{}")
+  characterRun    CharacterRun @relation(fields: [characterRunId], references: [id], onDelete: Cascade)
 }
