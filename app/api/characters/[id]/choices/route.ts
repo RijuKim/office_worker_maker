@@ -401,9 +401,10 @@ function resolveCareerGateFlagDelta(input: {
 
 function getCareerGateLabel(path: string, passed: boolean) {
   if (path === "licensed_profession") return passed ? "전문직 시험 합격" : "전문직 시험 불합격";
-  if (path === "company") return passed ? "다람소프트 최종 면접 합격" : "다람소프트 최종 면접 탈락";
   if (path === "public_safety") return passed ? "공공안전 전형 합격" : "공공안전 전형 탈락";
   if (path === "startup") return passed ? "창업 지원사업 선정" : "창업 지원사업 탈락";
+  if (path === "general_job") return passed ? "첫 지원 절차 통과" : "첫 지원 절차 탈락";
+  if (path === "company") return passed ? "기업 최종 면접 합격" : "기업 최종 면접 탈락";
   return passed ? "첫 지원 절차 통과" : "첫 지원 절차 탈락";
 }
 
@@ -436,7 +437,10 @@ function getDestinationKindForCareerGate(path: string) {
 }
 
 function getDestinationNameForCareerGate(path: string) {
-  if (path === "company") return "다람소프트";
+  if (path === "company") {
+    const companies = ["다람소프트", "삼슨전자", "네이봐", "카캉오", "배달이민족", "규글코리아", "스타벅수커피", "엘쥐전자", "현댜모터스", "에스끼리텔"];
+    return companies[Math.floor(Math.random() * companies.length)];
+  }
   if (path === "public_safety") return "공공안전 전형";
   if (path === "licensed_profession") return "전문직 시험";
   if (path === "startup") return "새싹엔진 캠프";
@@ -721,10 +725,15 @@ function pickCareerPath(stats: Record<string, number>, gate: { status: string; p
   }
 
   if (gate.path === "licensed_profession") return "전문직 수습 과정";
-  if (gate.path === "company") return "다람소프트 신입 실무자";
   if (gate.path === "public_safety") return "공공안전 직무 합격자";
   if (gate.path === "startup") return "새싹엔진 선정 창업자";
   if (gate.path === "general_job") return "첫 직장 신입 실무자";
+
+  if (gate.path === "company") {
+    const companies = ["다람소프트", "삼슨전자", "네이봐", "카캉오", "배달이민족", "규글코리아", "스타벅수커피", "엘쥐전자", "현댜모터스", "에스끼리텔"];
+    const idx = Math.floor(Math.abs(stats.practical * 7 + stats.reputation * 3 + stats.charm * 2) % companies.length);
+    return `${companies[idx]} 신입 실무자`;
+  }
 
   if (stats.reputation <= 2 && stats.wealth >= 6) return "위험한 돈에서 겨우 발을 뺀 생존자";
   if (stats.practical >= 8 && stats.reputation <= 5) return "사설 조사 보조원";
