@@ -275,6 +275,7 @@ export async function POST(request: Request, context: RouteContext) {
   return NextResponse.json({
     result: {
       choiceId: choice.id,
+      summary: resolvedSummary,
       stats: updatedStats,
       statDelta: diffPublicStats(previousStats, updatedStats),
       relationships: [...updatedRelationships, ...newRelationships.map((rel) => ({ name: rel.name, trust: rel.trust }))],
