@@ -25,8 +25,8 @@ export interface EventSelectionContext {
   recentRelationshipNames?: string[];
   previousChoiceSummary?: string;
   specs?: { specType: string; specName: string; status: string; score?: string | null }[];
-  jobApplications?: { companyName: string; currentStage: string; isActive: boolean }[];
-  careerPaths?: { pathType: string; status: string }[];
+  jobApplications?: { companyName: string; companyType?: string; currentStage: string; isActive: boolean }[];
+  careerPaths?: { pathType: string; pathName?: string; status: string }[];
 }
 
 interface ConditionalEvent extends StaticEvent {
@@ -57,11 +57,11 @@ interface ConditionalEvent extends StaticEvent {
 type StoryArcId = "settling" | "commitment" | "pressure" | "consequence" | "future";
 
 export const STORY_ARCS: { id: StoryArcId; title: string; phase: string; eventRange: [number, number]; openThread: string }[] = [
-  { id: "settling", title: "첫 학기와 생활 기반", phase: "발단", eventRange: [0, 2], openThread: "수업, 주거, 돈, 첫 관계의 리듬을 잡아야 한다" },
-  { id: "commitment", title: "소속과 첫 약속", phase: "전개", eventRange: [3, 5], openThread: "동아리, 알바, 연구실, 스터디 중 하나가 생활의 중심이 된다" },
-  { id: "pressure", title: "압박과 유혹", phase: "위기", eventRange: [6, 8], openThread: "돈과 평판, 가족 압박, 위험한 제안이 같은 시기에 겹친다" },
-  { id: "consequence", title: "선택의 청구서", phase: "절정", eventRange: [9, 11], openThread: "이전 선택이 사람과 사건을 통해 되돌아온다" },
-  { id: "future", title: "졸업 직전의 방향", phase: "결말", eventRange: [12, 15], openThread: "중도 이탈을 피했다면 마지막 관문을 거쳐 선택의 결과로 수렴한다" },
+  { id: "settling", title: "첫 학기와 생활 기반", phase: "발단", eventRange: [0, 4], openThread: "수업, 주거, 돈, 첫 관계의 리듬을 잡아야 한다" },
+  { id: "commitment", title: "소속과 첫 약속", phase: "전개", eventRange: [5, 9], openThread: "동아리, 알바, 연구실, 스터디 중 하나가 생활의 중심이 된다" },
+  { id: "pressure", title: "압박과 유혹", phase: "위기", eventRange: [10, 14], openThread: "돈과 평판, 가족 압박, 위험한 제안이 같은 시기에 겹친다" },
+  { id: "consequence", title: "선택의 청구서", phase: "절정", eventRange: [15, 19], openThread: "이전 선택이 사람과 사건을 통해 되돌아온다" },
+  { id: "future", title: "졸업 직전의 방향", phase: "결말", eventRange: [20, 24], openThread: "중도 이탈을 피했다면 마지막 관문을 거쳐 선택의 결과로 수렴한다" },
 ];
 
 export const STATIC_EVENTS: StaticEvent[] = [
@@ -859,6 +859,66 @@ export const CONDITIONAL_STATIC_EVENTS: ConditionalEvent[] = [
     condition: { requiredDestinationKinds: ["company", "public_sector", "graduate_school"] },
   },
   {
+    title: "졸업 전 채용 공고 세 갈래",
+    body: `채용 시즌 알림이 한꺼번에 쏟아진다. 같은 '취업'이라는 말로 묶이지만, 공고를 하나씩 열어보면 전혀 다른 삶이 보인다. 대기업의 긴 전형표, 스타트업의 빠른 실무 과제, 공기업의 안정적인 필기 전형, 외국계의 영어 면접 안내가 나란히 떠 있다.
+
+어디에 첫 지원서를 넣느냐에 따라 앞으로 마주할 시험과 면접, 생활 리듬이 달라진다. 완벽한 선택지는 없다. 이름이 또렷한 회사에 지원하는 순간, 취업 준비는 추상적인 불안이 아니라 구체적인 일정이 된다.`,
+    choices: [
+      {
+        id: "apply_samsun_dx",
+        label: "삼슨전자 DX 신입 공채에 지원한다.",
+        summary: "당신은 삼슨전자 DX 신입 공채에 지원하며 긴 대기업 전형에 들어섰다.",
+        statDelta: { reputation: 2, practical: 1, mental: -2, wealth: -10 },
+        relationshipDelta: [],
+        flagDelta: {
+          jobApplicationInit: { companyName: "삼슨전자 DX", companyType: "대기업" },
+          jobApplicationStarted: true,
+          careerPathChosen: true,
+        },
+      },
+      {
+        id: "apply_lumicube_labs",
+        label: "루미큐브랩스 서비스 운영 포지션에 지원한다.",
+        summary: "당신은 루미큐브랩스에 지원하며 빠른 실무형 전형을 선택했다.",
+        statDelta: { practical: 2, charm: 1, mental: -2, wealth: -5 },
+        relationshipDelta: [],
+        flagDelta: {
+          jobApplicationInit: { companyName: "루미큐브랩스", companyType: "스타트업" },
+          jobApplicationStarted: true,
+          careerPathChosen: true,
+        },
+      },
+      {
+        id: "apply_hanbit_public",
+        label: "한빛도시공사 일반행정 채용에 지원한다.",
+        summary: "당신은 한빛도시공사 일반행정 채용에 지원하며 안정적인 공공 전형을 택했다.",
+        statDelta: { academic: 2, reputation: 1, mental: -2, wealth: -8 },
+        relationshipDelta: [],
+        flagDelta: {
+          jobApplicationInit: { companyName: "한빛도시공사", companyType: "공기업" },
+          jobApplicationStarted: true,
+          careerPathChosen: true,
+        },
+      },
+      {
+        id: "apply_orbit_global",
+        label: "오르빗글로벌 코리아 신입 채용에 지원한다.",
+        summary: "당신은 오르빗글로벌 코리아에 지원하며 외국계 전형의 문을 열었다.",
+        statDelta: { charm: 2, practical: 1, mental: -2, wealth: -12 },
+        relationshipDelta: [],
+        flagDelta: {
+          jobApplicationInit: { companyName: "오르빗글로벌 코리아", companyType: "외국계" },
+          jobApplicationStarted: true,
+          careerPathChosen: true,
+        },
+      },
+    ],
+    tags: ["취업", "기업", "지원서"],
+    source: "STATIC",
+    arcIds: ["future"],
+    condition: { blockedFlags: ["jobApplicationStarted", "careerGate"] },
+  },
+  {
     title: "졸업 전 마지막 지원서",
     body: `마감 20분 전, 당신은 지원서 제출 버튼 앞에서 멈춘다. 특정 회사나 자격증처럼 선명한 관문은 아니지만, 그래도 이 지원서는 대학 생활 이후의 첫 문이다. 자기소개서에는 그동안의 선택들이 지나치게 짧은 문장으로 압축되어 있다.
 
@@ -870,7 +930,7 @@ export const CONDITIONAL_STATIC_EVENTS: ConditionalEvent[] = [
     tags: ["지원서", "면접", "진로"],
     source: "STATIC",
     arcIds: ["future"],
-    condition: { blockedFlags: ["careerGate"] },
+    condition: { blockedFlags: ["careerGate", "jobApplicationStarted"] },
   },
   {
     title: "시험 결과 발표",
@@ -929,32 +989,32 @@ export const CONDITIONAL_STATIC_EVENTS: ConditionalEvent[] = [
     condition: { requiredSpecs: ["CERTIFICATION"] },
   },
   {
-    title: "서류 합격",
-    body: `아침에 확인한 메일 제목은 담담했다. '서류 전형 합격 안내.' 지원한 여러 곳 중 하나에서 온 답이었고, 벌써 몇 번을 소리 내지 않고 다시 읽었는지 모른다. 서류가 통과됐다는 것은 이제부터가 진짜라는 뜻이기도 했다.
+    title: "서류 결과 확인",
+    body: `아침에 확인한 메일함에는 지원한 회사의 전형 결과 안내가 도착해 있다. 제목은 일부러 담담하게 쓰여 있어서, 합격인지 불합격인지 미리 짐작하기 어렵다. 커서를 메일 위에 올려두자 지난 몇 주 동안 고친 자기소개서 문장과 포트폴리오 파일명이 한꺼번에 떠오른다.
 
-다음 단계는 인적성 혹은 면접 스터디로 이어진다. 준비 방향을 어떻게 잡느냐에 따라 이 합격이 하나의 문으로 남을지, 그저 짧은 알림으로 지나갈지 정해진다.`,
+결과는 당신이 고르는 것이 아니다. 다만 어떤 마음으로 확인하고, 결과 이후의 시간을 어떻게 쓰느냐는 아직 당신의 몫이다.`,
     choices: [
-      { id: "prep_aptitude", label: "인적성 검사를 준비한다.", summary: "당신은 서류 합격 이후 인적성 검사 준비에 집중했다.", statDelta: { mental: 2, practical: 1 }, relationshipDelta: [], flagDelta: { advanceApplication: true } },
-      { id: "join_interview_group", label: "면접 스터디를 찾는다.", summary: "당신은 면접 스터디에 합류하며 다음 관문을 준비했다.", statDelta: { charm: 2, network: 1 }, relationshipDelta: [], flagDelta: { advanceApplication: true } },
+      { id: "open_document_result_calmly", label: "결과 메일을 열고 바로 다음 일정을 정리한다.", summary: "당신은 흔들리는 마음을 누르고 서류 결과를 확인했다.", statDelta: { practical: 1, mental: -1 }, relationshipDelta: [], flagDelta: { evaluateApplicationStage: true, documentResultStyle: "calm" } },
+      { id: "open_document_result_with_friend", label: "믿을 만한 사람과 통화하며 결과를 확인한다.", summary: "당신은 혼자 버티지 않고 누군가와 함께 서류 결과를 확인했다.", statDelta: { charm: 1, mental: 1, reputation: -1 }, relationshipDelta: [], flagDelta: { evaluateApplicationStage: true, documentResultStyle: "supported" } },
     ],
-    tags: ["취업", "서류", "합격"],
+    tags: ["취업", "서류", "결과"],
     source: "STATIC",
     arcIds: ["future"],
-    condition: { requiredApplicationStage: "DOCUMENT_REVIEW" },
+    condition: { requiredApplicationStage: "DOCUMENT" },
   },
   {
-    title: "서류 불합격",
-    body: `메일함에 쌓인 '아쉽게도'라는 단어들이 오늘도 하나 더 늘었다. 익숙해질 만도 한데, 매번 처음처럼 어깨가 내려앉는다. 이력서와 자기소개서를 다시 열어보면 잘못된 곳은 안 보이는데, 결과는 다시 같은 방향이었다.
+    title: "인성검사 안내",
+    body: `지원한 회사에서 인성검사 링크가 도착했다. 제한 시간은 넉넉해 보이지만, 문항은 이상하게 비슷한 질문을 다른 말로 반복한다. 솔직하게 답해야 할지, 회사가 좋아할 법한 사람처럼 보여야 할지 쉽게 판단이 서지 않는다.
 
-다른 회사에 지원을 이어가면 흐름은 유지되지만, 이유를 찾지 못한 채로 반복될 위험이 있다. 스펙을 더 쌓기로 하면 준비 기간이 길어지지만, 다음 시즌은 조금 다른 얼굴로 서게 될지도 모른다.`,
+이 검사는 정답이 없는 것 같지만, 결과는 분명히 다음 전형으로 이어진다. 당신이 어떤 사람으로 읽히느냐가 서류보다 더 차갑게 기록될 수도 있다.`,
     choices: [
-      { id: "apply_more", label: "다른 회사에 지원을 이어간다.", summary: "당신은 불합격을 뒤로하고 다음 지원서를 준비했다.", statDelta: { mental: -2, practical: 2 }, relationshipDelta: [], flagDelta: { applicationFailed: true } },
-      { id: "reinforce_spec", label: "스펙을 더 쌓기로 한다.", summary: "당신은 부족함을 인정하고 스펙 보강에 시간을 투자했다.", statDelta: { academic: 2, wealth: -2 }, relationshipDelta: [], flagDelta: { applicationFailed: true, specReinforce: true } },
+      { id: "personality_honest", label: "솔직하고 일관되게 답한다.", summary: "당신은 자신을 꾸미기보다 일관된 태도로 인성검사를 마쳤다.", statDelta: { mental: 1, reputation: 1 }, relationshipDelta: [], flagDelta: { evaluateApplicationStage: true, personalityStyle: "honest" } },
+      { id: "personality_company_fit", label: "회사 인재상에 맞춰 신중하게 답한다.", summary: "당신은 회사가 원하는 태도를 의식하며 인성검사를 마쳤다.", statDelta: { practical: 1, mental: -1 }, relationshipDelta: [], flagDelta: { evaluateApplicationStage: true, personalityStyle: "company_fit" } },
     ],
-    tags: ["취업", "서류", "불합격"],
+    tags: ["취업", "인성검사", "전형"],
     source: "STATIC",
     arcIds: ["future"],
-    condition: { requiredApplicationStage: "DOCUMENT_REVIEW" },
+    condition: { requiredApplicationStage: "PERSONALITY_TEST" },
   },
   {
     title: "코딩테스트",
@@ -962,8 +1022,8 @@ export const CONDITIONAL_STATIC_EVENTS: ConditionalEvent[] = [
 
 전략을 어떻게 세우느냐가 오늘의 결과를 가른다. 쉬운 문제부터 확실히 잡으면 최소한의 점수는 보장되고, 어려운 문제에 도전하면 승부수가 되지만 자칫 아무것도 남기지 못할 수 있다.`,
     choices: [
-      { id: "code_easy_first", label: "쉬운 문제부터 확실히 푼다.", summary: "당신은 안정적으로 점수를 확보하며 코딩테스트를 통과하려 했다.", statDelta: { practical: 3, mental: 1 }, relationshipDelta: [], flagDelta: { codingTestApproach: "safe" } },
-      { id: "code_hard_first", label: "어려운 문제에 도전한다.", summary: "당신은 승부수를 던지며 어려운 문제에 시간을 쏟았다.", statDelta: { academic: 3, mental: -2 }, relationshipDelta: [], flagDelta: { codingTestApproach: "risk" } },
+      { id: "code_easy_first", label: "쉬운 문제부터 확실히 푼다.", summary: "당신은 안정적으로 점수를 확보하려 했다.", statDelta: { practical: 3, mental: 1 }, relationshipDelta: [], flagDelta: { evaluateApplicationStage: true, codingTestApproach: "safe" } },
+      { id: "code_hard_first", label: "어려운 문제에 도전한다.", summary: "당신은 승부수를 던지며 어려운 문제에 시간을 쏟았다.", statDelta: { academic: 3, mental: -2 }, relationshipDelta: [], flagDelta: { evaluateApplicationStage: true, codingTestApproach: "risk" } },
     ],
     tags: ["취업", "코딩테스트", "실무"],
     source: "STATIC",
@@ -976,41 +1036,55 @@ export const CONDITIONAL_STATIC_EVENTS: ConditionalEvent[] = [
 
 철저한 예상 답변을 준비하면 안정감은 얻지만 답이 딱딱해질 수 있다. 자연스러운 대화 연습에 시간을 쓰면 유연해지지만, 어려운 질문에서 흔들릴 수도 있다.`,
     choices: [
-      { id: "interview_scripted", label: "예상 질문을 철저히 준비한다.", summary: "당신은 예상 답변을 촘촘히 준비하며 안정감을 높였다.", statDelta: { academic: 2, mental: -1 }, relationshipDelta: [], flagDelta: { interviewStyle: "scripted" } },
-      { id: "interview_conversation", label: "자연스러운 대화를 연습한다.", summary: "당신은 대화의 흐름에 집중하며 유연한 면접을 준비했다.", statDelta: { charm: 3, communication: 2 }, relationshipDelta: [], flagDelta: { interviewStyle: "conversation" } },
+      { id: "interview_scripted", label: "예상 질문을 철저히 준비한다.", summary: "당신은 예상 답변을 촘촘히 준비하며 안정감을 높였다.", statDelta: { academic: 2, mental: -1 }, relationshipDelta: [], flagDelta: { evaluateApplicationStage: true, interviewStyle: "scripted" } },
+      { id: "interview_conversation", label: "자연스러운 대화를 연습한다.", summary: "당신은 대화의 흐름에 집중하며 유연한 면접을 준비했다.", statDelta: { charm: 3, communication: 2 }, relationshipDelta: [], flagDelta: { evaluateApplicationStage: true, interviewStyle: "conversation" } },
     ],
     tags: ["취업", "면접", "준비"],
     source: "STATIC",
     arcIds: ["future"],
-    condition: { requiredApplicationStage: "INTERVIEW" },
+    condition: { requiredApplicationStage: "FIRST_INTERVIEW" },
   },
   {
-    title: "최종 합격",
-    body: `발표일 오후, 낯선 번호로 전화가 걸려온다. 목소리는 담담했지만 내용은 담담하지 않았다. "축하합니다. 최종 합격되셨습니다." 짧은 한 문장이 지난 몇 달의 지원과 시험과 면접을 한꺼번에 갈무리한다.
+    title: "2차 면접의 압박",
+    body: `1차 면접을 넘겼다는 안도감은 오래가지 않았다. 이번에는 실무진보다 더 높은 직급의 사람들이 들어온다는 안내가 왔다. 질문은 더 짧고, 침묵은 더 길어질 것이다.
 
-지금의 감각을 오래 붙잡아둘지, 곧바로 다음을 준비할지 정해야 한다. 어느 쪽이든 이 순간은 앞으로의 리듬을 정하는 첫 결정이다.`,
+회사에 맞는 사람이라는 걸 증명하려면 경험만으로는 부족하다. 왜 이 회사인지, 오래 버틸 수 있는지, 같이 일할 때 어떤 태도를 보일지까지 설득해야 한다.`,
     choices: [
-      { id: "final_celebrate", label: "기쁨을 만끽하고 스스로를 축하한다.", summary: "당신은 최종 합격의 순간을 온전히 누리며 자기 자신을 돌봤다.", statDelta: { mental: 4, health: 2 }, relationshipDelta: [], flagDelta: { finalOutcome: "accepted" } },
-      { id: "final_prep_next", label: "다음 스텝을 곧바로 준비한다.", summary: "당신은 축하보다 다음 단계 준비를 우선하며 앞으로 나아갔다.", statDelta: { practical: 3, mental: -1 }, relationshipDelta: [], flagDelta: { finalOutcome: "accepted", finalNextPrep: true } },
+      { id: "second_interview_vision", label: "회사에서 만들고 싶은 변화를 구체적으로 말한다.", summary: "당신은 회사 안에서 해보고 싶은 일을 구체적으로 설득했다.", statDelta: { charm: 2, reputation: 1, mental: -2 }, relationshipDelta: [], flagDelta: { evaluateApplicationStage: true, interviewStyle: "vision" } },
+      { id: "second_interview_resilience", label: "갈등과 실패를 견딘 경험을 중심으로 답한다.", summary: "당신은 쉽게 무너지지 않는 사람이라는 점을 보여주려 했다.", statDelta: { practical: 2, mental: -1, reputation: 1 }, relationshipDelta: [], flagDelta: { evaluateApplicationStage: true, interviewStyle: "resilience" } },
     ],
-    tags: ["취업", "합격", "진로"],
+    tags: ["취업", "2차면접", "기업"],
     source: "STATIC",
     arcIds: ["future"],
-    condition: { requiredApplicationStage: "FINAL_INTERVIEW" },
+    condition: { requiredApplicationStage: "SECOND_INTERVIEW" },
   },
   {
-    title: "블라인드 채용 반전",
-    body: `기대하지 않았던 회사에서 합격 소식이 왔다. 이력서와 자기소개서만으로 판단한다던 블라인드 채용, 처음에는 큰 기대를 걸지 않았기에 오히려 놀랐다. 이 결과는 운인지 실력인지 여전히 헷갈린다.
+    title: "최종 결과 발표",
+    body: `발표일 오후, 낯선 번호로 전화가 걸려온다. 목소리는 담담했지만 내용은 아직 알 수 없다. 지난 몇 달의 지원과 시험과 면접이 짧은 통화 하나로 갈무리될지도 모른다.
 
-어떻게 받아들이느냐에 따라 앞으로의 태도가 달라진다. 운이 따랐다고 인정하면 겸손해지지만 자신감은 흔들릴 수 있다. 내 실력이 통했다고 확신하면 다음 도전은 담대해지겠지만, 자만은 다른 실수를 부른다.`,
+결과는 당신이 선택할 수 없다. 다만 전화를 받는 순간 어떤 사람으로 남을지, 그리고 다음 계절을 어떻게 맞을지는 아직 정할 수 있다.`,
     choices: [
-      { id: "blind_luck", label: "운이 따랐다고 인정한다.", summary: "당신은 예상치 못한 결과를 겸손하게 받아들였다.", statDelta: { mental: 2, reputation: 1 }, relationshipDelta: [], flagDelta: { blindResult: "luck" } },
-      { id: "blind_skill", label: "내 실력이 통했다고 받아들인다.", summary: "당신은 결과를 자신의 실력으로 받아들이며 자신감을 얻었다.", statDelta: { charm: 3, practical: 2 }, relationshipDelta: [], flagDelta: { blindResult: "skill" } },
+      { id: "final_answer_calmly", label: "전화를 받고 결과를 차분히 확인한다.", summary: "당신은 최종 결과를 차분히 확인했다.", statDelta: { mental: 1 }, relationshipDelta: [], flagDelta: { evaluateApplicationStage: true, finalResultStyle: "calm" } },
+      { id: "final_answer_with_notes", label: "메모장을 열어 조건과 다음 절차를 적으며 듣는다.", summary: "당신은 최종 결과와 조건을 기록하며 다음 절차를 확인했다.", statDelta: { practical: 2, mental: -1 }, relationshipDelta: [], flagDelta: { evaluateApplicationStage: true, finalResultStyle: "practical" } },
     ],
-    tags: ["취업", "반전", "운"],
+    tags: ["취업", "최종결과", "진로"],
     source: "STATIC",
     arcIds: ["future"],
-    condition: { requiredApplicationStage: "FINAL_INTERVIEW" },
+    condition: { requiredApplicationStage: "FINAL_RESULT" },
+  },
+  {
+    title: "블라인드 채용 결과 확인",
+    body: `기대하지 않았던 회사에서 결과 안내가 왔다. 이력서와 자기소개서만으로 판단한다던 블라인드 채용, 처음에는 큰 기대를 걸지 않았기에 오히려 더 손이 멈춘다. 이 결과가 운인지 실력인지, 아니면 아직 부족했다는 통보인지 열어보기 전에는 알 수 없다.
+
+어떻게 받아들이느냐에 따라 앞으로의 태도가 달라진다. 결과 자체는 판정되지만, 그 결과를 당신의 다음 전략으로 바꾸는 일은 아직 남아 있다.`,
+    choices: [
+      { id: "blind_result_humble", label: "결과를 확인하고 원인을 차분히 분석한다.", summary: "당신은 블라인드 채용 결과를 확인하고 다음 전략을 정리했다.", statDelta: { mental: 1, reputation: 1 }, relationshipDelta: [], flagDelta: { evaluateApplicationStage: true, blindResultStyle: "humble" } },
+      { id: "blind_result_confident", label: "결과를 확인하고 바로 다음 지원 계획을 세운다.", summary: "당신은 블라인드 채용 결과를 확인하고 다음 지원 계획을 세웠다.", statDelta: { charm: 2, practical: 1, mental: -1 }, relationshipDelta: [], flagDelta: { evaluateApplicationStage: true, blindResultStyle: "confident" } },
+    ],
+    tags: ["취업", "블라인드채용", "결과"],
+    source: "STATIC",
+    arcIds: ["future"],
+    condition: { requiredApplicationStage: "FINAL_RESULT" },
   },
   {
     title: "워홀 진행 확인",
@@ -1377,6 +1451,14 @@ function scoreEventDiversity(event: Pick<StaticEvent, "title" | "tags" | "choice
   if (relationshipNames.size > 0 && [...relationshipNames].every((name) => !recentNames.includes(name))) score += 3;
   if (event.tags.some((tag) => ["돈", "가족", "연애", "범죄", "위험", "해외", "건강", "알바", "자취", "본가"].includes(tag))) {
     score += 2;
+  }
+  if ((context.coreEventCount ?? 0) <= 4) {
+    if (event.tags.some((tag) => ["외부모임", "전시", "독서", "게임", "취미", "운동", "알바", "가족", "해외", "어학", "자취", "본가"].includes(tag))) {
+      score += 5;
+    }
+    if ([...relationshipNames].some((name) => name.includes("민하") || name.includes("지민"))) {
+      score -= 6;
+    }
   }
 
   return score;

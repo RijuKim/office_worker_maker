@@ -217,8 +217,8 @@ export async function POST(request: Request, context: RouteContext) {
   const shouldCreateFinalEnding = !endingType && (
     (lifeStageTransition.state.lifeStage === "post_graduation" &&
      lifeStageTransition.state.graduation === "graduated" &&
-     coreEventCount >= 22) ||
-    coreEventCount >= 24
+     coreEventCount >= 36) ||
+    coreEventCount >= 40
   );
   const endingRecord = endingType ? await buildImmediateBadEndingRecord({
     userId,

@@ -205,6 +205,7 @@ export async function POST(request: Request, context: RouteContext) {
         },
         lifeStage: selectionLifeStage.lifeStage,
         graduation: selectionLifeStage.graduation,
+        academicTerm: selectionLifeStage.term.label,
         academicPlan: selectionLifeStage.academicPlan,
         destinationCandidates: selectionLifeStage.destinationCandidates,
         specs: selectionContext.specs,

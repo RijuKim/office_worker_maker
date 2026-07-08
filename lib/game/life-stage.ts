@@ -26,6 +26,8 @@ export type AcademicStatus = "ENROLLED" | "LEAVE" | "DROPPED_OUT" | "GRADUATED";
 export type GradeYear = 1 | 2 | 3 | 4;
 export type Semester = 1 | 2;
 
+export const CORE_EVENTS_PER_SEMESTER = 5;
+
 export type AcademicTerm = {
   gradeYear: GradeYear;
   semester: Semester;
@@ -369,7 +371,7 @@ export function applyLifeStageTransition(input: LifeStageTransitionInput): LifeS
       graduation: "gate_ready",
     };
     reasons.push("graduation_gate_ready");
-  } else if (next.stageEventCount >= 2 && next.graduation !== "gate_ready") {
+  } else if (next.stageEventCount >= CORE_EVENTS_PER_SEMESTER && next.graduation !== "gate_ready") {
     const advancedTerm = advanceTerm(next.term);
     next = {
       ...next,
@@ -525,15 +527,16 @@ function sanitizeDestinationCandidates(raw: unknown): DestinationCandidate[] {
 }
 
 function sanitizeStageEventCount(raw: unknown, coreEventCount?: number | null): number {
-  if (typeof raw === "number" && Number.isFinite(raw) && raw >= 0 && raw <= 2) {
+  if (typeof raw === "number" && Number.isFinite(raw) && raw >= 0 && raw <= CORE_EVENTS_PER_SEMESTER) {
     return Math.floor(raw);
   }
-  return clampNonNegativeInteger(coreEventCount, 0) % 2;
+  return clampNonNegativeInteger(coreEventCount, 0) % CORE_EVENTS_PER_SEMESTER;
 }
 
 function deriveFallbackTerm(currentGradeYear?: number | null, coreEventCount?: number | null): AcademicTerm {
-  const grade = clampGradeYear(currentGradeYear ?? Math.floor(clampNonNegativeInteger(coreEventCount, 0) / 4) + 1);
-  const semester = Math.floor(clampNonNegativeInteger(coreEventCount, 0) / 2) % 2 === 0 ? 1 : 2;
+  const events = clampNonNegativeInteger(coreEventCount, 0);
+  const grade = clampGradeYear(currentGradeYear ?? Math.floor(events / (CORE_EVENTS_PER_SEMESTER * 2)) + 1);
+  const semester = Math.floor(events / CORE_EVENTS_PER_SEMESTER) % 2 === 0 ? 1 : 2;
   return buildTerm(grade, semester);
 }
 
@@ -549,7 +552,7 @@ function deriveLifeStageFromStatus(academicStatus: string | null | undefined, gr
 function shouldOpenGraduationGate(state: LifeStageState): boolean {
   return state.lifeStage === "college_late" &&
     state.term.gradeYear === 4 &&
-    state.stageEventCount >= 2 &&
+    state.stageEventCount >= CORE_EVENTS_PER_SEMESTER &&
     state.graduation === "normal";
 }
 
