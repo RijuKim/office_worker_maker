@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { serializeCharacterRun } from "@/lib/game/character-foundation";
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
+import { logger } from "@/lib/server/logger";
 
 type RouteContext = {
   params: Promise<{
@@ -10,7 +11,9 @@ type RouteContext = {
   }>;
 };
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
+  const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  const log = logger.withRequestId(requestId);
   const userId = await requireCurrentUserId();
 
   if (!userId) {
@@ -43,6 +46,7 @@ export async function GET(_request: Request, context: RouteContext) {
   });
 
   if (!character) {
+    log.warn("캐릭터 조회 실패 - 찾을 수 없음", { userId, characterId: id });
     return NextResponse.json({ error: "캐릭터를 찾을 수 없습니다." }, { status: 404 });
   }
 

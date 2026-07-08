@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 
 import {
   applyFlagDeltas,
   applyRelationshipDeltas,
   applyStatDeltas,
+  normalizeStatDeltas,
   validateChoiceIndex,
 } from "@/lib/game/game-rules";
 import {
@@ -14,12 +16,24 @@ import {
 } from "@/lib/game/life-stage";
 import { generateAiEnding } from "@/lib/game/openrouter";
 import { gateConcreteResultFields } from "@/lib/game/result-gating";
+import {
+  evaluateCodingTest,
+  evaluateDocumentStage,
+  evaluateFinalResult,
+  evaluateFirstInterview,
+  evaluatePersonalityTest,
+  evaluateSecondInterview,
+  getCompanyStages,
+} from "@/lib/game/spec-system";
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
+import { logger } from "@/lib/server/logger";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, context: RouteContext) {
+  const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  const log = logger.withRequestId(requestId);
   const userId = await requireCurrentUserId();
   if (!userId) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
@@ -41,6 +55,11 @@ export async function POST(request: Request, context: RouteContext) {
       eventHistory: {
         orderBy: { createdAt: "asc" },
         include: { event: true },
+      },
+      jobApplications: {
+        where: { isActive: true },
+        orderBy: { createdAt: "asc" },
+        take: 1,
       },
     },
   });
@@ -77,6 +96,10 @@ export async function POST(request: Request, context: RouteContext) {
   if (!choice) {
     return NextResponse.json({ error: "올바른 선택을 해주세요." }, { status: 400 });
   }
+  const statDelta = Object.fromEntries(
+    Object.entries(normalizeStatDeltas(choice.statDelta))
+      .filter((entry): entry is [string, number] => typeof entry[1] === "number"),
+  );
 
   const updatedStats = applyStatDeltas(
     {
@@ -91,7 +114,7 @@ export async function POST(request: Request, context: RouteContext) {
       reputation: character.stats.reputation,
       charm: character.stats.charm,
     },
-    choice.statDelta,
+    statDelta,
   );
   const previousStats = {
     academic: character.stats.academic,
@@ -123,13 +146,18 @@ export async function POST(request: Request, context: RouteContext) {
     relationships: [...updatedRelationships, ...newRelationships.map((rel) => ({ name: rel.name, trust: rel.trust }))],
     currentFlags,
   });
-  const resolvedSummary = appendCareerGateOutcomeSummary(choice.summary, resolvedFlagDelta);
+  const resolvedSummary = appendApplicationOutcomeSummary(
+    appendCareerGateOutcomeSummary(choice.summary, resolvedFlagDelta),
+    character.jobApplications[0],
+    updatedStats,
+    resolvedFlagDelta,
+  );
   const storyFlagDelta = buildStoryFlagDelta({
     eventTitle: activeEvent.title,
     eventTags: Array.isArray(activeEvent.tags) ? activeEvent.tags.filter((tag) => typeof tag === "string") : [],
     choiceId: choice.id,
     choiceSummary: resolvedSummary,
-    statDelta: choice.statDelta,
+    statDelta,
     flagDelta: resolvedFlagDelta,
     coreEventCount: character.coreEventCount,
     currentFlags,
@@ -158,16 +186,26 @@ export async function POST(request: Request, context: RouteContext) {
       reputation: updatedStats.reputation,
     },
   });
+  const collapseRisk = getCollapseRisk({
+    currentStats: {
+      health: character.stats.health,
+      mental: character.stats.mental,
+      reputation: character.stats.reputation,
+    },
+    statDelta,
+    currentFlags,
+  });
   const finalEventFlags = {
     ...updatedEventFlags,
     ...lifeStageTransition.flagDelta,
+    ...collapseRisk.flagDelta,
   };
   const hiddenStateAfterTransition = {
     ...character.hiddenState,
     eventFlags: finalEventFlags,
     burnoutRisk: updatedBurnoutRisk,
   };
-  const endingType = getImmediateBadEnding(updatedStats);
+  const endingType = getImmediateBadEnding(updatedStats, collapseRisk.endingType);
   const relationshipLife = deriveRelationshipLifeState(finalEventFlags);
   const relationshipEndingType = getRelationshipEndingType(
     relationshipLife.relationshipLife,
@@ -178,8 +216,9 @@ export async function POST(request: Request, context: RouteContext) {
   const coreEventCount = character.coreEventCount + 1;
   const shouldCreateFinalEnding = !endingType && (
     (lifeStageTransition.state.lifeStage === "post_graduation" &&
-     lifeStageTransition.state.graduation === "graduated") ||
-    coreEventCount >= 14
+     lifeStageTransition.state.graduation === "graduated" &&
+     coreEventCount >= 22) ||
+    coreEventCount >= 24
   );
   const endingRecord = endingType ? await buildImmediateBadEndingRecord({
     userId,
@@ -212,6 +251,13 @@ export async function POST(request: Request, context: RouteContext) {
     relationshipEndingType,
     parentingEndingType,
   }) : null;
+  const jobApplicationWrites = buildJobApplicationWrites({
+    characterRunId: id,
+    specScore: character.specScore,
+    stats: updatedStats,
+    activeApplication: character.jobApplications[0],
+    flagDelta: resolvedFlagDelta,
+  });
 
   await prisma.$transaction([
     prisma.characterStats.update({
@@ -235,7 +281,7 @@ export async function POST(request: Request, context: RouteContext) {
         eventId: activeEvent.id,
         choiceId: choice.id,
         summary: resolvedSummary,
-        statDelta: choice.statDelta as object,
+        statDelta: statDelta as object,
         relationshipDelta: choice.relationshipDelta as object,
         flagDelta: { ...resolvedFlagDelta, ...storyFlagDelta, ...lifeStageTransition.flagDelta } as object,
       },
@@ -247,6 +293,7 @@ export async function POST(request: Request, context: RouteContext) {
       }),
     ),
     ...newRelationships.map((rel) => prisma.relationship.create({ data: rel })),
+    ...jobApplicationWrites,
     ...(endingRecord ? [
       prisma.careerEndingRecord.create({ data: endingRecord }),
       prisma.characterRun.update({
@@ -271,6 +318,15 @@ export async function POST(request: Request, context: RouteContext) {
       }),
     ]),
   ]);
+
+  log.info("선택 처리 완료", {
+    userId,
+    characterId: id,
+    choiceId: choice.id,
+    eventTitle: activeEvent.title,
+    endingTriggered: Boolean(endingRecord),
+    lifeStage: lifeStageTransition.state.lifeStage,
+  });
 
   return NextResponse.json({
     result: {
@@ -304,11 +360,215 @@ function diffPublicStats(previous: Record<string, number>, next: Record<string, 
   );
 }
 
-function getImmediateBadEnding(stats: Record<string, number>) {
+function getImmediateBadEnding(stats: Record<string, number>, collapseEndingType: string | null = null) {
+  if (collapseEndingType) return collapseEndingType;
   if (stats.health <= 0) return "건강 붕괴";
   if (stats.mental <= 0) return "멘탈 붕괴";
   if (stats.reputation <= 0) return "평판 붕괴";
   return null;
+}
+
+function buildJobApplicationWrites(input: {
+  characterRunId: string;
+  specScore: number;
+  stats: Record<string, number>;
+  activeApplication?: {
+    id: string;
+    companyName: string;
+    companyType: string;
+    currentStage: string;
+    specScore: number;
+    stageResults: unknown;
+  } | null;
+  flagDelta: Record<string, unknown>;
+}) {
+  const writes: Prisma.PrismaPromise<unknown>[] = [];
+  const init = readRecord(input.flagDelta.jobApplicationInit);
+  if (init && typeof init.companyName === "string" && typeof init.companyType === "string") {
+    writes.push(prisma.jobApplication.create({
+      data: {
+        characterRunId: input.characterRunId,
+        companyName: init.companyName,
+        companyType: init.companyType,
+        currentStage: "DOCUMENT",
+        specScore: input.specScore,
+        isActive: true,
+      },
+    }));
+    return writes;
+  }
+
+  const active = input.activeApplication;
+  if (!active) return writes;
+
+  const stageResult = getApplicationStageResult({
+    application: active,
+    stats: input.stats,
+    flagDelta: input.flagDelta,
+  });
+  if (!stageResult) return writes;
+
+  const stages = getCompanyStages(active.companyType);
+  const currentIndex = stages.indexOf(active.currentStage);
+  const nextStage = currentIndex >= 0 && currentIndex + 1 < stages.length ? stages[currentIndex + 1] : active.currentStage;
+  const isTerminal = active.currentStage === "FINAL_RESULT" || currentIndex < 0 || currentIndex + 1 >= stages.length;
+  const previousResults = Array.isArray(active.stageResults) ? active.stageResults.filter((item) => typeof item === "object" && item !== null) : [];
+
+  writes.push(prisma.jobApplication.update({
+    where: { id: active.id },
+    data: {
+      currentStage: stageResult.passed && !isTerminal ? nextStage as never : active.currentStage as never,
+      stageResults: [...previousResults, stageResult] as object,
+      isActive: stageResult.passed && !isTerminal,
+      ...applicationStageFieldUpdate(active.currentStage, stageResult.passed),
+    },
+  }));
+
+  return writes;
+}
+
+function getApplicationStageResult(input: {
+  application: {
+    companyType: string;
+    currentStage: string;
+    specScore: number;
+    stageResults: unknown;
+  };
+  stats: Record<string, number>;
+  flagDelta: Record<string, unknown>;
+}) {
+  const stage = input.application.currentStage;
+  const flagDelta = input.flagDelta;
+  if (flagDelta.applicationFailed === true) {
+    return {
+      stage,
+      passed: false,
+      score: 0,
+      evaluatedAt: new Date().toISOString(),
+    };
+  }
+
+  if (flagDelta.evaluateApplicationStage !== true &&
+      flagDelta.advanceApplication !== true &&
+      flagDelta.codingTestApproach === undefined &&
+      flagDelta.interviewStyle === undefined &&
+      flagDelta.finalOutcome !== "accepted") {
+    return null;
+  }
+
+  const evaluation = evaluateApplicationStage({
+    application: input.application,
+    stats: input.stats,
+  });
+
+  return {
+    stage,
+    passed: evaluation.passed,
+    score: evaluation.score,
+    evaluatedAt: new Date().toISOString(),
+  };
+}
+
+function evaluateApplicationStage(input: {
+  application: {
+    currentStage: string;
+    specScore: number;
+    stageResults: unknown;
+  };
+  stats: Record<string, number>;
+}) {
+  const stats = input.stats;
+  if (input.application.currentStage === "DOCUMENT") {
+    return evaluateDocumentStage(input.application.specScore, stats.academic, stats.practical);
+  }
+  if (input.application.currentStage === "PERSONALITY_TEST") {
+    return evaluatePersonalityTest(stats.mental, stats.reputation);
+  }
+  if (input.application.currentStage === "CODING_TEST") {
+    return evaluateCodingTest(stats.practical, stats.academic);
+  }
+  if (input.application.currentStage === "FIRST_INTERVIEW") {
+    return evaluateFirstInterview(stats.communication, stats.charm, stats.practical);
+  }
+  if (input.application.currentStage === "SECOND_INTERVIEW") {
+    return evaluateSecondInterview(stats.reputation, stats.mental, stats.charm);
+  }
+
+  const previousResults = Array.isArray(input.application.stageResults)
+    ? input.application.stageResults.filter((item): item is { score: number } =>
+      typeof item === "object" &&
+      item !== null &&
+      typeof (item as { score?: unknown }).score === "number",
+    )
+    : [];
+  const aggregateScore = previousResults.reduce((sum, result) => sum + result.score, 0);
+  return evaluateFinalResult(aggregateScore);
+}
+
+function applicationStageFieldUpdate(stage: string, passed: boolean) {
+  if (stage === "DOCUMENT") return { documentPassed: passed };
+  if (stage === "PERSONALITY_TEST") return { personalityPassed: passed };
+  if (stage === "CODING_TEST") return { codingTestPassed: passed };
+  if (stage === "FIRST_INTERVIEW") return { firstInterviewPassed: passed };
+  if (stage === "SECOND_INTERVIEW") return { secondInterviewPassed: passed };
+  if (stage === "FINAL_RESULT") return { finalResult: passed };
+  return {};
+}
+
+function appendApplicationOutcomeSummary(
+  summary: string,
+  activeApplication: {
+    companyName: string;
+    companyType: string;
+    currentStage: string;
+    specScore: number;
+    stageResults: unknown;
+  } | undefined,
+  stats: Record<string, number>,
+  flagDelta: Record<string, unknown>,
+) {
+  if (!activeApplication || flagDelta.evaluateApplicationStage !== true) return summary;
+  const evaluation = evaluateApplicationStage({ application: activeApplication, stats });
+  const outcome = evaluation.passed ? "통과했다" : "통과하지 못했다";
+  return `${summary} ${activeApplication.companyName} ${applicationStageLabel(activeApplication.currentStage)} 판정 결과, ${outcome}.`;
+}
+
+function applicationStageLabel(stage: string) {
+  if (stage === "DOCUMENT") return "서류 전형";
+  if (stage === "PERSONALITY_TEST") return "인성검사";
+  if (stage === "CODING_TEST") return "코딩테스트";
+  if (stage === "FIRST_INTERVIEW") return "1차 면접";
+  if (stage === "SECOND_INTERVIEW") return "2차 면접";
+  if (stage === "FINAL_RESULT") return "최종 전형";
+  return "전형";
+}
+
+function getCollapseRisk(input: {
+  currentStats: { health: number; mental: number; reputation: number };
+  statDelta: Record<string, number>;
+  currentFlags: Record<string, unknown>;
+}) {
+  const healthHitAtFloor = input.currentStats.health <= 1 && (input.statDelta.health ?? 0) < 0;
+  const mentalHitAtFloor = input.currentStats.mental <= 1 && (input.statDelta.mental ?? 0) < 0;
+  const flagDelta: Record<string, unknown> = {};
+
+  if (healthHitAtFloor) {
+    if (input.currentFlags.healthCollapseWarning === true) {
+      return { endingType: "건강 붕괴", flagDelta };
+    }
+    flagDelta.healthCollapseWarning = true;
+    flagDelta.lastCriticalWarning = "health";
+  }
+
+  if (mentalHitAtFloor) {
+    if (input.currentFlags.mentalCollapseWarning === true) {
+      return { endingType: "멘탈 붕괴", flagDelta };
+    }
+    flagDelta.mentalCollapseWarning = true;
+    flagDelta.lastCriticalWarning = "mental";
+  }
+
+  return { endingType: null, flagDelta };
 }
 
 function getNextBurnoutRisk(input: {
@@ -591,6 +851,7 @@ async function buildImmediateBadEndingRecord(input: {
       flagDelta: history.flagDelta,
     })),
     finalChoiceSummary: input.summary,
+    resultMode: "crisis",
     relationshipLife: input.relationshipLife,
   });
   const generated = aiEnding.success ? aiEnding.ending : null;
@@ -600,21 +861,21 @@ async function buildImmediateBadEndingRecord(input: {
     userId: input.userId,
     characterRunId: input.characterRunId,
     title: sanitizeResultText(generated?.title) ?? `${input.characterName}의 선택의 결과: ${input.endingType}`,
-    summary: generated?.summary ?? `${input.characterName}은 ${input.eventTitle} 이후 ${reason}.`,
+    summary: sanitizeResultText(generated?.summary) ?? `${input.characterName}은 ${input.eventTitle} 이후 ${reason}.`,
     longNarrative: sanitizeResultText(generated?.longNarrative) ?? buildLongFallbackEnding(input.characterName, input.major, "중도 이탈", input.stats, input.summary, reason),
     careerPath: sanitizeResultText(generated?.careerPath) ?? "중도 이탈",
     jobRole: concreteResult.jobRole,
     destinationName: concreteResult.destinationName,
     salaryBand: concreteResult.salaryBand,
-    workplaceTone: generated?.workplaceTone ?? [],
+    workplaceTone: sanitizeTextArray(generated?.workplaceTone),
     statSnapshot: input.stats,
     keyRelationships: serializeRelationships(input.relationships),
     majorEvents: [...input.eventHistory.map((history) => ({ eventTitle: history.event.title, summary: history.summary, choiceId: null })), { eventTitle: input.eventTitle, summary: input.summary, choiceId: null }],
     satisfaction: generated?.satisfaction ?? 0,
     growthPotential: generated?.growthPotential ?? 0,
     workLifeBalance: generated?.workLifeBalance ?? 0,
-    healthState: generated?.healthState ?? (input.stats.health <= 0 ? "붕괴" : "나쁨"),
-    relationshipState: generated?.relationshipState ?? (input.stats.reputation <= 0 ? "고립" : "불안정"),
+    healthState: sanitizeResultText(generated?.healthState) ?? (input.stats.health <= 0 ? "붕괴" : "나쁨"),
+    relationshipState: sanitizeResultText(generated?.relationshipState) ?? (input.stats.reputation <= 0 ? "고립" : "불안정"),
     tags: sanitizeTags(generated?.tags, ["중도결과", input.endingType]),
     similarityKey: `result-${input.endingType}`,
   };
@@ -673,6 +934,7 @@ async function buildFinalEndingRecord(input: {
       flagDelta: history.flagDelta,
     })),
     finalChoiceSummary: input.summary,
+    resultMode: "final",
     relationshipLife: input.relationshipLife,
   });
   const generated = aiEnding.success ? aiEnding.ending : null;
@@ -688,15 +950,15 @@ async function buildFinalEndingRecord(input: {
     jobRole: gate?.status === "passed" ? concreteResult.jobRole : null,
     destinationName: gate?.status === "passed" ? concreteResult.destinationName : null,
     salaryBand: gate?.status === "passed" ? concreteResult.salaryBand : null,
-    workplaceTone: generated?.workplaceTone ?? [],
+    workplaceTone: sanitizeTextArray(generated?.workplaceTone),
     statSnapshot: input.stats,
     keyRelationships: serializeRelationships(input.relationships),
     majorEvents: [...input.eventHistory.map((history) => ({ eventTitle: history.event.title, summary: history.summary, choiceId: null })), { eventTitle: input.eventTitle, summary: input.summary, choiceId: null }],
     satisfaction: generated?.satisfaction ?? satisfaction,
     growthPotential: generated?.growthPotential ?? growthPotential,
     workLifeBalance: generated?.workLifeBalance ?? workLifeBalance,
-    healthState: generated?.healthState ?? healthState,
-    relationshipState: generated?.relationshipState ?? relationshipState,
+    healthState: sanitizeResultText(generated?.healthState) ?? healthState,
+    relationshipState: sanitizeResultText(generated?.relationshipState) ?? relationshipState,
     tags: sanitizeTags(generated?.tags, ["선택의 결과", careerPath]),
     similarityKey: `result-${careerPath}`,
   };
@@ -759,12 +1021,21 @@ function sanitizeResultText(value: unknown) {
     .replace(/배드엔딩/g, "중도 결과")
     .replace(/일반엔딩/g, "선택의 결과")
     .replace(/AI엔딩/g, "선택의 결과")
-    .replace(/엔딩/g, "결과");
+    .replace(/엔딩/g, "결과")
+    .replace(/(학점|학업|지식|실무|실무력|건강|멘탈|정신|자산|돈|평판|명성|매력|네트워크|관계|academic|practical|health|mental|wealth|reputation|charm|network)\s*(?:수치|점수|스탯|stat)?\s*(?:은|는|이|가|의)?\s*[:：]?\s*(?:10|[0-9])\b/gi, "$1")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 function sanitizeTags(value: unknown, fallback: string[]) {
   const tags = Array.isArray(value) && value.length > 0 ? value.filter((tag) => typeof tag === "string") : fallback;
   return tags.map((tag) => sanitizeResultText(tag) ?? tag).slice(0, 10);
+}
+
+function sanitizeTextArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item) => typeof item === "string").map((item) => sanitizeResultText(item) ?? item)
+    : [];
 }
 
 function serializeRelationships(relationships: { name: string; role: string; trust: number; tags: unknown }[]) {

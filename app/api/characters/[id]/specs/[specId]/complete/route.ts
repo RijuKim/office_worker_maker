@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { calculateSpecScore } from "@/lib/game/spec-system";
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
+import { logger } from "@/lib/server/logger";
 
 type RouteContext = { params: Promise<{ id: string; specId: string }> };
 
@@ -11,6 +12,8 @@ const VALID_STATUSES = ["COMPLETED", "FAILED"] as const;
 type StatusValue = (typeof VALID_STATUSES)[number];
 
 export async function POST(request: Request, context: RouteContext) {
+  const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  const log = logger.withRequestId(requestId);
   const userId = await requireCurrentUserId();
   if (!userId) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
@@ -71,6 +74,8 @@ export async function POST(request: Request, context: RouteContext) {
     where: { id },
     data: { specScore },
   });
+
+  log.info("스펙 완료", { userId, characterId: id, specId, status, specScore });
 
   return NextResponse.json({ spec: updatedSpec, specScore });
 }

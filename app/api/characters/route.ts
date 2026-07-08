@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
+import { logger } from "@/lib/server/logger";
 
 import {
   buildFirstEvent,
@@ -28,7 +29,8 @@ const includeCharacterDetails = {
   },
 };
 
-export async function GET() {
+export async function GET(request: Request) {
+  const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   const userId = await requireCurrentUserId();
 
   if (!userId) {
@@ -50,10 +52,14 @@ export async function GET() {
     orderBy: { updatedAt: "desc" },
   });
 
+  logger.withRequestId(requestId).info("캐릭터 목록 조회", { userId, count: characters.length });
+
   return NextResponse.json({ characters: characters.map(serializeCharacterRun) });
 }
 
 export async function POST(request: Request) {
+  const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  const log = logger.withRequestId(requestId);
   const userId = await requireCurrentUserId();
 
   if (!userId) {
@@ -64,6 +70,7 @@ export async function POST(request: Request) {
   const parsed = characterCreateSchema.safeParse(body);
 
   if (!parsed.success) {
+    log.warn("캐릭터 생성 유효성 검사 실패", { userId, issues: parsed.error.flatten().fieldErrors });
     return NextResponse.json(
       { error: "캐릭터 정보를 확인해 주세요.", issues: parsed.error.flatten().fieldErrors },
       { status: 400 },
@@ -87,7 +94,7 @@ export async function POST(request: Request) {
         major: createInput.major,
         lifeStatus: [],
         stats: {
-          create: buildInitialStats(createInput.preferredStats),
+          create: buildInitialStats(createInput.preferredStats, createInput),
         },
         hiddenState: {
           create: buildInitialHiddenState(createInput),
@@ -113,6 +120,8 @@ export async function POST(request: Request) {
       include: includeCharacterDetails,
     });
   });
+
+  log.info("캐릭터 생성 완료", { userId, characterId: character.id, name: character.name });
 
   return NextResponse.json({ character: serializeCharacterRun(character) }, { status: 201 });
 }

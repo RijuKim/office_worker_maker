@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
+import { logger } from "@/lib/server/logger";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -17,6 +18,8 @@ const VALID_SPEC_TYPES = [
 type SpecTypeValue = (typeof VALID_SPEC_TYPES)[number];
 
 export async function POST(request: Request, context: RouteContext) {
+  const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  const log = logger.withRequestId(requestId);
   const userId = await requireCurrentUserId();
   if (!userId) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
@@ -53,6 +56,8 @@ export async function POST(request: Request, context: RouteContext) {
       status: "IN_PROGRESS",
     },
   });
+
+  log.info("스펙 생성", { userId, characterId: id, specId: spec.id, specType, specName });
 
   return NextResponse.json({ spec }, { status: 201 });
 }

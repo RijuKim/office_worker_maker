@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
+import { logger } from "@/lib/server/logger";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -10,6 +11,8 @@ const VALID_COMPANY_TYPES = ["대기업", "스타트업", "공기업", "전문�
 type CompanyTypeValue = (typeof VALID_COMPANY_TYPES)[number];
 
 export async function POST(request: Request, context: RouteContext) {
+  const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  const log = logger.withRequestId(requestId);
   const userId = await requireCurrentUserId();
   if (!userId) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
@@ -51,6 +54,8 @@ export async function POST(request: Request, context: RouteContext) {
       isActive: true,
     },
   });
+
+  log.info("입사 지원", { userId, characterId: id, applicationId: application.id, companyName, companyType });
 
   return NextResponse.json({ application }, { status: 201 });
 }

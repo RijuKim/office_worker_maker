@@ -5,10 +5,13 @@ import { checkForcedEvent } from "@/lib/game/game-rules";
 import { applyLifeStageTransition, getDropoutReason, getLeaveReason, readRiskDebt } from "@/lib/game/life-stage";
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
+import { logger } from "@/lib/server/logger";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-export async function POST(_request: Request, context: RouteContext) {
+export async function POST(request: Request, context: RouteContext) {
+  const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  const log = logger.withRequestId(requestId);
   const userId = await requireCurrentUserId();
   if (!userId) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
@@ -114,6 +117,13 @@ export async function POST(_request: Request, context: RouteContext) {
       }),
     ] : []),
   ]);
+
+  log.info("강제 이벤트 생성", {
+    userId,
+    characterId: id,
+    eventId: newEvent.id,
+    reason: forcedByLifeStage ? (dropoutReason || leaveReason) : "game_rule",
+  });
 
   return NextResponse.json({
     forced: true,

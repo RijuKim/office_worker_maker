@@ -6,10 +6,13 @@ import { deriveLifeStageState } from "@/lib/game/life-stage";
 import { checkDailyAiLimit, generateAiEvent, incrementAiUsage } from "@/lib/game/openrouter";
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
+import { logger } from "@/lib/server/logger";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-export async function POST(_request: Request, context: RouteContext) {
+export async function POST(request: Request, context: RouteContext) {
+  const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  const log = logger.withRequestId(requestId);
   const userId = await requireCurrentUserId();
   if (!userId) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
@@ -24,6 +27,15 @@ export async function POST(_request: Request, context: RouteContext) {
       hiddenState: true,
       relationships: {
         orderBy: { createdAt: "asc" },
+      },
+      specs: {
+        orderBy: { startedAt: "asc" },
+      },
+      jobApplications: {
+        orderBy: { createdAt: "asc" },
+      },
+      careerPaths: {
+        orderBy: { startedAt: "asc" },
       },
       eventHistory: {
         orderBy: { createdAt: "desc" },
@@ -87,6 +99,23 @@ export async function POST(_request: Request, context: RouteContext) {
     academicPlan: selectionLifeStage.academicPlan,
     graduation: selectionLifeStage.graduation,
     destinationCandidates: selectionLifeStage.destinationCandidates,
+    specs: character.specs.map((spec: { specType: string; specName: string; status: string; score: string | null }) => ({
+      specType: spec.specType,
+      specName: spec.specName,
+      status: spec.status,
+      score: spec.score,
+    })),
+    jobApplications: character.jobApplications.map((app: { companyName: string; companyType: string; currentStage: string; isActive: boolean }) => ({
+      companyName: app.companyName,
+      companyType: app.companyType,
+      currentStage: app.currentStage,
+      isActive: app.isActive,
+    })),
+    careerPaths: character.careerPaths.map((path: { pathType: string; pathName: string; status: string }) => ({
+      pathType: path.pathType,
+      pathName: path.pathName,
+      status: path.status,
+    })),
     recentTags: diversityGuidance.recentTags,
     recentRelationshipNames: diversityGuidance.recentPeople,
     previousChoiceSummary,
@@ -136,8 +165,11 @@ export async function POST(_request: Request, context: RouteContext) {
 
   let selectedEvent = event;
   let source: EventSource = type === "forced" ? "FORCED" : event.source;
+  let aiAttempted = false;
+  let aiFailed = false;
 
   if (type !== "forced" && character.stats && canUseAiForLifeStage(selectionLifeStage.lifeStage, character.academicStatus)) {
+    aiAttempted = true;
     const limit = await checkDailyAiLimit(userId);
     if (!limit.allowed) {
       console.warn("AI daily limit reached, falling back to OpenRouter", {
@@ -175,6 +207,9 @@ export async function POST(_request: Request, context: RouteContext) {
         graduation: selectionLifeStage.graduation,
         academicPlan: selectionLifeStage.academicPlan,
         destinationCandidates: selectionLifeStage.destinationCandidates,
+        specs: selectionContext.specs,
+        jobApplications: selectionContext.jobApplications,
+        careerPaths: selectionContext.careerPaths,
         avoidCategories: diversityGuidance.avoidCategories,
         preferCategories: diversityGuidance.preferCategories,
         avoidPeople: diversityGuidance.avoidPeople,
@@ -198,14 +233,28 @@ export async function POST(_request: Request, context: RouteContext) {
         if (isEventAllowedForLifeStage({ title: aiEvent.title, tags: aiEvent.tags }, selectionContext)) {
           selectedEvent = aiEvent;
           source = "AI";
+        } else {
+          aiFailed = true;
+          console.warn("AI event rejected for life stage", {
+            characterRunId: id,
+            title: aiEvent.title,
+            tags: aiEvent.tags,
+            lifeStage: selectionLifeStage.lifeStage,
+          });
         }
+      } else {
+        aiFailed = true;
+        console.warn("AI event failed, using final static fallback", {
+          characterRunId: id,
+          reason: aiResult.reason,
+          lifeStage: selectionLifeStage.lifeStage,
+        });
       }
     }
   }
 
-  if (source === "AI" && isRepeatedEvent(selectedEvent.title, selectedEvent.tags, usedEventTitles, recentSummaries)) {
-    selectedEvent = event;
-    source = event.source;
+  if (aiAttempted && aiFailed && source !== "AI" && source !== "FORCED") {
+    source = "FALLBACK";
   }
 
   const newEvent = await prisma.event.create({
@@ -235,8 +284,19 @@ export async function POST(_request: Request, context: RouteContext) {
         ...selectionFlags,
         storyArc,
         lastEventSource: source,
+        ...(aiAttempted && aiFailed ? { lastAiFallbackReason: "generation_failed" } : {}),
       },
     },
+  });
+
+  log.info("이벤트 생성 완료", {
+    userId,
+    characterId: id,
+    eventId: newEvent.id,
+    source: newEvent.source,
+    aiAttempted,
+    aiFailed,
+    lifeStage: selectionLifeStage.lifeStage,
   });
 
   return NextResponse.json({
@@ -275,17 +335,6 @@ async function getRecentlySeenUserEventTitles(userId: string, currentCharacterRu
   return recentHistory
     .map((history: { event?: { title?: string } }) => history.event?.title)
     .filter(Boolean) as string[];
-}
-
-function isRepeatedEvent(title: string, tags: string[], usedTitles: string[], recentSummaries: string[]) {
-  if (usedTitles.some((used) => used === title || used.includes(title) || title.includes(used))) {
-    return true;
-  }
-  const normalizedTitle = title.replace(/\s/g, "");
-  if (recentSummaries.some((summary) => summary.replace(/\s/g, "").includes(normalizedTitle))) {
-    return true;
-  }
-  return false;
 }
 
 function getResidence(rawFamilyState: unknown) {

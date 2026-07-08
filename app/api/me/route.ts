@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
+import { logger } from "@/lib/server/logger";
 
 function dateKey(date = new Date()) {
   return date.toISOString().slice(0, 10);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  const log = logger.withRequestId(requestId);
   const userId = await requireCurrentUserId();
 
   if (!userId) {
@@ -38,6 +41,7 @@ export async function GET() {
   ]);
 
   if (!user) {
+    log.error("사용자 정보 조회 실패 - 계정 없음", { userId });
     return NextResponse.json({ error: "계정을 찾을 수 없습니다." }, { status: 404 });
   }
 
@@ -49,8 +53,8 @@ export async function GET() {
     aiUsage: {
       date: usage?.date ?? dateKey(),
       count: usage?.count ?? 0,
-      limit: 30,
-      remaining: Math.max(0, 30 - (usage?.count ?? 0)),
+      limit: null,
+      remaining: null,
     },
   });
 }

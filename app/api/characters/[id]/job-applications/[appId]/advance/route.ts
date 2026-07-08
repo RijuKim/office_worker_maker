@@ -14,6 +14,7 @@ import {
 } from "@/lib/game/spec-system";
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
+import { logger } from "@/lib/server/logger";
 
 type RouteContext = { params: Promise<{ id: string; appId: string }> };
 
@@ -41,7 +42,9 @@ const STAGE_TO_FIELD: Record<string, string> = {
   FINAL_RESULT: "finalResult",
 };
 
-export async function POST(_request: Request, context: RouteContext) {
+export async function POST(request: Request, context: RouteContext) {
+  const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  const log = logger.withRequestId(requestId);
   const userId = await requireCurrentUserId();
   if (!userId) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
@@ -170,6 +173,16 @@ export async function POST(_request: Request, context: RouteContext) {
       data: { wealth: nextWealth },
     }),
   ]);
+
+  log.info("지원 전형 진행", {
+    userId,
+    characterId: id,
+    applicationId: appId,
+    stage: currentStage,
+    passed: evaluation.passed,
+    nextStage,
+    isTerminal,
+  });
 
   return NextResponse.json({
     application: updatedApplication,
