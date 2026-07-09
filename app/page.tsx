@@ -3,6 +3,7 @@
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
+import type { CareerEndingRecord } from "@prisma/client";
 import { EndingArt, getEndingArtType } from "@/lib/game/ending-art";
 import { CODEX_CATALOG, type CodexSlot } from "@/lib/game/codex-catalog";
 import { deriveCodexState, type CodexState } from "@/lib/game/derive-codex-state";
@@ -185,18 +186,20 @@ function recordText(record: Record<string, unknown>, key: string, fallback = "")
   return stripRouteGradeText(record[key]) || fallback;
 }
 
-function PixelPortrait({ name, compact = false, variant }: { name?: string; compact?: boolean; variant?: string }) {
+function PixelPortrait({ name, compact = false, large = false, variant }: { name?: string; compact?: boolean; large?: boolean; variant?: string }) {
   const refName = variant || name || "";
   const initial = refName.trim().slice(0, 1) || "?";
+  let portraitClass = "";
 
   let variantClass = "";
-  if (refName.includes("지민 선배") || refName.includes("지민")) variantClass = "variant-jimin";
-  else if (refName.includes("민하")) variantClass = "variant-minha";
-  else if (refName.includes("서연")) variantClass = "variant-seoyeon";
-  else if (refName.includes("부모님")) variantClass = "variant-parents";
+  if (refName.includes("지민 선배") || refName.includes("지민")) { variantClass = "variant-jimin"; portraitClass = "portrait-art-jimin"; }
+  else if (refName.includes("민하")) { variantClass = "variant-minha"; portraitClass = "portrait-art-minha"; }
+  else if (refName.includes("서연")) { variantClass = "variant-seoyeon"; portraitClass = "portrait-art-seoyeon"; }
+  else if (refName.includes("부모님")) { variantClass = "variant-parents"; portraitClass = "portrait-art-parents"; }
+  else if (refName.includes("상혁") || refName.includes("교수")) { variantClass = "variant-professor"; portraitClass = "portrait-art-professor"; }
+  else if (refName.includes("도윤")) { variantClass = "variant-doyoon"; portraitClass = "portrait-art-doyoon"; }
   else if (refName.includes("현우")) variantClass = "variant-hyunwoo";
   else if (refName.includes("은지")) variantClass = "variant-eunji";
-  else if (refName.includes("도윤")) variantClass = "variant-doyoon";
   else if (refName.includes("재석")) variantClass = "variant-jaeseok";
   else if (refName.includes("수진")) variantClass = "variant-sujin";
   else if (refName.includes("유진")) variantClass = "variant-yujin";
@@ -208,7 +211,6 @@ function PixelPortrait({ name, compact = false, variant }: { name?: string; comp
   else if (refName.includes("혜진")) variantClass = "variant-hyejin";
   else if (refName.includes("명수")) variantClass = "variant-myeongsu";
   else if (refName.includes("상혁")) variantClass = "variant-sanghyuk";
-  else if (refName.includes("교수")) variantClass = "variant-professor";
   else if (refName.includes("조교")) variantClass = "variant-assistant";
   else if (refName.includes("동기")) variantClass = "variant-peer";
   else if (refName.includes("선배")) variantClass = "variant-senior";
@@ -218,12 +220,25 @@ function PixelPortrait({ name, compact = false, variant }: { name?: string; comp
   else if (refName.includes("해외") || refName.includes("emma") || refName.includes("엠마")) variantClass = "variant-overseas";
 
   return (
-    <div className={`pixel-portrait ${compact ? "pixel-portrait-compact" : ""} ${variantClass}`} aria-hidden="true">
-      <div className="portrait-hair" />
-      <div className="portrait-face">
-        <span>{initial}</span>
-      </div>
-      <div className="portrait-body" />
+    <div className={`pixel-portrait ${compact ? "pixel-portrait-compact" : ""} ${large ? "pixel-portrait-large" : ""} ${variantClass}`} aria-hidden="true">
+      {portraitClass ? (
+        <div className={`portrait-art ${portraitClass}`} />
+      ) : (
+        <>
+          <div className="portrait-backdrop" />
+          <div className="portrait-hair" />
+          <div className="portrait-face">
+            <i className="portrait-eye portrait-eye-left" />
+            <i className="portrait-eye portrait-eye-right" />
+            <i className="portrait-cheek portrait-cheek-left" />
+            <i className="portrait-cheek portrait-cheek-right" />
+            <i className="portrait-mouth" />
+            <span className="portrait-initial">{initial}</span>
+          </div>
+          <div className="portrait-collar" />
+          <div className="portrait-body" />
+        </>
+      )}
     </div>
   );
 }
@@ -299,10 +314,11 @@ export default function AppPage() {
   const [choiceFeedback, setChoiceFeedback] = useState<ChoiceFeedback | null>(null);
   const [mobileStatsOpen, setMobileStatsOpen] = useState(false);
 
-  const codexState: CodexState = useMemo(() => deriveCodexState(records as any[], CODEX_CATALOG), [records]);
+  const careerRecords = useMemo(() => records as unknown as CareerEndingRecord[], [records]);
+  const codexState: CodexState = useMemo(() => deriveCodexState(careerRecords, CODEX_CATALOG), [careerRecords]);
   const selectedSlotState = selectedSlot ? codexState.slots.find((s) => s.slot.id === selectedSlot.id) ?? null : null;
   const selectedSlotRecordSample = selectedSlot
-    ? records.find((r) => CODEX_CATALOG.some((slot) => slot.id === selectedSlot.id && slot.matches(r as any))) ?? null
+    ? careerRecords.find((r) => CODEX_CATALOG.some((slot) => slot.id === selectedSlot.id && slot.matches(r))) ?? null
     : null;
 
   const [specs, setSpecs] = useState<{ specType: string; specName: string; status: string; score?: string }[]>([]);
@@ -374,8 +390,15 @@ export default function AppPage() {
     try {
       const streamed = await fetchNextEventStream(charId);
       if (!streamed) {
-        const { ok, data } = await doFetch(`/api/characters/${charId}/events/next`, "POST");
-        if (ok) setCurrentEvent(data.event);
+        // 스트림 실패: AI 생성이 완료됐는데 SSE만 끊겼을 수 있음 → DB 먼저 확인
+        const { ok, data } = await doFetch(`/api/characters/${charId}`);
+        if (ok && data.currentEvent) {
+          setCurrentEvent(data.currentEvent);
+        } else {
+          // 진짜로 생성된 이벤트가 없을 때만 fallback
+          const { ok: ok2, data: data2 } = await doFetch(`/api/characters/${charId}/events/next`, "POST");
+          if (ok2) setCurrentEvent(data2.event);
+        }
       }
       await loadCharacterEvent(charId);
       await loadSpecData(charId);
@@ -910,7 +933,7 @@ export default function AppPage() {
                 firstAchievedAt={selectedSlotState?.firstAchievedAt ?? null}
                 isOpen={selectedSlot !== null}
                 onClose={() => setSelectedSlot(null)}
-                recordSample={selectedSlotRecordSample as any}
+                recordSample={selectedSlotRecordSample}
                 slot={selectedSlot as CodexSlot}
                 unlocked={selectedSlotState?.unlocked ?? false}
               />
@@ -1135,44 +1158,74 @@ export default function AppPage() {
         )}
         {activeScreen === "character_detail" && currentChar && (
           <section className="mx-auto max-w-[760px]">
-            <h2 className="text-xl font-bold">캐릭터 상세</h2>
-            <div className="mt-4 space-y-3">
-              <div className="pixel-panel p-4">
-                <p><strong>이름:</strong> {currentChar.name}</p>
-                <p><strong>전공:</strong> {currentChar.major}</p>
-                <p><strong>학사 진행:</strong> {getAcademicProgressLabel(currentChar)}</p>
-                <p><strong>나이:</strong> {currentChar.age}세</p>
-                <p><strong>학적:</strong> {formatAcademicStatus(currentChar.academicStatus)}</p>
+            <h2 className="screen-title text-xl font-black">캐릭터 상세</h2>
+            <div className="character-sheet pixel-panel mt-4 overflow-hidden">
+              <div className="character-portrait-stage">
+                <PixelPortrait name={currentChar.name} large />
+              </div>
+              <div className="character-sheet-body p-5">
+                <p className="text-xs font-black text-[#8a4f2d]">CURRENT STUDENT FILE</p>
+                <h3 className="mt-1 text-2xl font-black leading-tight">{currentChar.name}</h3>
+                <div className="mt-4 grid grid-cols-2 gap-2 text-sm max-[520px]:grid-cols-1">
+                  <p className="profile-chip"><strong>이름:</strong> {currentChar.name}</p>
+                  <p className="profile-chip"><strong>전공:</strong> {currentChar.major}</p>
+                  <p className="profile-chip"><strong>학사 진행:</strong> {getAcademicProgressLabel(currentChar)}</p>
+                  <p className="profile-chip"><strong>나이:</strong> {currentChar.age}세</p>
+                  <p className="profile-chip"><strong>학적:</strong> {formatAcademicStatus(currentChar.academicStatus)}</p>
+                </div>
+                <div className="mt-5 grid grid-cols-2 gap-2 max-[520px]:grid-cols-1">
+                  {Object.entries(statLabels).map(([key, label]) => (
+                    <div className="stat-card" key={key}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span><span className="mr-1 text-xs text-[#8a4f2d]">{statIcons[key]}</span>{label}</span>
+                        <strong>{key === "wealth" ? formatWealth(currentChar.stats?.[key] ?? 0) : `${statLevel(currentChar.stats?.[key] ?? 0)}/10`}</strong>
+                      </div>
+                      {key !== "wealth" && (
+                        <div className="mt-2 h-2 border-2 border-[#2a2018] bg-[#e2d7c8]">
+                          <div className="h-full bg-[#2f7a84]" style={{ width: `${statLevel(currentChar.stats?.[key] ?? 0) * 10}%` }} />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </section>
         )}
         {activeScreen === "relationships" && currentChar && (
           <section className="mx-auto max-w-[760px]">
-            <h2 className="text-xl font-bold">관계</h2>
-            <div className="mt-4 space-y-3">
+            <h2 className="screen-title text-xl font-black">관계</h2>
+            <div className="relationship-grid mt-4 grid gap-3">
               {currentChar.relationships?.map((rel) => (
-                <div className="pixel-panel flex items-start gap-4 p-4" key={rel.name}>
-                  <PixelPortrait name={rel.name} variant={rel.name} />
+                <div className="relationship-card pixel-panel flex items-start gap-4 p-4" key={rel.name}>
+                  <PixelPortrait name={rel.name} variant={rel.name} large />
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between"><span className="font-bold">{rel.name}</span><span className="text-sm text-[#706b62]">{rel.role}</span></div>
+                    <div className="flex items-center justify-between gap-3 max-[520px]:block">
+                      <span className="text-lg font-black">{rel.name}</span>
+                      <span className="text-sm text-[#706b62]">{rel.role}</span>
+                    </div>
                     <div className="mt-2">
                       <div className="flex items-center justify-between text-sm">
-                        <span>{relationshipState(rel.trust)}</span>
+                        <span className="font-bold text-[#8a4f2d]">{relationshipState(rel.trust)}</span>
                         <span className="font-bold">{trustHearts(rel.trust)}</span>
                       </div>
-                      <div className="mt-2 h-3 border-2 border-[#2a2018] bg-[#d8c8b4]">
+                      <div className="relationship-meter mt-2 h-3 border-2 border-[#2a2018] bg-[#d8c8b4]">
                         <div
                           className={`${rel.trust >= 0 ? "bg-[#d85f87]" : "bg-[#3f5f9f]"} h-full`}
                           style={{ width: `${Math.min(100, Math.abs(rel.trust))}%` }}
                         />
                       </div>
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-1">{(rel.tags ?? []).map((tag: string) => (<span className="rounded-full bg-[#efe5d7] px-2 py-1 text-xs text-[#68412b]" key={tag}>{tag}</span>))}</div>
+                    <div className="mt-3 flex flex-wrap gap-1">{(rel.tags ?? []).map((tag: string) => (<span className="relation-tag border-2 border-[#2a2018] bg-[#efe5d7] px-2 py-1 text-xs text-[#68412b]" key={tag}>{tag}</span>))}</div>
                   </div>
                 </div>
               ))}
-              {(!currentChar.relationships || currentChar.relationships.length === 0) && <p className="text-sm text-[#706b62]">아직 관계 정보가 없습니다.</p>}
+              {(!currentChar.relationships || currentChar.relationships.length === 0) && (
+                <div className="pixel-panel empty-relationship p-6 text-center">
+                  <PixelPortrait name="?" large />
+                  <p className="mt-3 text-sm text-[#706b62]">아직 관계 정보가 없습니다.</p>
+                </div>
+              )}
             </div>
           </section>
         )}
