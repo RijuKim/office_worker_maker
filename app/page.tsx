@@ -1,9 +1,13 @@
 "use client";
 
 import { signIn, signOut, useSession } from "next-auth/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import { EndingArt, getEndingArtType } from "@/lib/game/ending-art";
+import { CODEX_CATALOG, type CodexSlot } from "@/lib/game/codex-catalog";
+import { deriveCodexState, type CodexState } from "@/lib/game/derive-codex-state";
+import { CodexGrid } from "@/app/components/codex/CodexGrid";
+import { CodexDetailModal } from "@/app/components/codex/CodexDetailModal";
 
 type Screen = "auth" | "create" | "play" | "records" | "character_detail" | "relationships";
 
@@ -286,12 +290,20 @@ export default function AppPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState<Record<string, unknown>[]>([]);
+  const [recordsTab, setRecordsTab] = useState<"records" | "codex">("records");
+  const [selectedSlot, setSelectedSlot] = useState<CodexSlot | null>(null);
   const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
   const [pendingNext, setPendingNext] = useState(false);
   const [endingNotice, setEndingNotice] = useState("");
   const [latestRecordId, setLatestRecordId] = useState<string | null>(null);
   const [choiceFeedback, setChoiceFeedback] = useState<ChoiceFeedback | null>(null);
   const [mobileStatsOpen, setMobileStatsOpen] = useState(false);
+
+  const codexState: CodexState = useMemo(() => deriveCodexState(records as any[], CODEX_CATALOG), [records]);
+  const selectedSlotState = selectedSlot ? codexState.slots.find((s) => s.slot.id === selectedSlot.id) ?? null : null;
+  const selectedSlotRecordSample = selectedSlot
+    ? records.find((r) => CODEX_CATALOG.some((slot) => slot.id === selectedSlot.id && slot.matches(r as any))) ?? null
+    : null;
 
   const [specs, setSpecs] = useState<{ specType: string; specName: string; status: string; score?: string }[]>([]);
   const [jobApps, setJobApps] = useState<{ companyName: string; currentStage: string; isActive: boolean }[]>([]);
@@ -692,11 +704,14 @@ export default function AppPage() {
 
   if (activeScreen === "create" && !currentChar) {
     return (
-      <main className="pixel-shell flex min-h-screen items-start justify-center p-4 pt-10">
-        <div className="w-full max-w-lg">
-          <div className="mb-6 flex items-center justify-between text-[#fff3d7]">
-            <h1 className="text-2xl font-black">NEW RUN</h1>
-            <div className="flex gap-3">
+      <main className="pixel-shell app-screen flex min-h-screen items-start justify-center p-4 pt-10">
+        <div className="w-full max-w-[560px]">
+          <div className="create-header mb-5 flex items-center justify-between gap-4 text-[#fff3d7]">
+            <div>
+              <p className="mb-1 text-xs font-black text-[#b8d7a3]">NEW RUN</p>
+              <h1 className="create-title text-2xl font-black leading-tight">일어나보니 대한민국 취준생</h1>
+            </div>
+            <div className="create-actions flex gap-3">
               {status === "authenticated" && (
                 <button className="text-sm text-[#d9c9b5] underline" onClick={() => { setExpandedRecord(null); setScreen("records"); loadRecords(); }}>
                   기록
@@ -709,7 +724,7 @@ export default function AppPage() {
           </div>
           <h2 className="mb-3 text-sm font-bold text-[#d9c9b5]">새 이야기</h2>
           {error && <p className="mb-4 border-2 border-[#b3423c] bg-[#ffe1db] p-2 text-sm font-bold text-[#8d2f2a]">{error}</p>}
-          <div className="pixel-panel space-y-5 p-6">
+          <div className="pixel-panel create-panel space-y-5 p-6">
             <div className="create-hero-art overflow-hidden border-4 border-[#2a2018]">
               <PixelScene scene="intro" label="새 게임 인트로" />
             </div>
@@ -737,7 +752,7 @@ export default function AppPage() {
                     onClick={() => setCharResidence(option.id)}
                     type="button"
                   >
-                    <span className="block font-bold">{charResidence === option.id ? "[선택됨] " : ""}{option.label}</span>
+                    <span className="block font-bold">{charResidence === option.id ? "선택됨 · " : ""}{option.label}</span>
                     <span className="mt-1 block text-xs leading-5 text-[#706b62]">{option.description}</span>
                   </button>
                 ))}
@@ -753,7 +768,7 @@ export default function AppPage() {
                     onClick={() => togglePreferredStat(key)}
                     type="button"
                   >
-                    <span className="mr-2 text-xs text-[#8a4f2d]">{preferredStats.includes(key) ? "■" : "□"} {statIcons[key]}</span>
+                    <span className="mr-2 text-xs text-[#8a4f2d]">{preferredStats.includes(key) ? "●" : "○"} {statIcons[key]}</span>
                     <span className="font-bold">{label}</span>
                   </button>
                 ))}
@@ -784,87 +799,123 @@ export default function AppPage() {
               </button>
             </div>
           </div>
-          <div className="grid gap-5">
-            {records.map((r: Record<string, unknown>) => {
-              const isExpanded = expandedRecord === r.id;
-              const title = recordText(r, "title", "선택의 결과");
-              const summary = recordText(r, "summary");
-              const careerPath = recordText(r, "careerPath", "진로 기록");
-              const healthState = recordText(r, "healthState", "생활 상태");
-              const relationshipStateText = recordText(r, "relationshipState", "관계의 여운");
-              const narrativeText = recordText(r, "longNarrative");
-              const narrativePreview = narrativeText.length > 150 ? narrativeText.slice(0, 150) + "..." : narrativeText;
-              return (
-                <div className={`record-card record-card-${getRecordTone(r)} pixel-panel overflow-hidden`} id={`record-card-${r.id as string}`} key={r.id as string}>
-                  <button
-                    className="grid w-full grid-cols-[156px_minmax(0,1fr)_32px] items-center gap-5 p-5 text-left max-[720px]:grid-cols-[96px_minmax(0,1fr)_24px] max-[520px]:grid-cols-1"
-                    onClick={() => setExpandedRecord(isExpanded ? null : r.id as string)}
-                  >
-                    <RecordPoster record={r} />
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <span className="text-lg font-bold text-[#2a241e]">{title}</span>
-                      </div>
-                      <p className="mt-1 text-sm text-[#706b62]">{summary}</p>
-                      {!isExpanded && narrativePreview && (
-                        <p className="mt-2 text-xs leading-relaxed text-[#a9967d]">{narrativePreview}</p>
-                      )}
-                    </div>
-                    <span className="text-xl text-[#8a4f2d] max-[520px]:hidden">{isExpanded ? "▲" : "▼"}</span>
-                  </button>
-                  {isExpanded && (
-                    <div className="border-t-4 border-[#2a2018] bg-[#fffaf0] p-5">
-                      <div className="prose prose-sm max-w-none whitespace-pre-wrap text-sm leading-relaxed text-[#2a241e]">
-                        {narrativeText}
-                      </div>
-                      <div className="mt-4 grid grid-cols-3 gap-3 border-t-2 border-[#f2efe7] pt-4 text-center text-sm">
-                        <div><span className="block text-xs text-[#706b62]">만족도</span><span className="text-lg font-bold">{r.satisfaction as number}</span></div>
-                        <div><span className="block text-xs text-[#706b62]">성장 가능성</span><span className="text-lg font-bold">{r.growthPotential as number}</span></div>
-                        <div><span className="block text-xs text-[#706b62]">워라밸</span><span className="text-lg font-bold">{r.workLifeBalance as number}</span></div>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <span className="border-2 border-[#ded9ce] bg-[#f2efe7] px-2.5 py-1 text-xs font-bold">{careerPath}</span>
-                        <span className="border-2 border-[#ded9ce] bg-[#f2efe7] px-2.5 py-1 text-xs">{healthState}</span>
-                        <span className="border-2 border-[#ded9ce] bg-[#f2efe7] px-2.5 py-1 text-xs">관계: {relationshipStateText}</span>
-                      </div>
-                      <div className="mt-4 flex flex-wrap gap-2 border-t-2 border-[#f2efe7] pt-4">
-                        <button
-                          className="pixel-button-dark px-3 py-2 text-xs font-bold"
-                          onClick={() => shareRecord(r.id as string)}
-                        >
-                          🔗 링크 복사
-                        </button>
-                        <button
-                          className="pixel-button-dark px-3 py-2 text-xs font-bold"
-                          onClick={() => shareRecordImage(r.id as string)}
-                        >
-                          🖼️ 이미지 저장
-                        </button>
-                        <button
-                          className="pixel-button px-3 py-2 text-xs font-bold"
-                          onClick={() => shareRecordSocial("twitter", r.id as string)}
-                        >
-                          𝕏 공유
-                        </button>
-                        <button
-                          className="pixel-button px-3 py-2 text-xs font-bold"
-                          onClick={() => shareRecordSocial("kakaotalk", r.id as string)}
-                        >
-                          💬 카톡 공유
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            {records.length === 0 && (
-              <div className="pixel-panel border-dashed p-10 text-center">
-                <p className="text-sm text-[#706b62]">아직 저장된 기록이 없습니다.</p>
-                <p className="mt-2 text-xs text-[#a9967d]">게임을 플레이하고 충분한 사건을 경험하면 기록을 생성할 수 있습니다.</p>
-              </div>
-            )}
+          <div className="mb-6 flex flex-wrap gap-2 border-b-4 border-[#2a2018] pb-4" role="tablist">
+            <button
+              className={`pixel-button px-4 py-2 text-sm font-bold ${recordsTab === "records" ? "bg-[#ffe0a2]" : "bg-white"}`}
+              onClick={() => setRecordsTab("records")}
+              type="button"
+              role="tab"
+              aria-selected={recordsTab === "records"}
+            >
+              내 기록
+            </button>
+            <button
+              className={`pixel-button px-4 py-2 text-sm font-bold ${recordsTab === "codex" ? "bg-[#ffe0a2]" : "bg-white"}`}
+              onClick={() => setRecordsTab("codex")}
+              type="button"
+              role="tab"
+              aria-selected={recordsTab === "codex"}
+            >
+              도감
+            </button>
           </div>
+
+          {recordsTab === "records" ? (
+            <div className="grid gap-5">
+              {records.map((r: Record<string, unknown>) => {
+                const isExpanded = expandedRecord === r.id;
+                const title = recordText(r, "title", "선택의 결과");
+                const summary = recordText(r, "summary");
+                const careerPath = recordText(r, "careerPath", "진로 기록");
+                const healthState = recordText(r, "healthState", "생활 상태");
+                const relationshipStateText = recordText(r, "relationshipState", "관계의 여운");
+                const narrativeText = recordText(r, "longNarrative");
+                const narrativePreview = narrativeText.length > 150 ? narrativeText.slice(0, 150) + "..." : narrativeText;
+                return (
+                  <div className={`record-card record-card-${getRecordTone(r)} pixel-panel overflow-hidden`} id={`record-card-${r.id as string}`} key={r.id as string}>
+                    <button
+                      className="grid w-full grid-cols-[156px_minmax(0,1fr)_32px] items-center gap-5 p-5 text-left max-[720px]:grid-cols-[96px_minmax(0,1fr)_24px] max-[520px]:grid-cols-1"
+                      onClick={() => setExpandedRecord(isExpanded ? null : r.id as string)}
+                    >
+                      <RecordPoster record={r} />
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="text-lg font-bold text-[#2a241e]">{title}</span>
+                        </div>
+                        <p className="mt-1 text-sm text-[#706b62]">{summary}</p>
+                        {!isExpanded && narrativePreview && (
+                          <p className="mt-2 text-xs leading-relaxed text-[#a9967d]">{narrativePreview}</p>
+                        )}
+                      </div>
+                      <span className="text-xl text-[#8a4f2d] max-[520px]:hidden">{isExpanded ? "▲" : "▼"}</span>
+                    </button>
+                    {isExpanded && (
+                      <div className="border-t-4 border-[#2a2018] bg-[#fffaf0] p-5">
+                        <div className="prose prose-sm max-w-none whitespace-pre-wrap text-sm leading-relaxed text-[#2a241e]">
+                          {narrativeText}
+                        </div>
+                        <div className="mt-4 grid grid-cols-3 gap-3 border-t-2 border-[#f2efe7] pt-4 text-center text-sm">
+                          <div><span className="block text-xs text-[#706b62]">만족도</span><span className="text-lg font-bold">{r.satisfaction as number}</span></div>
+                          <div><span className="block text-xs text-[#706b62]">성장 가능성</span><span className="text-lg font-bold">{r.growthPotential as number}</span></div>
+                          <div><span className="block text-xs text-[#706b62]">워라밸</span><span className="text-lg font-bold">{r.workLifeBalance as number}</span></div>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <span className="border-2 border-[#ded9ce] bg-[#f2efe7] px-2.5 py-1 text-xs font-bold">{careerPath}</span>
+                          <span className="border-2 border-[#ded9ce] bg-[#f2efe7] px-2.5 py-1 text-xs">{healthState}</span>
+                          <span className="border-2 border-[#ded9ce] bg-[#f2efe7] px-2.5 py-1 text-xs">관계: {relationshipStateText}</span>
+                        </div>
+                        <div className="mt-4 flex flex-wrap gap-2 border-t-2 border-[#f2efe7] pt-4">
+                          <button
+                            className="pixel-button-dark px-3 py-2 text-xs font-bold"
+                            onClick={() => shareRecord(r.id as string)}
+                          >
+                            🔗 링크 복사
+                          </button>
+                          <button
+                            className="pixel-button-dark px-3 py-2 text-xs font-bold"
+                            onClick={() => shareRecordImage(r.id as string)}
+                          >
+                            🖼️ 이미지 저장
+                          </button>
+                          <button
+                            className="pixel-button px-3 py-2 text-xs font-bold"
+                            onClick={() => shareRecordSocial("twitter", r.id as string)}
+                          >
+                            𝕏 공유
+                          </button>
+                          <button
+                            className="pixel-button px-3 py-2 text-xs font-bold"
+                            onClick={() => shareRecordSocial("kakaotalk", r.id as string)}
+                          >
+                            💬 카톡 공유
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {records.length === 0 && (
+                <div className="pixel-panel border-dashed p-10 text-center">
+                  <p className="text-sm text-[#706b62]">아직 저장된 기록이 없습니다.</p>
+                  <p className="mt-2 text-xs text-[#a9967d]">게임을 플레이하고 충분한 사건을 경험하면 기록을 생성할 수 있습니다.</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="relative pb-12">
+              <CodexGrid codexState={codexState} onSlotClick={(slot) => setSelectedSlot(slot)} />
+              <CodexDetailModal
+                achievementCount={selectedSlotState?.achievementCount ?? 0}
+                firstAchievedAt={selectedSlotState?.firstAchievedAt ?? null}
+                isOpen={selectedSlot !== null}
+                onClose={() => setSelectedSlot(null)}
+                recordSample={selectedSlotRecordSample as any}
+                slot={selectedSlot as CodexSlot}
+                unlocked={selectedSlotState?.unlocked ?? false}
+              />
+            </div>
+          )}
         </div>
       </main>
     );
@@ -960,6 +1011,11 @@ export default function AppPage() {
       <main className="play-main bg-[#f7efe2] px-11 py-[34px]">
         {activeScreen === "play" && (
           <section className="mx-auto max-w-[760px]">
+            <div className="play-status-strip mb-4">
+              <span>{academicProgressLabel}</span>
+              <span>{currentChar?.major ?? "전공 미정"}</span>
+              <span>{currentChar ? formatWealth(currentChar.stats?.wealth ?? 0) : "자산"}</span>
+            </div>
             {error && <p className="mb-4 rounded bg-red-50 p-2 text-sm text-red-600">{error}</p>}
             {choiceFeedback && (
               <div className="feedback-pop pixel-panel mb-5 p-4">
@@ -1046,7 +1102,7 @@ export default function AppPage() {
                     </div>
                   </div>
                 </div>
-                <div className="mt-7 grid gap-3">
+                <div className="choice-stack mt-7 grid gap-3">
                   {currentEvent.choices.map((choice, idx) => (
                     <button className="choice-button pixel-button grid min-h-12 grid-cols-[32px_minmax(0,1fr)] items-center gap-3 px-4 py-3.5 text-left text-[15px] disabled:opacity-50" disabled={loading} key={choice.id} onClick={() => makeChoice(idx)}>
                       <span className="choice-index">{idx + 1}</span>
