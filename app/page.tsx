@@ -1290,12 +1290,12 @@ export default function AppPage() {
     <div className="app-layout pixel-shell min-h-screen pt-14 text-[#2a241e]">
       <aside className="sidebar border-r border-[#3b3025] bg-[#231d17] p-[22px] text-[#f7efe2]">
         <div className="sidebar-top">
-          <div className="sidebar-profile flex items-center gap-3">
-            <PixelPortrait name={currentChar?.name} compact />
-            <div className="min-w-0">
+          <div className="sidebar-profile flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <PixelPortrait name={currentChar?.name} compact />
               <h1 className="text-[22px] font-bold leading-tight">{currentChar?.name ?? "..."}</h1>
-              <p className="sidebar-major mt-1 text-[13px] leading-relaxed text-[#c4b39c]">{currentChar?.major} · {academicProgressLabel}</p>
             </div>
+            <p className="shrink-0 text-right text-[13px] leading-relaxed text-[#c4b39c]">{academicProgressLabel}</p>
           </div>
           <div className="sidebar-progress mt-4 border-2 border-[#4d3d2f] bg-[#1b1612] p-3">
             <p className="text-[11px] font-bold uppercase tracking-normal text-[#a9967d]">학사 진행</p>
