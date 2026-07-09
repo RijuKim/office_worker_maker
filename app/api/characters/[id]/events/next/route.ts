@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import type { EventSource } from "@prisma/client";
 
 import { getStoryArc, isEventAllowedForLifeStage, selectNextEvent } from "@/lib/game/event-engine";
+import { buildAiRetryGuidance, evaluateCandidateEvent, findValidatedStaticFallback } from "@/lib/game/event-quality-policy";
 import { deriveLifeStageState } from "@/lib/game/life-stage";
 import { checkDailyAiLimit, generateAiEvent, incrementAiUsage } from "@/lib/game/openrouter";
+import { recordEventQualityLog } from "@/lib/server/event-quality-log";
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
 import { logger } from "@/lib/server/logger";
@@ -152,6 +154,24 @@ export async function POST(request: Request, context: RouteContext) {
   const recentSummaries = character.eventHistory
     .map((h: { summary: string }) => h.summary)
     .filter(Boolean) as string[];
+  const qualityContext = {
+    academicStatus: character.academicStatus,
+    lifeStage: selectionLifeStage.lifeStage,
+    eventFlags: selectionFlags,
+    recentSummaries,
+    recentEvents: character.eventHistory.map((history: {
+      summary: string;
+      relationshipDelta: unknown;
+      event?: { title?: string | null; body?: string | null; tags?: unknown };
+    }) => ({
+      title: history.event?.title,
+      body: history.event?.body,
+      summary: history.summary,
+      tags: Array.isArray(history.event?.tags) ? history.event.tags.filter((tag) => typeof tag === "string") : [],
+      people: readRelationshipNames(history.relationshipDelta),
+    })),
+    previousChoiceSummary,
+  };
   const usedEventTitles = character.eventHistory
     .map((h: { event?: { title?: string } }) => h.event?.title)
     .filter(Boolean) as string[];
@@ -167,6 +187,8 @@ export async function POST(request: Request, context: RouteContext) {
   let source: EventSource = type === "forced" ? "FORCED" : event.source;
   let aiAttempted = false;
   let aiFailed = false;
+  let retryUsed = false;
+  let fallbackUsed = false;
 
   if (type !== "forced" && character.stats && canUseAiForLifeStage(selectionLifeStage.lifeStage, character.academicStatus)) {
     aiAttempted = true;
@@ -179,7 +201,7 @@ export async function POST(request: Request, context: RouteContext) {
       });
     }
     {
-      const aiResult = await generateAiEvent({
+      const aiState = {
         name: character.name,
         age: character.age,
         major: character.major,
@@ -214,7 +236,8 @@ export async function POST(request: Request, context: RouteContext) {
         avoidCategories: diversityGuidance.avoidCategories,
         preferCategories: diversityGuidance.preferCategories,
         avoidPeople: diversityGuidance.avoidPeople,
-      }, { skipPrimary: !limit.allowed });
+      };
+      const aiResult = await generateAiEvent(aiState, { skipPrimary: !limit.allowed });
 
       if (aiResult.success) {
         if (aiResult.providerId === "ollama") {
@@ -231,17 +254,82 @@ export async function POST(request: Request, context: RouteContext) {
           tags: aiResult.event.tags,
           source: "FALLBACK" as const,
         };
-        if (isEventAllowedForLifeStage({ title: aiEvent.title, tags: aiEvent.tags }, selectionContext)) {
+        const initialEvaluation = evaluateCandidateEvent("AI", aiEvent, qualityContext);
+        recordEventQualityLog({
+          characterRunId: id,
+          eventId: null,
+          phase: "initial_ai",
+          source: "AI",
+          verdict: initialEvaluation.verdict,
+          reasons: initialEvaluation.verdict.reasons,
+          diversityScore: initialEvaluation.verdict.diversityScore,
+          continuityExemptions: initialEvaluation.verdict.continuityExemptions,
+          retryUsed: false,
+          fallbackUsed: false,
+          selectedFallbackTitle: null,
+          durationMs: initialEvaluation.durationMs,
+          createdAt: new Date().toISOString(),
+        });
+
+        if (initialEvaluation.verdict.status === "pass" && isEventAllowedForLifeStage({ title: aiEvent.title, tags: aiEvent.tags }, selectionContext)) {
           selectedEvent = aiEvent;
           source = "AI";
         } else {
           aiFailed = true;
-          console.warn("AI event rejected for life stage", {
+          console.warn("AI event rejected by quality validation", {
             characterRunId: id,
             title: aiEvent.title,
             tags: aiEvent.tags,
             lifeStage: selectionLifeStage.lifeStage,
+            reasons: initialEvaluation.verdict.reasons,
           });
+
+          if (initialEvaluation.verdict.retryRecommended) {
+            retryUsed = true;
+            const retryResult = await generateAiEvent({
+              ...aiState,
+              recentSummaries: [...recentSummaries, buildAiRetryGuidance(initialEvaluation.verdict)],
+            }, { skipPrimary: !limit.allowed });
+
+            if (retryResult.success) {
+              if (retryResult.providerId === "ollama") {
+                await incrementAiUsage(userId);
+              }
+              const retryEvent = {
+                title: retryResult.event.title,
+                body: retryResult.event.body,
+                choices: retryResult.event.choices.map((choice) => ({
+                  ...choice,
+                  relationshipDelta: choice.relationshipDelta ?? [],
+                  flagDelta: { aiGenerated: true, storyPhase: storyArc.phase },
+                })),
+                tags: retryResult.event.tags,
+                source: "FALLBACK" as const,
+              };
+              const retryEvaluation = evaluateCandidateEvent("AI", retryEvent, qualityContext);
+              recordEventQualityLog({
+                characterRunId: id,
+                eventId: null,
+                phase: "retry_ai",
+                source: "AI",
+                verdict: retryEvaluation.verdict,
+                reasons: retryEvaluation.verdict.reasons,
+                diversityScore: retryEvaluation.verdict.diversityScore,
+                continuityExemptions: retryEvaluation.verdict.continuityExemptions,
+                retryUsed: true,
+                fallbackUsed: false,
+                selectedFallbackTitle: null,
+                durationMs: retryEvaluation.durationMs,
+                createdAt: new Date().toISOString(),
+              });
+
+              if (retryEvaluation.verdict.status === "pass" && isEventAllowedForLifeStage({ title: retryEvent.title, tags: retryEvent.tags }, selectionContext)) {
+                selectedEvent = retryEvent;
+                source = "AI";
+                aiFailed = false;
+              }
+            }
+          }
         }
       } else {
         aiFailed = true;
@@ -256,6 +344,75 @@ export async function POST(request: Request, context: RouteContext) {
 
   if (aiAttempted && aiFailed && source !== "AI" && source !== "FORCED") {
     source = "FALLBACK";
+  }
+
+  if (source !== "AI") {
+    const staticEvaluation = evaluateCandidateEvent(source, selectedEvent, qualityContext);
+    if (source === "FORCED" && staticEvaluation.verdict.status !== "pass") {
+      log.error("강제 이벤트 품질 검증 실패", {
+        characterId: id,
+        reasons: staticEvaluation.verdict.reasons,
+        diversityScore: staticEvaluation.verdict.diversityScore,
+      });
+      return NextResponse.json({ error: "다음 사건을 생성하지 못했습니다." }, { status: 500 });
+    }
+
+    if (staticEvaluation.verdict.status !== "pass") {
+      const fallback = findValidatedStaticFallback({
+        preferredEvent: selectedEvent,
+        selectionContext,
+        excludedEventTitles,
+        qualityContext,
+      });
+
+      if (!fallback) {
+        log.error("이벤트 품질 fallback_failed", {
+          characterId: id,
+          source,
+          reasons: staticEvaluation.verdict.reasons,
+          diversityScore: staticEvaluation.verdict.diversityScore,
+        });
+        return NextResponse.json({ error: "다음 사건을 생성하지 못했습니다." }, { status: 500 });
+      }
+
+      selectedEvent = fallback.event;
+      source = "FALLBACK";
+      fallbackUsed = true;
+      recordEventQualityLog({
+        characterRunId: id,
+        eventId: null,
+        phase: "static_fallback",
+        source: "FALLBACK",
+        verdict: fallback.evaluation.verdict,
+        reasons: fallback.evaluation.verdict.reasons,
+        diversityScore: fallback.evaluation.verdict.diversityScore,
+        continuityExemptions: fallback.evaluation.verdict.continuityExemptions,
+        retryUsed,
+        fallbackUsed: true,
+        selectedFallbackTitle: fallback.event.title,
+        durationMs: fallback.evaluation.durationMs,
+        createdAt: new Date().toISOString(),
+      });
+    } else if (source === "FALLBACK") {
+      fallbackUsed = true;
+      recordEventQualityLog({
+        characterRunId: id,
+        eventId: null,
+        phase: "static_fallback",
+        source: "FALLBACK",
+        verdict: staticEvaluation.verdict,
+        reasons: staticEvaluation.verdict.reasons,
+        diversityScore: staticEvaluation.verdict.diversityScore,
+        continuityExemptions: staticEvaluation.verdict.continuityExemptions,
+        retryUsed,
+        fallbackUsed: true,
+        selectedFallbackTitle: selectedEvent.title,
+        durationMs: staticEvaluation.durationMs,
+        createdAt: new Date().toISOString(),
+      });
+    } else if (staticEvaluation.verdict.status !== "pass") {
+      return NextResponse.json({ error: "다음 사건을 생성하지 못했습니다." }, { status: 500 });
+    }
   }
 
   const newEvent = await prisma.event.create({
@@ -285,7 +442,7 @@ export async function POST(request: Request, context: RouteContext) {
         ...selectionFlags,
         storyArc,
         lastEventSource: source,
-        ...(aiAttempted && aiFailed ? { lastAiFallbackReason: "generation_failed" } : {}),
+        ...(fallbackUsed ? { lastAiFallbackReason: "quality_or_generation_failed" } : {}),
       },
     },
   });
@@ -297,6 +454,8 @@ export async function POST(request: Request, context: RouteContext) {
     source: newEvent.source,
     aiAttempted,
     aiFailed,
+    retryUsed,
+    fallbackUsed,
     lifeStage: selectionLifeStage.lifeStage,
   });
 

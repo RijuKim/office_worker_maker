@@ -1,6 +1,10 @@
 import { getServerSession } from "next-auth";
+import { cookies } from "next/headers";
 
 import { authOptions } from "@/lib/server/auth-options";
+import { prisma } from "@/lib/server/prisma";
+
+export const GUEST_USER_COOKIE = "sano_guest_user_id";
 
 export async function getCurrentUserId() {
   const session = await getServerSession(authOptions);
@@ -11,9 +15,47 @@ export async function getCurrentUserId() {
 export async function requireCurrentUserId() {
   const userId = await getCurrentUserId();
 
-  if (!userId) {
-    return null;
+  if (userId) {
+    return userId;
   }
 
-  return userId;
+  return getOrCreateGuestUserId();
+}
+
+export async function getGuestUserId() {
+  const cookieStore = await cookies();
+  return cookieStore.get(GUEST_USER_COOKIE)?.value ?? null;
+}
+
+async function getOrCreateGuestUserId() {
+  const cookieStore = await cookies();
+  const existingId = cookieStore.get(GUEST_USER_COOKIE)?.value;
+
+  if (existingId) {
+    const existingUser = await prisma.user.findUnique({
+      where: { id: existingId },
+      select: { id: true },
+    });
+    if (existingUser) return existingUser.id;
+  }
+
+  const id = crypto.randomUUID();
+  const user = await prisma.user.create({
+    data: {
+      id,
+      email: `guest-${id}@guest.local`,
+      passwordHash: "guest",
+    },
+    select: { id: true },
+  });
+
+  cookieStore.set(GUEST_USER_COOKIE, user.id, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+  });
+
+  return user.id;
 }
