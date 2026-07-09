@@ -326,6 +326,7 @@ export default function AppPage() {
   const musicGainRef = useRef<GainNode | null>(null);
   const musicTimerRef = useRef<number | null>(null);
   const musicStepRef = useRef(0);
+  const bgmAudioRef = useRef<HTMLAudioElement | null>(null);
   const loadedAudioSettingsRef = useRef(false);
 
   const careerRecords = useMemo(() => records as unknown as CareerEndingRecord[], [records]);
@@ -355,6 +356,10 @@ export default function AppPage() {
     if (musicTimerRef.current !== null) {
       window.clearInterval(musicTimerRef.current);
       musicTimerRef.current = null;
+    }
+    if (bgmAudioRef.current) {
+      bgmAudioRef.current.pause();
+      bgmAudioRef.current.currentTime = 0;
     }
   }, []);
 
@@ -443,56 +448,27 @@ export default function AppPage() {
     void playSound(kind);
   }, [playSound, pulseHaptic]);
 
-  const playLoFiBar = useCallback(async () => {
-    const context = await ensureAudio();
-    const musicGain = musicGainRef.current;
-    if (!context || !musicGain || document.visibilityState === "hidden") return;
-
-    const chords = [
-      [261.63, 329.63, 392],
-      [220, 261.63, 329.63],
-      [246.94, 293.66, 369.99],
-      [196, 246.94, 329.63],
-    ];
-    const bass = [65.41, 55, 61.74, 49];
-    const step = musicStepRef.current % chords.length;
-    const now = context.currentTime;
-    const filter = context.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 1800;
-    filter.Q.value = 0.9;
-    filter.connect(musicGain);
-
-    [...chords[step], bass[step]].forEach((frequency, index) => {
-      const oscillator = context.createOscillator();
-      const gain = context.createGain();
-      oscillator.type = index === chords[step].length ? "sine" : "triangle";
-      oscillator.frequency.value = frequency;
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.linearRampToValueAtTime(index === chords[step].length ? 0.22 : 0.11, now + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.75);
-      oscillator.connect(gain);
-      gain.connect(filter);
-      oscillator.start(now);
-      oscillator.stop(now + 1.85);
-    });
-
-    musicStepRef.current += 1;
-  }, [ensureAudio]);
-
   const startMusic = useCallback(async (force = false) => {
-    if ((!force && !audioSettings.music) || document.visibilityState === "hidden" || musicTimerRef.current !== null) return;
-    await playLoFiBar();
-    musicTimerRef.current = window.setInterval(() => {
-      void playLoFiBar();
-    }, 1850);
-  }, [audioSettings.music, playLoFiBar]);
+    if ((!force && !audioSettings.music) || document.visibilityState === "hidden") return;
+    if (bgmAudioRef.current) {
+      bgmAudioRef.current.currentTime = 0;
+      bgmAudioRef.current.volume = 0.36;
+      bgmAudioRef.current.loop = true;
+      bgmAudioRef.current.play().catch(() => undefined);
+      return;
+    }
+    const audio = new Audio("/bgm.mp3");
+    audio.volume = 0.36;
+    audio.loop = true;
+    bgmAudioRef.current = audio;
+    audio.play().catch(() => undefined);
+  }, [audioSettings.music]);
 
   const updateAudioSetting = useCallback((key: keyof AudioSettings, value: boolean) => {
     setAudioSettings((current) => ({ ...current, [key]: value }));
     if (key === "music" && value) {
       stopMusic();
-      void ensureAudio().then(() => startMusic(true));
+      void startMusic(true);
     }
     if (key === "music" && !value) {
       stopMusic();
