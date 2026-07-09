@@ -27,8 +27,6 @@ export async function POST(request: Request, context: RouteContext) {
       const send = (event: string, data: unknown) => {
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       };
-      let sentBodyDelta = false;
-
       try {
         send("status", { message: "선택의 시간이 다가오고 있습니다..." });
         const character = await prisma.characterRun.findFirst({
@@ -170,8 +168,6 @@ export async function POST(request: Request, context: RouteContext) {
         let aiFailed = false;
         let retryUsed = false;
         let fallbackUsed = false;
-        let shouldReplaceStreamedBody = false;
-
         if (type !== "forced" && character.stats && canUseAiForLifeStage(lifeStage.lifeStage, character.academicStatus)) {
           aiAttempted = true;
           const limit = await checkDailyAiLimit(userId);
@@ -220,7 +216,6 @@ export async function POST(request: Request, context: RouteContext) {
               avoidPeople: diversityGuidance.avoidPeople,
             };
             const aiResult = await generateAiEventStream(aiState, (text) => {
-              sentBodyDelta = true;
               send("body_delta", { text });
             }, { skipPrimary: !limit.allowed });
 
@@ -258,9 +253,9 @@ export async function POST(request: Request, context: RouteContext) {
 
               if (initialEvaluation.verdict.status === "pass" && isEventAllowedForLifeStage({ title: selectedEvent.title, tags: selectedEvent.tags }, selectionContext)) {
                 source = "AI";
-              } else {
+              } else if (initialEvaluation.verdict.hardFailure) {
                 aiFailed = true;
-                console.warn("AI event stream rejected by quality validation", {
+                console.warn("AI event stream hard failure, retrying", {
                   characterRunId: id,
                   reasons: initialEvaluation.verdict.reasons,
                   lifeStage: lifeStage.lifeStage,
@@ -268,8 +263,6 @@ export async function POST(request: Request, context: RouteContext) {
 
                 if (initialEvaluation.verdict.retryRecommended) {
                   retryUsed = true;
-                  shouldReplaceStreamedBody = sentBodyDelta;
-                  send("status", { message: "선택의 시간이 다가오고 있습니다..." });
                   const retryResult = await generateAiEvent({
                     ...aiState,
                     recentSummaries: [...recentSummaries, buildAiRetryGuidance(initialEvaluation.verdict)],
@@ -314,6 +307,13 @@ export async function POST(request: Request, context: RouteContext) {
                     }
                   }
                 }
+              } else {
+                source = "AI";
+                console.warn("AI event stream accepted despite low diversity score", {
+                  characterRunId: id,
+                  score: initialEvaluation.verdict.diversityScore,
+                  reasons: initialEvaluation.verdict.reasons,
+                });
               }
             } else {
               aiFailed = true;
@@ -322,7 +322,6 @@ export async function POST(request: Request, context: RouteContext) {
                 reason: aiResult.reason,
                 lifeStage: lifeStage.lifeStage,
               });
-              send("status", { message: "선택의 시간이 다가오고 있습니다..." });
 
               const retryResult = await generateAiEvent(aiState, { skipPrimary: !limit.allowed });
               if (retryResult.success) {
@@ -342,9 +341,6 @@ export async function POST(request: Request, context: RouteContext) {
                   source: "FALLBACK",
                 };
                 source = "AI";
-                if (sentBodyDelta) {
-                  send("replace_body", { text: selectedEvent.body });
-                }
               } else {
                 console.warn("AI event retry failed, using final static fallback", {
                   characterRunId: id,
@@ -394,7 +390,6 @@ export async function POST(request: Request, context: RouteContext) {
             selectedEvent = fallback.event;
             source = "FALLBACK";
             fallbackUsed = true;
-            shouldReplaceStreamedBody = sentBodyDelta;
             recordEventQualityLog({
               characterRunId: id,
               eventId: null,
@@ -412,7 +407,6 @@ export async function POST(request: Request, context: RouteContext) {
             });
           } else if (source === "FALLBACK") {
             fallbackUsed = true;
-            shouldReplaceStreamedBody = sentBodyDelta;
             recordEventQualityLog({
               characterRunId: id,
               eventId: null,
@@ -431,11 +425,7 @@ export async function POST(request: Request, context: RouteContext) {
           }
         }
 
-        if (!sentBodyDelta) {
-          await streamTextFallback(selectedEvent.body, (text) => send("body_delta", { text }));
-        } else if (shouldReplaceStreamedBody || source === "FALLBACK") {
-          send("replace_body", { text: selectedEvent.body });
-        }
+        await streamTextFallback(selectedEvent.body, (text) => send("body_delta", { text }));
 
         const newEvent = await prisma.event.create({
           data: {
