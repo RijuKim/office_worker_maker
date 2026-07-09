@@ -1456,6 +1456,30 @@ button {
   gap: 4px;
 }
 
+.chrome-brand {
+  pointer-events: none;
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+}
+
+.chrome-brand-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.chrome-brand-name {
+  font-size: 15px;
+  font-weight: 900;
+  color: #2a2018;
+  white-space: nowrap;
+}
+
 .chrome-menu-button span {
   display: block;
   width: 18px;

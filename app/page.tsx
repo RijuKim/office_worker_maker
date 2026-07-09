@@ -674,6 +674,16 @@ export default function AppPage() {
     loadCharacters();
   }, [status]);
 
+  // 앤입토스 뒤로가기 제스처 차단
+  useEffect(() => {
+    history.pushState(null, "", location.href);
+    const handlePopState = () => {
+      history.pushState(null, "", location.href);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   useEffect(() => {
     const saved = window.localStorage.getItem("sano-audio-settings");
     if (!saved) {
@@ -937,6 +947,10 @@ export default function AppPage() {
   );
   const topChrome = (
     <div className="app-top-chrome">
+      <div className="chrome-brand">
+        <span className="chrome-brand-icon">🎮</span>
+        <span className="chrome-brand-name">취준생게임</span>
+      </div>
       <button
         aria-expanded={menuOpen}
         aria-label="메뉴"
@@ -1011,6 +1025,13 @@ export default function AppPage() {
           >
             {status === "authenticated" ? "계정" : "로그인/저장"}
           </button>
+          <a
+            className="block min-h-[38px] border-0 border-b-2 border-[#eadfce] bg-transparent px-[10px] py-2 text-left text-[14px] font-black leading-[38px] text-[#2a241e] no-underline last:border-b-0 hover:bg-[#f2efe7]"
+            href="/privacy"
+            onClick={() => setMenuOpen(false)}
+          >
+            개인정보처리방침
+          </a>
         </div>
       )}
       {settingsOpen && (

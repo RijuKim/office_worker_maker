@@ -20,10 +20,12 @@
   "dependencies": {
     "@prisma/adapter-pg": "7.8.0",
     "@prisma/client": "7.8.0",
+    "canvas": "^3.2.3",
     "html-to-image": "^1.11.13",
     "next": "16.2.10",
     "next-auth": "4.24.14",
     "pg": "8.16.3",
+    "pptxgenjs": "^4.0.1",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "zod": "4.4.3"
