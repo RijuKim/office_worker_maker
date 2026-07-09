@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Slice Walkthrough Prototype</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #241b15; color: #2a241e; }
+    main { max-width: 900px; margin: 0 auto; padding: 24px; }
+    .screen { display: none; background: #f7efe2; border: 4px solid #2a2018; padding: 22px; box-shadow: 6px 6px 0 #0f0b08; }
+    .screen.active { display: block; }
+    .panel { border: 3px solid #2a2018; background: #fffaf0; padding: 16px; margin: 14px 0; }
+    .choices { display: grid; gap: 10px; }
+    button { border: 3px solid #2a2018; background: #fff6df; padding: 12px 14px; font-weight: 800; box-shadow: 3px 3px 0 #2a2018; cursor: pointer; }
+    .nav { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+    .tag { display: inline-block; border: 2px solid #ded9ce; background: #f2efe7; padding: 4px 8px; margin: 3px; }
+    .muted { color: #706b62; }
+  </style>
+</head>
+<body>
+<main>
+  <section id="slice1" class="screen active">
+    <h1>Slice 1 체크포인트</h1>
+    <p class="muted">고정 카운터 대신 학기/상태가 진행의 중심이 됩니다.</p>
+    <div class="panel">
+      <strong>현재 진행</strong>
+      <p>2학년 1학기 · 전공 적합도 흔들림 · 휴학 위험 낮음</p>
+      <span class="tag">복수전공 후보 없음</span>
+      <span class="tag">교수 면담 가능</span>
+    </div>
+    <div class="panel">
+      <h2>복수전공 설명회 포스터</h2>
+      <p>미디어커뮤니케이션학과 설명회 포스터를 본 당신은 지금 전공을 계속 밀지, 다른 길을 섞을지 고민한다.</p>
+      <div class="choices">
+        <button onclick="document.getElementById('state').textContent='2학년 1학기 · 복수전공 검토 · 졸업 부담 증가'">복수전공 설명회에 간다</button>
+        <button onclick="document.getElementById('state').textContent='2학년 1학기 · 전공 유지 · 교수 면담 후보'">교수님과 전공 적합도를 상담한다</button>
+        <button onclick="document.getElementById('state').textContent='2학년 1학기 · 회복 우선 · 휴학 위험 감소'">이번 학기는 건강을 우선한다</button>
+      </div>
+      <p id="state" class="muted">선택하면 상태 문구가 바뀝니다.</p>
+    </div>
+    <div class="nav"><button onclick="show('slice2')">Slice 2 미리보기</button></div>
+  </section>
+
+  <section id="slice2" class="screen">
+    <h1>Slice 2 체크포인트</h1>
+    <p class="muted">AI가 결과를 쓰되, 회사/대학원/결혼/아이 결과는 열린 게이트만 사용할 수 있습니다.</p>
+    <div class="panel">
+      <strong>열린 게이트</strong>
+      <p><span class="tag">다람소프트 면접 통과</span><span class="tag">서연과 동거 논의</span><span class="tag">캡스톤 통과</span></p>
+    </div>
+    <div class="panel">
+      <h2>선택의 결과 기록</h2>
+      <p>당신은 다람소프트의 신입 실무자가 되었지만, 동거를 이야기했던 서연과는 첫 출근의 계절을 지나며 서로 다른 리듬을 배웠다. 캡스톤 발표에서 버틴 경험은 면접장보다 오래 남았다...</p>
+      <p class="muted">등급 없음 · 열린 목적지만 사용 · 과거 사건 3개 이상 반영</p>
+    </div>
+    <div class="nav"><button onclick="show('slice1')">Slice 1로 돌아가기</button></div>
+  </section>
+</main>
+<script>
+function show(id) {
+  document.querySelectorAll('.screen').forEach((screen) => screen.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+</script>
+</body>
+</html>

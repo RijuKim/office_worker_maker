@@ -1,0 +1,16 @@
+- generic [active] [ref=f2e1]:
+  - main [ref=f2e2]:
+    - generic [ref=f2e5]:
+      - heading "일어나보니 대한민국 취준생" [level=1] [ref=f2e6]:
+        - text: 일어나보니
+        - text: 대한민국 취준생
+      - paragraph [ref=f2e7]: LITERARY CAREER ADVENTURE
+      - generic [ref=f2e8]:
+        - textbox "이메일" [ref=f2e9]: test@test.com
+        - textbox "비밀번호 (8자 이상)" [ref=f2e10]: Password123!
+        - generic [ref=f2e11]:
+          - button "회원가입" [disabled] [ref=f2e15] [cursor=pointer]
+          - paragraph [ref=f2e13]:
+            - text: 이미 계정이 있으신가요?
+            - button "로그인" [ref=f2e16] [cursor=pointer]
+  - alert [ref=f2e4]

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Slice 1 Wireframe</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #f7efe2; color: #2a241e; }
+    main { max-width: 920px; margin: 0 auto; padding: 24px; }
+    .panel { border: 3px solid #2a2018; background: #fffaf0; padding: 18px; box-shadow: 4px 4px 0 #2a2018; margin-bottom: 18px; }
+    .bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .step { border: 2px solid #2a2018; padding: 10px; background: #efe5d7; font-weight: 700; }
+    .active { background: #f7d08b; }
+    .choice { display: block; width: 100%; margin-top: 10px; border: 3px solid #2a2018; background: #fff6df; padding: 14px; text-align: left; }
+  </style>
+</head>
+<body>
+<main>
+  <div class="panel">
+    <h1>Slice 1: 학기와 학적 상태가 보이는 진행</h1>
+    <p>기존 0/15 카운터 대신 학년/학기/휴학/추가학기/졸업관문 상태를 보여준다.</p>
+    <div class="bar">
+      <div class="step">1학년 1학기</div>
+      <div class="step active">1학년 2학기</div>
+      <div class="step">2학년</div>
+      <div class="step">전공 갈림길</div>
+    </div>
+  </div>
+  <div class="panel">
+    <strong>현재 상태</strong>
+    <p>재학 · 1학년 2학기 · 졸업요건 정상 · 휴학 위험 낮음</p>
+    <p>다음 사건 후보는 동아리, 수업, 교수 면담, 알바, 가족 압박 중 현재 상태와 최근 기억을 보고 결정된다.</p>
+  </div>
+  <div class="panel">
+    <h2>중간고사 이후의 전공 상담</h2>
+    <p>성적표를 받은 뒤 교수님은 전공을 계속 밀어붙일지, 복수전공을 알아볼지 묻는다.</p>
+    <button class="choice">전공을 계속 밀어붙인다</button>
+    <button class="choice">복수전공 설명회를 찾아본다</button>
+    <button class="choice">이번 학기는 회복을 우선한다</button>
+  </div>
+</main>
+</body>
+</html>

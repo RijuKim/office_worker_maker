@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Event Quality Final Product</title>
+  <style>
+    body { margin: 0; background: #16130f; color: #2a241e; font-family: system-ui, sans-serif; }
+    main { max-width: 900px; margin: 0 auto; padding: 28px; }
+    .panel { border: 4px solid #2a2018; background: #fff3d7; box-shadow: 6px 6px 0 #0a0705; padding: 22px; }
+    .badge { display: inline-block; border: 2px solid #2a2018; background: #f7d08b; padding: 4px 8px; font-size: 12px; font-weight: 900; }
+    .event { display: grid; grid-template-columns: 190px 1fr; gap: 20px; }
+    .art { min-height: 210px; border: 3px solid #2a2018; background: linear-gradient(#8bc0d6 0 60%, #6f7f52 60%); position: relative; }
+    .art::before { content: ""; position: absolute; left: 40px; bottom: 42px; width: 70px; height: 50px; border: 3px solid #2a2018; background: #305d73; }
+    .art::after { content: ""; position: absolute; right: 36px; bottom: 36px; width: 36px; height: 70px; border: 3px solid #2a2018; background: #d85f87; }
+    h1 { color: #fff3d7; }
+    h2 { margin: 10px 0; }
+    p { line-height: 1.7; }
+    .choices { display: grid; gap: 10px; margin-top: 18px; }
+    button { text-align: left; border: 3px solid #2a2018; background: #fffaf0; padding: 12px; font-weight: 800; box-shadow: 3px 3px 0 #2a2018; }
+    .meta { margin-top: 20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .meta div { border: 2px solid #2a2018; background: #d5edf6; padding: 10px; font-size: 13px; }
+    @media (max-width: 720px) { .event, .meta { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>최종 체감 화면</h1>
+  <section class="panel event">
+    <div class="art"></div>
+    <div>
+      <span class="badge">새 장면</span>
+      <h2>공모전 제출 마감 전날</h2>
+      <p>지난번에 꾸린 팀은 아직 흩어지지 않았다. 이번 장면은 같은 공모전이지만, 단순한 재권유가 아니라 제출 직전의 책임과 갈등으로 넘어간다.</p>
+      <div class="choices">
+        <button>팀원들의 빈 부분을 정리하고 제출 기준을 다시 맞춘다.</button>
+        <button>내 파트의 완성도를 낮추더라도 전체 일정부터 지킨다.</button>
+        <button>발표 가능성을 보고 교수님께 짧은 피드백을 구한다.</button>
+      </div>
+    </div>
+  </section>
+  <div class="meta">
+    <div><strong>검수</strong><br>하드 실패 없음</div>
+    <div><strong>다양성</strong><br>연속성 예외 적용</div>
+    <div><strong>로그</strong><br>quality verdict 기록</div>
+  </div>
+</main>
+</body>
+</html>

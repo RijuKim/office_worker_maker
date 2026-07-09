@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Event Quality Architecture</title>
+  <style>
+    body { margin: 0; background: #16130f; color: #fff3d7; font-family: system-ui, sans-serif; }
+    main { max-width: 980px; margin: 0 auto; padding: 28px; }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    p { color: #d9c9b5; line-height: 1.6; }
+    svg { width: 100%; height: auto; border: 4px solid #0f0b08; background: #fff3d7; box-shadow: 6px 6px 0 #0a0705; }
+    .box { fill: #fffaf0; stroke: #2a2018; stroke-width: 3; }
+    .server { fill: #d5edf6; }
+    .ai { fill: #ffe1db; }
+    .fallback { fill: #dff2d7; }
+    .text { fill: #2a2018; font-size: 14px; font-weight: 800; }
+    .small { fill: #6d4a2f; font-size: 11px; font-weight: 600; }
+    path { stroke: #305d73; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+    g:hover .box { fill: #f7d08b; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>이벤트 품질 시스템 아키텍처</h1>
+  <p>AI는 제안만 하고, 서버 검수기가 최종 저장 여부를 결정한다. 실패 시 한 번만 재생성하고, 이후에는 네트워크 없는 안전 fallback으로 진행한다.</p>
+  <svg viewBox="0 0 940 520" role="img" aria-label="event quality architecture">
+    <defs>
+      <marker id="arrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+        <polygon points="0 0, 10 3.5, 0 7" fill="#305d73"></polygon>
+      </marker>
+    </defs>
+    <g><rect class="box" x="40" y="60" width="160" height="70"/><text class="text" x="120" y="92" text-anchor="middle">플레이어</text><text class="small" x="120" y="112" text-anchor="middle">다음 사건 요청</text></g>
+    <g><rect class="box server" x="260" y="60" width="180" height="70"/><text class="text" x="350" y="92" text-anchor="middle">Next Event Route</text><text class="small" x="350" y="112" text-anchor="middle">stream / non-stream</text></g>
+    <g><rect class="box ai" x="500" y="40" width="180" height="70"/><text class="text" x="590" y="72" text-anchor="middle">AI Candidate</text><text class="small" x="590" y="92" text-anchor="middle">OpenRouter/Ollama</text></g>
+    <g><rect class="box fallback" x="500" y="140" width="180" height="70"/><text class="text" x="590" y="172" text-anchor="middle">Static Candidate</text><text class="small" x="590" y="192" text-anchor="middle">no network</text></g>
+    <g><rect class="box server" x="260" y="250" width="220" height="90"/><text class="text" x="370" y="284" text-anchor="middle">Event Quality</text><text class="small" x="370" y="304" text-anchor="middle">hard rules + diversity</text><text class="small" x="370" y="322" text-anchor="middle">continuity exceptions</text></g>
+    <g><rect class="box" x="540" y="260" width="160" height="70"/><text class="text" x="620" y="292" text-anchor="middle">Retry Once</text><text class="small" x="620" y="312" text-anchor="middle">only if needed</text></g>
+    <g><rect class="box fallback" x="750" y="260" width="150" height="70"/><text class="text" x="825" y="292" text-anchor="middle">Safe Fallback</text><text class="small" x="825" y="312" text-anchor="middle">validated</text></g>
+    <g><rect class="box server" x="260" y="400" width="180" height="70"/><text class="text" x="350" y="432" text-anchor="middle">Persist Event</text><text class="small" x="350" y="452" text-anchor="middle">Prisma Event</text></g>
+    <g><rect class="box" x="520" y="400" width="180" height="70"/><text class="text" x="610" y="432" text-anchor="middle">Quality Log</text><text class="small" x="610" y="452" text-anchor="middle">adapter only</text></g>
+    <path d="M200 95 L260 95"/>
+    <path d="M440 86 L500 76"/>
+    <path d="M440 108 L500 164"/>
+    <path d="M590 110 L440 250"/>
+    <path d="M590 210 L470 260"/>
+    <path d="M480 294 L540 294"/>
+    <path d="M700 294 L750 294"/>
+    <path d="M825 330 L440 400"/>
+    <path d="M370 340 L350 400"/>
+    <path d="M440 435 L520 435"/>
+  </svg>
+</main>
+</body>
+</html>

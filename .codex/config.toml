@@ -1,0 +1,132 @@
+[mcp_servers.tenet]
+command = "tenet"
+args = ["serve"]
+
+[mcp_servers.tenet.tools.tenet_init]
+approval_mode = "approve"
+
+[mcp_servers.tenet.tools.tenet_continue]
+approval_mode = "approve"
+
+[mcp_servers.tenet.tools.tenet_compile_context]
+approval_mode = "approve"
+
+[mcp_servers.tenet.tools.tenet_start_job]
+approval_mode = "approve"
+
+[mcp_servers.tenet.tools.tenet_register_jobs]
+approval_mode = "approve"
+
+[mcp_servers.tenet.tools.tenet_job_wait]
+approval_mode = "approve"
+
+[mcp_servers.tenet.tools.tenet_job_result]
+approval_mode = "approve"
+
+[mcp_servers.tenet.tools.tenet_cancel_job]
+approval_mode = "approve"
+
+[mcp_servers.tenet.tools.tenet_start_eval]
+approval_mode = "approve"
+
+[mcp_servers.tenet.tools.tenet_validate_clarity]
+approval_mode = "approve"
+
+[mcp_servers.tenet.tools.tenet_validate_readiness]
+approval_mode = "approve"
+
+[mcp_servers.tenet.tools.tenet_update_knowledge]
+approval_mode = "approve"
+
+[mcp_servers.tenet.tools.tenet_add_steer]
+approval_mode = "approve"
+
+[mcp_servers.tenet.tools.tenet_process_steer]
+approval_mode = "approve"
+
+[mcp_servers.tenet.tools.tenet_update_steer]
+approval_mode = "approve"
+
+[mcp_servers.tenet.tools.tenet_health_check]
+approval_mode = "approve"
+
+[mcp_servers.tenet.tools.tenet_get_status]
+approval_mode = "approve"
+
+[mcp_servers.tenet.tools.tenet_retry_job]
+approval_mode = "approve"
+
+[mcp_servers.tenet.tools.tenet_report_blocking_finding]
+approval_mode = "approve"
+
+
+[mcp_servers.playwright]
+command = "npx"
+args = ["@playwright/mcp@latest"]
+
+[mcp_servers.playwright.tools.browser_navigate]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_navigate_back]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_click]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_type]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_fill_form]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_snapshot]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_take_screenshot]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_wait_for]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_press_key]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_select_option]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_hover]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_drag]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_resize]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_tabs]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_close]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_console_messages]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_network_requests]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_evaluate]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_run_code]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_file_upload]
+approval_mode = "approve"
+
+[mcp_servers.playwright.tools.browser_handle_dialog]
+approval_mode = "approve"
+
+
+[projects."/Users/guremini/projects/sano_officeworker"]
+trust_level = "trusted"

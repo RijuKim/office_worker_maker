@@ -1,0 +1,50 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_navigate_back",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_type",
+      "mcp__playwright__browser_fill_form",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_wait_for",
+      "mcp__playwright__browser_press_key",
+      "mcp__playwright__browser_select_option",
+      "mcp__playwright__browser_hover",
+      "mcp__playwright__browser_drag",
+      "mcp__playwright__browser_resize",
+      "mcp__playwright__browser_tabs",
+      "mcp__playwright__browser_close",
+      "mcp__playwright__browser_console_messages",
+      "mcp__playwright__browser_network_requests",
+      "mcp__playwright__browser_evaluate",
+      "mcp__playwright__browser_run_code",
+      "mcp__playwright__browser_file_upload",
+      "mcp__playwright__browser_handle_dialog",
+      "mcp__tenet__tenet_init",
+      "mcp__tenet__tenet_continue",
+      "mcp__tenet__tenet_compile_context",
+      "mcp__tenet__tenet_start_job",
+      "mcp__tenet__tenet_register_jobs",
+      "mcp__tenet__tenet_job_wait",
+      "mcp__tenet__tenet_job_result",
+      "mcp__tenet__tenet_cancel_job",
+      "mcp__tenet__tenet_start_eval",
+      "mcp__tenet__tenet_validate_clarity",
+      "mcp__tenet__tenet_validate_readiness",
+      "mcp__tenet__tenet_update_knowledge",
+      "mcp__tenet__tenet_add_steer",
+      "mcp__tenet__tenet_process_steer",
+      "mcp__tenet__tenet_update_steer",
+      "mcp__tenet__tenet_health_check",
+      "mcp__tenet__tenet_get_status",
+      "mcp__tenet__tenet_retry_job",
+      "mcp__tenet__tenet_report_blocking_finding"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "playwright",
+    "tenet"
+  ]
+}

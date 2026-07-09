@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Final Product Mockup</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #241b15; color: #2a241e; }
+    .shell { display: grid; grid-template-columns: 270px minmax(0,1fr) 310px; min-height: 100vh; }
+    aside { background: #231d17; color: #f7efe2; padding: 22px; border-right: 3px solid #0f0b08; }
+    main { background: #f7efe2; padding: 34px; }
+    .right { border-left: 3px solid #0f0b08; }
+    .panel { border: 3px solid #2a2018; background: #fffaf0; padding: 18px; box-shadow: 4px 4px 0 #2a2018; }
+    .dark { border-color: #4d3d2f; background: #1b1612; box-shadow: none; }
+    .badge { display: inline-block; border: 2px solid #2a2018; background: #f7d08b; padding: 4px 8px; font-size: 12px; font-weight: 800; }
+    h1, h2, h3 { margin: 0; }
+    .muted { color: #8a7a66; }
+    .light { color: #c4b39c; }
+    .progress { margin-top: 14px; height: 12px; border: 2px solid #0f0b08; background: #35261c; }
+    .progress div { height: 100%; background: #d79b52; width: 58%; }
+    .choices { display: grid; gap: 12px; margin-top: 24px; }
+    button { border: 3px solid #2a2018; background: #fff6df; padding: 14px; text-align: left; font-weight: 700; box-shadow: 3px 3px 0 #2a2018; }
+    .grid { display: grid; gap: 14px; }
+    @media (max-width: 860px) { .shell { display: block; } .right { display: none; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside>
+      <h2>한서윤</h2>
+      <p class="light">컴퓨터공학과 · 3학년 2학기</p>
+      <div class="panel dark">
+        <strong>복수전공 검토 중</strong>
+        <p class="light">졸업요건: 캡스톤 / 전공필수 1개 남음</p>
+        <div class="progress"><div></div></div>
+      </div>
+      <div class="grid" style="margin-top:16px">
+        <button>진행</button><button>캐릭터</button><button>관계</button><button>기록</button>
+      </div>
+    </aside>
+    <main>
+      <section class="panel">
+        <span class="badge">3학년 2학기 · 연구실 갈림길</span>
+        <h1 style="margin-top:12px">교수님의 늦은 메일</h1>
+        <p>교수님은 대학원 설명회가 끝난 뒤에도 당신을 붙잡았다. 연구실에는 석사 자리가 하나 비어 있고, 인턴으로 들어갔던 회사에서는 다음 달 면접을 보자는 연락이 와 있다.</p>
+        <p>복수전공을 계속하면 졸업은 늦어질 수 있다. 하지만 지금 포기하면 지금까지 버틴 시간이 이상하게 가벼워질 것 같다.</p>
+      </section>
+      <div class="choices">
+        <button>연구실에 남아 석사 진학 가능성을 묻는다<br><span class="muted">학업 +, 교수 관계 +, 멘탈 -</span></button>
+        <button>회사 면접 준비를 우선하고 교수님께 솔직히 말한다<br><span class="muted">실무 +, 평판 +, 학업 -</span></button>
+        <button>복수전공을 줄이고 졸업요건부터 정리한다<br><span class="muted">건강 +, 졸업 안정 +, 기회 -</span></button>
+      </div>
+    </main>
+    <aside class="right">
+      <h3>주요 분기</h3>
+      <p class="light">연구실 카드 · 회사 면접 후보 · 복수전공 부담 · 서연과 동거 이야기</p>
+      <div class="panel dark"><strong>목적지 후보</strong><p class="light">다람소프트 인턴 면접 · 푸른가람 연구실 석사</p></div>
+    </aside>
+  </div>
+</body>
+</html>
