@@ -354,8 +354,6 @@ export async function POST(request: Request, context: RouteContext) {
           }
         }
 
-        await streamTextFallback(selectedEvent.body, (text) => send("body_delta", { text }));
-
         const newEvent = await prisma.event.create({
           data: {
             characterRunId: id,
@@ -404,6 +402,8 @@ export async function POST(request: Request, context: RouteContext) {
             forced: source === "FORCED",
           },
         });
+
+        await streamTextFallback(selectedEvent.body, (text) => send("body_delta", { text }));
       } catch (error) {
         console.error("Next event stream route failed", error);
         log.error("스트림 이벤트 생성 중 예외", { userId, characterId: id, error: String(error) });
