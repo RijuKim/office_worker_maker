@@ -49,6 +49,16 @@ interface ChoiceFeedback {
   summary: string;
 }
 
+type AudioSettings = {
+  music: boolean;
+  sfx: boolean;
+  haptics: boolean;
+};
+
+type AudioKind = "tap" | "success" | "warning" | "ending";
+
+type BrowserAudioContext = typeof AudioContext;
+
 const statLabels: Record<string, string> = {
   academic: "학업",
   practical: "실무",
@@ -189,15 +199,14 @@ function recordText(record: Record<string, unknown>, key: string, fallback = "")
 function PixelPortrait({ name, compact = false, large = false, variant }: { name?: string; compact?: boolean; large?: boolean; variant?: string }) {
   const refName = variant || name || "";
   const initial = refName.trim().slice(0, 1) || "?";
-  let portraitClass = "";
 
   let variantClass = "";
-  if (refName.includes("지민 선배") || refName.includes("지민")) { variantClass = "variant-jimin"; portraitClass = "portrait-art-jimin"; }
-  else if (refName.includes("민하")) { variantClass = "variant-minha"; portraitClass = "portrait-art-minha"; }
-  else if (refName.includes("서연")) { variantClass = "variant-seoyeon"; portraitClass = "portrait-art-seoyeon"; }
-  else if (refName.includes("부모님")) { variantClass = "variant-parents"; portraitClass = "portrait-art-parents"; }
-  else if (refName.includes("상혁") || refName.includes("교수")) { variantClass = "variant-professor"; portraitClass = "portrait-art-professor"; }
-  else if (refName.includes("도윤")) { variantClass = "variant-doyoon"; portraitClass = "portrait-art-doyoon"; }
+  if (refName.includes("지민 선배") || refName.includes("지민")) variantClass = "variant-jimin";
+  else if (refName.includes("민하")) variantClass = "variant-minha";
+  else if (refName.includes("서연")) variantClass = "variant-seoyeon";
+  else if (refName.includes("부모님")) variantClass = "variant-parents";
+  else if (refName.includes("상혁") || refName.includes("교수")) variantClass = "variant-professor";
+  else if (refName.includes("도윤")) variantClass = "variant-doyoon";
   else if (refName.includes("현우")) variantClass = "variant-hyunwoo";
   else if (refName.includes("은지")) variantClass = "variant-eunji";
   else if (refName.includes("재석")) variantClass = "variant-jaeseok";
@@ -221,24 +230,18 @@ function PixelPortrait({ name, compact = false, large = false, variant }: { name
 
   return (
     <div className={`pixel-portrait ${compact ? "pixel-portrait-compact" : ""} ${large ? "pixel-portrait-large" : ""} ${variantClass}`} aria-hidden="true">
-      {portraitClass ? (
-        <div className={`portrait-art ${portraitClass}`} />
-      ) : (
-        <>
-          <div className="portrait-backdrop" />
-          <div className="portrait-hair" />
-          <div className="portrait-face">
-            <i className="portrait-eye portrait-eye-left" />
-            <i className="portrait-eye portrait-eye-right" />
-            <i className="portrait-cheek portrait-cheek-left" />
-            <i className="portrait-cheek portrait-cheek-right" />
-            <i className="portrait-mouth" />
-            <span className="portrait-initial">{initial}</span>
-          </div>
-          <div className="portrait-collar" />
-          <div className="portrait-body" />
-        </>
-      )}
+      <div className="portrait-backdrop" />
+      <div className="portrait-hair" />
+      <div className="portrait-face">
+        <i className="portrait-eye portrait-eye-left" />
+        <i className="portrait-eye portrait-eye-right" />
+        <i className="portrait-cheek portrait-cheek-left" />
+        <i className="portrait-cheek portrait-cheek-right" />
+        <i className="portrait-mouth" />
+        <span className="portrait-initial">{initial}</span>
+      </div>
+      <div className="portrait-collar" />
+      <div className="portrait-body" />
     </div>
   );
 }
@@ -313,6 +316,16 @@ export default function AppPage() {
   const [latestRecordId, setLatestRecordId] = useState<string | null>(null);
   const [choiceFeedback, setChoiceFeedback] = useState<ChoiceFeedback | null>(null);
   const [mobileStatsOpen, setMobileStatsOpen] = useState(false);
+  const [audioSettings, setAudioSettings] = useState<AudioSettings>({ music: false, sfx: true, haptics: true });
+  const [audioReady, setAudioReady] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const masterGainRef = useRef<GainNode | null>(null);
+  const musicGainRef = useRef<GainNode | null>(null);
+  const musicTimerRef = useRef<number | null>(null);
+  const musicStepRef = useRef(0);
+  const loadedAudioSettingsRef = useRef(false);
 
   const careerRecords = useMemo(() => records as unknown as CareerEndingRecord[], [records]);
   const codexState: CodexState = useMemo(() => deriveCodexState(careerRecords, CODEX_CATALOG), [careerRecords]);
@@ -336,6 +349,157 @@ export default function AppPage() {
 
   const mountedRef = useRef(false);
   const activeScreen = screen;
+
+  const stopMusic = useCallback(() => {
+    if (musicTimerRef.current !== null) {
+      window.clearInterval(musicTimerRef.current);
+      musicTimerRef.current = null;
+    }
+  }, []);
+
+  const ensureAudio = useCallback(async () => {
+    if (typeof window === "undefined") return null;
+    const AudioCtor = (window.AudioContext || (window as typeof window & { webkitAudioContext?: BrowserAudioContext }).webkitAudioContext);
+    if (!AudioCtor) return null;
+
+    if (!audioContextRef.current) {
+      const context = new AudioCtor();
+      const master = context.createGain();
+      const music = context.createGain();
+      master.gain.value = 0.9;
+      music.gain.value = 0.36;
+      music.connect(master);
+      master.connect(context.destination);
+      audioContextRef.current = context;
+      masterGainRef.current = master;
+      musicGainRef.current = music;
+    }
+
+    if (audioContextRef.current.state === "suspended") {
+      try {
+        await audioContextRef.current.resume();
+        // WebView 오디오 언락: 무음 버퍼를 재생해 AudioContext를 완전히 활성화
+        const silent = audioContextRef.current.createBuffer(1, 1, 44100);
+        const src = audioContextRef.current.createBufferSource();
+        src.buffer = silent;
+        src.connect(audioContextRef.current.destination);
+        src.start(0);
+      } catch {
+        // WebView가 resume을 거부한 경우, 새 컨텍스트로 재시도
+        audioContextRef.current = null;
+        masterGainRef.current = null;
+        musicGainRef.current = null;
+        return null;
+      }
+    }
+
+    setAudioReady(audioContextRef.current?.state === "running");
+    return audioContextRef.current;
+  }, []);
+
+  const pulseHaptic = useCallback((kind: AudioKind) => {
+    if (!audioSettings.haptics || typeof navigator === "undefined" || !("vibrate" in navigator)) return;
+    const pattern: Record<AudioKind, number | number[]> = {
+      tap: 12,
+      success: [18, 28, 18],
+      warning: [32, 24, 32],
+      ending: [24, 32, 24, 48, 36],
+    };
+    navigator.vibrate(pattern[kind]);
+  }, [audioSettings.haptics]);
+
+  const playSound = useCallback(async (kind: AudioKind) => {
+    if (!audioSettings.sfx) return;
+    const context = await ensureAudio();
+    const master = masterGainRef.current;
+    if (!context || !master) return;
+
+    const now = context.currentTime;
+    const shape: Record<AudioKind, { notes: number[]; duration: number; gain: number; type: OscillatorType }> = {
+      tap: { notes: [440], duration: 0.06, gain: 0.08, type: "square" },
+      success: { notes: [523.25, 659.25, 783.99], duration: 0.11, gain: 0.07, type: "triangle" },
+      warning: { notes: [196, 164.81], duration: 0.14, gain: 0.08, type: "sawtooth" },
+      ending: { notes: [261.63, 329.63, 392, 523.25], duration: 0.18, gain: 0.075, type: "triangle" },
+    };
+
+    shape[kind].notes.forEach((frequency, index) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = shape[kind].type;
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0, now + index * 0.06);
+      gain.gain.linearRampToValueAtTime(shape[kind].gain, now + index * 0.06 + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + index * 0.06 + shape[kind].duration);
+      oscillator.connect(gain);
+      gain.connect(master);
+      oscillator.start(now + index * 0.06);
+      oscillator.stop(now + index * 0.06 + shape[kind].duration + 0.03);
+    });
+  }, [audioSettings.sfx, ensureAudio]);
+
+  const playFeedbackCue = useCallback((kind: AudioKind) => {
+    pulseHaptic(kind);
+    void playSound(kind);
+  }, [playSound, pulseHaptic]);
+
+  const playLoFiBar = useCallback(async () => {
+    const context = await ensureAudio();
+    const musicGain = musicGainRef.current;
+    if (!context || !musicGain || document.visibilityState === "hidden") return;
+
+    const chords = [
+      [261.63, 329.63, 392],
+      [220, 261.63, 329.63],
+      [246.94, 293.66, 369.99],
+      [196, 246.94, 329.63],
+    ];
+    const bass = [65.41, 55, 61.74, 49];
+    const step = musicStepRef.current % chords.length;
+    const now = context.currentTime;
+    const filter = context.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 1800;
+    filter.Q.value = 0.9;
+    filter.connect(musicGain);
+
+    [...chords[step], bass[step]].forEach((frequency, index) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = index === chords[step].length ? "sine" : "triangle";
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(index === chords[step].length ? 0.22 : 0.11, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.75);
+      oscillator.connect(gain);
+      gain.connect(filter);
+      oscillator.start(now);
+      oscillator.stop(now + 1.85);
+    });
+
+    musicStepRef.current += 1;
+  }, [ensureAudio]);
+
+  const startMusic = useCallback(async (force = false) => {
+    if ((!force && !audioSettings.music) || document.visibilityState === "hidden" || musicTimerRef.current !== null) return;
+    await playLoFiBar();
+    musicTimerRef.current = window.setInterval(() => {
+      void playLoFiBar();
+    }, 1850);
+  }, [audioSettings.music, playLoFiBar]);
+
+  const updateAudioSetting = useCallback((key: keyof AudioSettings, value: boolean) => {
+    setAudioSettings((current) => ({ ...current, [key]: value }));
+    if (key === "music" && value) {
+      stopMusic();
+      void ensureAudio().then(() => startMusic(true));
+    }
+    if (key === "music" && !value) {
+      stopMusic();
+    }
+    if ((key === "sfx" || key === "haptics") && value) {
+      playFeedbackCue("tap");
+    }
+  }, [ensureAudio, playFeedbackCue, startMusic, stopMusic]);
 
   async function doFetch(url: string, method = "GET", body?: unknown) {
     const opts: RequestInit = { method, headers: { "Content-Type": "application/json" } };
@@ -509,9 +673,60 @@ export default function AppPage() {
     loadCharacters();
   }, [status]);
 
+  useEffect(() => {
+    const saved = window.localStorage.getItem("sano-audio-settings");
+    if (!saved) {
+      loadedAudioSettingsRef.current = true;
+      return;
+    }
+    window.setTimeout(() => {
+      try {
+        const parsed = JSON.parse(saved) as Partial<AudioSettings>;
+        setAudioSettings({
+          music: parsed.music === true,
+          sfx: parsed.sfx !== false,
+          haptics: parsed.haptics !== false,
+        });
+      } catch {
+        window.localStorage.removeItem("sano-audio-settings");
+      } finally {
+        loadedAudioSettingsRef.current = true;
+      }
+    }, 0);
+  }, []);
+
+  useEffect(() => {
+    if (!loadedAudioSettingsRef.current) return;
+    window.localStorage.setItem("sano-audio-settings", JSON.stringify(audioSettings));
+  }, [audioSettings]);
+
+  useEffect(() => {
+    if (audioSettings.music) {
+      void startMusic();
+    } else {
+      stopMusic();
+    }
+  }, [audioSettings.music, startMusic, stopMusic]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        stopMusic();
+      } else if (audioSettings.music) {
+        void startMusic();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      stopMusic();
+    };
+  }, [audioSettings.music, startMusic, stopMusic]);
+
   const createCharacter = useCallback(async () => {
     setError("");
     setLoading(true);
+    playFeedbackCue("tap");
     try {
       const { ok, data } = await doFetch("/api/characters", "POST", {
         name: charName.trim(),
@@ -527,12 +742,13 @@ export default function AppPage() {
       setCurrentEvent(data.character.events?.[0] ?? null);
       setPendingNext(false);
       setScreen("play");
+      playFeedbackCue("success");
     } catch {
       setError("서버 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
-  }, [charName, charAge, charResidence, preferredStats]);
+  }, [charName, charAge, charResidence, preferredStats, playFeedbackCue]);
 
   const resumeCharacter = useCallback(async (char: CharacterData) => {
     setCurrentChar(char);
@@ -554,6 +770,7 @@ export default function AppPage() {
   }, []);
 
   const startNewCharacter = useCallback(() => {
+    playFeedbackCue("tap");
     setCurrentChar(null);
     setCurrentEvent(null);
     setStreamingEventBody("");
@@ -565,10 +782,11 @@ export default function AppPage() {
     setJobApps([]);
     setCareerPaths([]);
     setScreen("create");
-  }, []);
+  }, [playFeedbackCue]);
 
   const makeChoice = useCallback(async (choiceIndex: number) => {
     if (!currentChar || !currentEvent) return;
+    playFeedbackCue("tap");
     setLoading(true);
     try {
       const { ok, data } = await doFetch(`/api/characters/${currentChar.id}/choices`, "POST", {
@@ -580,26 +798,30 @@ export default function AppPage() {
       }
       await loadCharacterEvent(currentChar.id);
       await loadSpecData(currentChar.id);
-      setChoiceFeedback({
+      const feedback = {
         statDelta: data.result?.statDelta ?? {},
         relationshipDelta: data.result?.relationshipDelta ?? [],
         summary: data.result?.summary ?? "",
-      });
+      };
+      setChoiceFeedback(feedback);
       setCurrentEvent(null);
       if (data.result?.endingTriggered) {
         setPendingNext(false);
         setLatestRecordId(data.result?.endingRecordId ?? null);
         setEndingNotice("선택의 결과가 기록되었습니다. 선택의 결과 기록에서 확인할 수 있습니다.");
+        playFeedbackCue("ending");
       } else {
+        playFeedbackCue(getChoiceFeedbackTone(feedback) === "warning" ? "warning" : "success");
         setPendingNext(false);
         await fetchNextEvent(currentChar.id, { preserveFeedback: true });
       }
     } finally {
       setLoading(false);
     }
-  }, [currentChar, currentEvent]);
+  }, [currentChar, currentEvent, playFeedbackCue]);
 
   const togglePreferredStat = useCallback((key: string) => {
+    playFeedbackCue("tap");
     setPreferredStats((current) => {
       if (current.includes(key)) {
         return current.filter((item) => item !== key);
@@ -609,12 +831,13 @@ export default function AppPage() {
       }
       return [...current, key];
     });
-  }, []);
+  }, [playFeedbackCue]);
 
   const continueToNextEvent = useCallback(async () => {
     if (!currentChar || currentEvent || loading) return;
+    playFeedbackCue("tap");
     await fetchNextEvent(currentChar.id);
-  }, [currentChar, currentEvent, loading]);
+  }, [currentChar, currentEvent, loading, playFeedbackCue]);
 
   const loadRecords = useCallback(async () => {
     setLoading(true);
@@ -682,11 +905,119 @@ export default function AppPage() {
 
   const academicProgressLabel = getAcademicProgressLabel(currentChar);
   const runCompleted = Boolean(endingNotice);
+  const audioControls = (
+    <div className="audio-controls rounded-lg border-2 border-[#4d3d2f] bg-[#1b1612] p-3 text-[#f7efe2]">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-xs font-black text-[#f7d08b]">AUDIO</span>
+        <span className="text-[11px] text-[#a9967d]">{audioReady ? "ON" : "READY"}</span>
+      </div>
+      <div className="grid gap-2">
+        {([
+          ["music", "Lo-fi"],
+          ["sfx", "효과음"],
+          ["haptics", "햅틱"],
+        ] as const).map(([key, label]) => (
+          <label className="audio-toggle flex items-center justify-between gap-3 text-[13px] font-bold" key={key}>
+            <span>{label}</span>
+            <input
+              checked={audioSettings[key]}
+              onChange={(event) => updateAudioSetting(key, event.target.checked)}
+              onPointerDown={() => {
+                if (key === "music" && !audioSettings.music) {
+                  void ensureAudio();
+                }
+              }}
+              type="checkbox"
+            />
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+  const topChrome = (
+    <div className="app-top-chrome">
+      <button
+        aria-expanded={menuOpen}
+        aria-label="메뉴"
+        className="chrome-icon-button chrome-menu-button"
+        onClick={() => {
+          setMenuOpen((open) => !open);
+          setSettingsOpen(false);
+        }}
+        type="button"
+      >
+        <span />
+        <span />
+        <span />
+      </button>
+      <button
+        aria-expanded={settingsOpen}
+        aria-label="설정"
+        className="chrome-icon-button chrome-settings-button"
+        onClick={() => {
+          setSettingsOpen((open) => !open);
+          setMenuOpen(false);
+        }}
+        type="button"
+      >
+        ⚙
+      </button>
+      {menuOpen && (
+        <div className="app-popover app-menu-popover">
+          <button
+            onClick={() => {
+              setScreen(currentChar ? "play" : "create");
+              setMenuOpen(false);
+            }}
+            type="button"
+          >
+            {currentChar ? "진행" : "새 이야기"}
+          </button>
+          <button
+            onClick={() => {
+              setExpandedRecord(null);
+              setScreen("records");
+              setMenuOpen(false);
+              void loadRecords();
+            }}
+            type="button"
+          >
+            기록
+          </button>
+          <button
+            onClick={() => {
+              startNewCharacter();
+              setMenuOpen(false);
+            }}
+            type="button"
+          >
+            새 게임
+          </button>
+          <button
+            onClick={() => {
+              setScreen("auth");
+              setMenuOpen(false);
+            }}
+            type="button"
+          >
+            {status === "authenticated" ? "계정" : "로그인/저장"}
+          </button>
+        </div>
+      )}
+      {settingsOpen && (
+        <div className="app-popover app-settings-popover">
+          {audioControls}
+        </div>
+      )}
+    </div>
+  );
 
   if (activeScreen === "auth") {
     return (
-      <main className="pixel-shell flex min-h-screen items-center justify-center p-4">
-        <div className="pixel-panel w-full max-w-sm p-8">
+      <>
+        {topChrome}
+        <main className="pixel-shell flex min-h-screen items-center justify-center p-4">
+          <div className="pixel-panel w-full max-w-sm p-8">
           <h1 className="mb-4 text-center text-2xl font-black leading-9">{status === "authenticated" ? "저장된 계정" : "진행 저장하기"}</h1>
           <p className="mb-6 border-y-2 border-[#2a2018] py-2 text-center text-xs font-bold text-[#6d4a2f]">
             {status === "authenticated" ? "SIGNED IN" : "LOGIN TO KEEP YOUR RUN"}
@@ -720,29 +1051,22 @@ export default function AppPage() {
               </div>
             </div>
           )}
-        </div>
-      </main>
+          </div>
+        </main>
+      </>
     );
   }
 
   if (activeScreen === "create" && !currentChar) {
     return (
-      <main className="pixel-shell app-screen flex min-h-screen items-start justify-center p-4 pt-10">
-        <div className="w-full max-w-[560px]">
-          <div className="create-header mb-5 flex items-center justify-between gap-4 text-[#fff3d7]">
+      <>
+        {topChrome}
+        <main className="pixel-shell app-screen flex min-h-screen items-start justify-center p-4 pt-10">
+          <div className="w-full max-w-[560px]">
+            <div className="create-header mb-5 text-[#fff3d7]">
             <div>
               <p className="mb-1 text-xs font-black text-[#b8d7a3]">NEW RUN</p>
               <h1 className="create-title text-2xl font-black leading-tight">일어나보니 대한민국 취준생</h1>
-            </div>
-            <div className="create-actions flex gap-3">
-              {status === "authenticated" && (
-                <button className="text-sm text-[#d9c9b5] underline" onClick={() => { setExpandedRecord(null); setScreen("records"); loadRecords(); }}>
-                  기록
-                </button>
-              )}
-              <button className="text-sm text-[#d9c9b5] underline" onClick={() => setScreen("auth")}>
-                {status === "authenticated" ? "계정" : "로그인/저장"}
-              </button>
             </div>
           </div>
           <h2 className="mb-3 text-sm font-bold text-[#d9c9b5]">새 이야기</h2>
@@ -772,7 +1096,10 @@ export default function AppPage() {
                   <button
                     className={`pixel-button px-4 py-3 text-left text-sm ${charResidence === option.id ? "bg-[#ffe0a2]" : ""}`}
                     key={option.id}
-                    onClick={() => setCharResidence(option.id)}
+                    onClick={() => {
+                      playFeedbackCue("tap");
+                      setCharResidence(option.id);
+                    }}
                     type="button"
                   >
                     <span className="block font-bold">{charResidence === option.id ? "선택됨 · " : ""}{option.label}</span>
@@ -800,31 +1127,34 @@ export default function AppPage() {
             </div>
             <button className="pixel-button-dark w-full px-4 py-3 text-sm font-bold disabled:opacity-50" disabled={loading || !charName.trim() || preferredStats.length !== 2} onClick={createCharacter}>눈을 뜬다</button>
           </div>
-        </div>
-      </main>
+          </div>
+        </main>
+      </>
     );
   }
 
   if (activeScreen === "records") {
     return (
-      <main className="records-screen min-h-screen p-4 pt-8">
-        <div className="mx-auto max-w-5xl">
-          <div className="record-hero mb-6 flex items-center justify-between gap-5 border-b-4 border-[#2a2018] pb-5 max-[720px]:block">
+      <>
+        {topChrome}
+        <main className="records-screen min-h-screen p-4 pt-8">
+          <div className="mx-auto max-w-5xl">
+          <div className="record-hero mb-4 flex items-end justify-between gap-5 border-b-4 border-[#2a2018] pb-5 max-[720px]:block">
             <div>
               <p className="mb-2 text-xs font-black text-[#8a4f2d]">ARCHIVE</p>
               <h1 className="text-3xl font-black leading-tight">선택의 결과 기록</h1>
               <p className="mt-2 text-sm text-[#706b62]">플레이가 남긴 직업, 관계, 생활의 스냅샷</p>
             </div>
-            <div className="flex gap-3 max-[720px]:mt-4">
-              <button className="pixel-button bg-white px-4 py-2 text-sm font-bold text-[#2a241e]" onClick={loadRecords}>새로고침</button>
-              <button className="pixel-button bg-white px-4 py-2 text-sm font-bold text-[#2a241e]" onClick={runCompleted ? startNewCharacter : () => { setScreen("play"); }}>
+            <div className="record-actions flex items-center gap-4 max-[720px]:mt-4">
+              <button className="record-action" onClick={loadRecords} type="button">새로고침</button>
+              <button className="record-action" onClick={runCompleted ? startNewCharacter : () => { setScreen("play"); }} type="button">
                 {runCompleted ? "새로 시작" : "진행으로"}
               </button>
             </div>
           </div>
-          <div className="mb-6 flex flex-wrap gap-2 border-b-4 border-[#2a2018] pb-4" role="tablist">
+          <div className="record-tabs mb-6" role="tablist">
             <button
-              className={`pixel-button px-4 py-2 text-sm font-bold ${recordsTab === "records" ? "bg-[#ffe0a2]" : "bg-white"}`}
+              className={recordsTab === "records" ? "active" : ""}
               onClick={() => setRecordsTab("records")}
               type="button"
               role="tab"
@@ -833,7 +1163,7 @@ export default function AppPage() {
               내 기록
             </button>
             <button
-              className={`pixel-button px-4 py-2 text-sm font-bold ${recordsTab === "codex" ? "bg-[#ffe0a2]" : "bg-white"}`}
+              className={recordsTab === "codex" ? "active" : ""}
               onClick={() => setRecordsTab("codex")}
               type="button"
               role="tab"
@@ -939,13 +1269,16 @@ export default function AppPage() {
               />
             </div>
           )}
-        </div>
-      </main>
+          </div>
+        </main>
+      </>
     );
   }
 
   return (
-    <div className="app-layout pixel-shell min-h-screen text-[#2a241e]">
+    <>
+    {topChrome}
+    <div className="app-layout pixel-shell min-h-screen pt-14 text-[#2a241e]">
       <aside className="sidebar border-r border-[#3b3025] bg-[#231d17] p-[22px] text-[#f7efe2]">
         <div className="sidebar-top">
           <div className="sidebar-profile flex items-center gap-3">
@@ -1319,33 +1652,39 @@ export default function AppPage() {
             top: 0;
             z-index: 20;
             border-right: 0;
-            border-bottom: 3px solid #0f0b08;
-            padding: 10px 12px;
-            box-shadow: 0 5px 0 #0d0b09;
+            border-bottom: 2px solid #0f0b08;
+            padding: 8px 10px;
+            box-shadow: 0 3px 0 #0d0b09;
           }
           .sidebar-top {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(108px, 32vw);
-            gap: 8px;
+            display: block;
             align-items: center;
           }
           .sidebar-profile {
             display: grid;
-            grid-template-columns: 38px minmax(0, 1fr);
-            gap: 8px;
+            grid-template-columns: 28px minmax(0, 1fr);
+            gap: 6px;
             align-items: center;
           }
           .sidebar-profile :global(.pixel-portrait) {
-            width: 38px;
-            height: 42px;
-            box-shadow: 2px 2px 0 #0a0705;
+            width: 28px;
+            height: 30px;
+            border-width: 2px;
+            box-shadow: 1px 1px 0 #0a0705;
           }
           .sidebar-profile :global(.portrait-hair) {
             left: 8px;
             top: 5px;
             width: 22px;
             height: 9px;
-            box-shadow: -5px 5px 0 #35261c, 5px 5px 0 #35261c;
+            box-shadow:
+              -5px 5px 0 var(--hair-color, #35261c),
+              5px 5px 0 var(--hair-color, #35261c),
+              0 10px 0 var(--hair-color, #35261c);
+          }
+          .sidebar-profile :global(.portrait-hair::before),
+          .sidebar-profile :global(.portrait-hair::after) {
+            display: none;
           }
           .sidebar-profile :global(.portrait-face) {
             left: 9px;
@@ -1367,10 +1706,16 @@ export default function AppPage() {
             white-space: nowrap;
             font-size: 16px;
           }
-          .sidebar-major { display: none; }
+          .sidebar-major {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 12px;
+            line-height: 1.2;
+          }
           .sidebar-progress {
-            margin-top: 0;
-            padding: 6px;
+            display: none;
           }
           .sidebar-progress > div:first-child {
             font-size: 10px;
@@ -1380,22 +1725,32 @@ export default function AppPage() {
             margin-top: 4px;
           }
           .sidebar-nav {
-            display: grid;
-            grid-template-columns: repeat(5, minmax(0, 1fr));
+            display: flex;
             gap: 6px;
-            margin-top: 8px;
+            margin: 8px -10px 0;
+            overflow-x: auto;
+            padding: 0 10px 2px;
+            scrollbar-width: none;
+          }
+          .sidebar-nav::-webkit-scrollbar {
+            display: none;
           }
           .sidebar-nav button {
+            flex: 0 0 auto;
             min-height: 34px;
+            min-width: 58px;
             overflow: hidden;
-            padding: 6px 4px;
+            padding: 7px 10px;
             text-align: center;
             text-overflow: ellipsis;
             white-space: nowrap;
-            font-size: 12px;
+            font-size: 13px;
           }
           .mobile-stats-toggle {
             display: block;
+          }
+          .sidebar-nav button:last-child {
+            display: none;
           }
           .sidebar-stats {
             display: none;
@@ -1425,24 +1780,27 @@ export default function AppPage() {
             display: none;
           }
           .play-main {
-            padding: 14px 12px 24px;
+            padding: 14px 12px 22px;
           }
         }
         @media (max-width: 420px) {
-          .sidebar-top {
-            grid-template-columns: minmax(0, 1fr) minmax(96px, 34vw);
+          .sidebar-profile :global(.pixel-portrait) {
+            display: none;
           }
           .sidebar-profile {
             grid-template-columns: minmax(0, 1fr);
           }
-          .sidebar-profile :global(.pixel-portrait) {
-            display: none;
+          .sidebar-nav {
+            margin-top: 7px;
           }
           .sidebar-nav button {
-            font-size: 11px;
+            min-width: 56px;
+            padding-inline: 9px;
+            font-size: 12px;
           }
         }
       `}</style>
     </div>
+    </>
   );
 }
