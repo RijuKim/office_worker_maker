@@ -1,6 +1,7 @@
 export const STAT_MIN = 1;
 export const STAT_MAX = 10;
 export const MAX_STAT_DELTA_PER_CHOICE = 3;
+export const MAX_HEALTH_LOSS_PER_CHOICE = 1;
 export const BURNOUT_THRESHOLD = 80;
 
 export const TRUST_MIN = -100;
@@ -28,8 +29,9 @@ export function applyStatDeltas(
   deltas: StatDelta,
 ): Record<string, number> {
   const result = { ...currentStats };
+  const normalizedDeltas = normalizeStatDeltas(deltas);
 
-  for (const [stat, delta] of Object.entries(deltas)) {
+  for (const [stat, delta] of Object.entries(normalizedDeltas)) {
     if (typeof delta !== "number") continue;
     const current = result[stat] ?? 5;
     const clamped = stat === "wealth"
@@ -39,6 +41,21 @@ export function applyStatDeltas(
   }
 
   return result;
+}
+
+export function normalizeStatDeltas(deltas: StatDelta): StatDelta {
+  const normalized: StatDelta = {};
+
+  for (const [stat, delta] of Object.entries(deltas)) {
+    if (typeof delta !== "number") continue;
+    if (stat === "health" && delta < -MAX_HEALTH_LOSS_PER_CHOICE) {
+      normalized[stat] = -MAX_HEALTH_LOSS_PER_CHOICE;
+    } else {
+      normalized[stat] = delta;
+    }
+  }
+
+  return normalized;
 }
 
 export function applyRelationshipDeltas(

@@ -57,9 +57,9 @@ describe("deriveLifeStageState", () => {
     });
 
     expect(state.lifeStage).toBe("college_mid");
-    expect(state.term).toEqual({ gradeYear: 2, semester: 1, label: "2학년 1학기" });
+    expect(state.term).toEqual({ gradeYear: 2, semester: 2, label: "2학년 2학기" });
     expect(state.graduation).toBe("normal");
-    expect(state.stageEventCount).toBe(1);
+    expect(state.stageEventCount).toBe(2);
     expect(state.academicPlan).toMatchObject({
       major: "경영학",
       majorChanged: false,
@@ -111,7 +111,7 @@ describe("buildInitialLifeStageFlags", () => {
 });
 
 describe("applyLifeStageTransition", () => {
-  it("advances semester after two resolved core events in the current semester", () => {
+  it("keeps the same semester after two resolved core events in the current semester", () => {
     const result = applyLifeStageTransition({
       currentGradeYear: 1,
       academicStatus: "ENROLLED",
@@ -120,6 +120,25 @@ describe("applyLifeStageTransition", () => {
         lifeStage: { id: "college_early" },
         academicTerm: { gradeYear: 1, semester: 1 },
         stageEventCount: 1,
+      },
+      stats: { health: 6, mental: 6, reputation: 5 },
+      burnoutRisk: 10,
+    });
+
+    expect(result.state.term).toEqual({ gradeYear: 1, semester: 1, label: "1학년 1학기" });
+    expect(result.state.stageEventCount).toBe(2);
+    expect(result.reasons).toEqual(["no_transition"]);
+  });
+
+  it("advances semester after three resolved core events in the current semester", () => {
+    const result = applyLifeStageTransition({
+      currentGradeYear: 1,
+      academicStatus: "ENROLLED",
+      coreEventCount: 2,
+      eventFlags: {
+        lifeStage: { id: "college_early" },
+        academicTerm: { gradeYear: 1, semester: 1 },
+        stageEventCount: 2,
       },
       stats: { health: 6, mental: 6, reputation: 5 },
       burnoutRisk: 10,
@@ -139,7 +158,7 @@ describe("applyLifeStageTransition", () => {
       eventFlags: {
         lifeStage: { id: "college_early" },
         academicTerm: { gradeYear: 1, semester: 2 },
-        stageEventCount: 1,
+        stageEventCount: 2,
       },
       stats: { health: 6, mental: 6, reputation: 5 },
       burnoutRisk: 10,
@@ -195,7 +214,7 @@ describe("applyLifeStageTransition", () => {
         lifeStage: { id: "college_late" },
         academicTerm: { gradeYear: 4, semester: 2 },
         graduation: { state: "normal" },
-        stageEventCount: 1,
+        stageEventCount: 2,
       },
       stats: { academic: 4, practical: 7, health: 6, mental: 6, reputation: 6 },
       burnoutRisk: 10,
@@ -215,7 +234,7 @@ describe("applyLifeStageTransition", () => {
         lifeStage: { id: "college_late" },
         academicTerm: { gradeYear: 4, semester: 2 },
         graduation: { state: "normal" },
-        stageEventCount: 1,
+        stageEventCount: 2,
       },
       stats: { academic: 7, practical: 7, health: 6, mental: 6, reputation: 6 },
       burnoutRisk: 10,

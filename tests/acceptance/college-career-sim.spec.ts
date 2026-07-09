@@ -26,7 +26,7 @@ test('signup, login, and user-entered character creation persist visible state',
   await expect(page.getByText(/2학년/)).toBeVisible();
   await expect(page.getByText(/학업/)).toBeVisible();
   await expect(page.getByText(/매력/)).toBeVisible();
-  await expect(page.getByText(/커리어와 엔딩 기록/)).toBeVisible();
+  await expect(page.getByText(/선택의 결과 기록/)).toBeVisible();
 
   await page.reload();
   await expect(page.getByText('한서윤')).toBeVisible();
@@ -64,7 +64,7 @@ test('forced burnout event triggers without an initial player choice and returns
   await expect(page.getByRole('button', { name: /회복|도움|쉬기|병원|상담/ })).toBeVisible();
 });
 
-test('career and ending record is generated and remains after relogin', async ({ page }) => {
+test('choice result record is generated and remains after relogin', async ({ page }) => {
   await signUpAndCreateCharacter(page);
   await page.evaluate(async () => {
     await fetch('/api/test/characters/current/progression', {
@@ -73,12 +73,12 @@ test('career and ending record is generated and remains after relogin', async ({
       body: JSON.stringify({ coreEventCount: 15, branchPoint: 'EMPLOYMENT' }),
     });
   });
-  await page.getByRole('button', { name: /기록 생성|엔딩|커리어와 엔딩 기록/ }).click();
-  await expect(page.getByText(/커리어와 엔딩 기록 저장|저장되었습니다/)).toBeVisible();
+  await page.getByRole('button', { name: /기록 생성|선택의 결과 기록/ }).click();
+  await expect(page.getByText(/선택의 결과 기록|저장되었습니다/)).toBeVisible();
   await expect(page.getByText(/초봉|연봉|직무|만족도|워라밸/)).toBeVisible();
 
   await page.reload();
-  await page.getByText(/커리어와 엔딩 기록/).click();
+  await page.getByText(/선택의 결과 기록/).click();
   await expect(page.getByText(/한서윤/)).toBeVisible();
 });
 

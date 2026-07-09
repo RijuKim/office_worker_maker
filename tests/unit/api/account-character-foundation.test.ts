@@ -4,6 +4,7 @@ const prismaMock = vi.hoisted(() => ({
   user: {
     create: vi.fn(),
     findUnique: vi.fn(),
+    update: vi.fn(),
   },
   aiUsage: {
     findUnique: vi.fn(),
@@ -17,6 +18,8 @@ const prismaMock = vi.hoisted(() => ({
 
 const sessionMock = vi.hoisted(() => ({
   requireCurrentUserId: vi.fn(),
+  getGuestUserId: vi.fn(),
+  GUEST_USER_COOKIE: "sano_guest_user_id",
 }));
 
 vi.mock("@/lib/server/prisma", () => ({
@@ -29,6 +32,7 @@ import { GET as getCharacter } from "@/app/api/characters/[id]/route";
 import { GET as listCharacters, POST as createCharacter } from "@/app/api/characters/route";
 import { POST as signup } from "@/app/api/auth/signup/route";
 import { GET as getMe } from "@/app/api/me/route";
+import { buildCharacterProfile, buildInitialHiddenState, buildInitialStats, pickRandomGradeYear, randomMajors } from "@/lib/game/character-foundation";
 
 function jsonRequest(body: unknown) {
   return new Request("http://localhost/api/test", {
@@ -78,6 +82,58 @@ function characterRecord(overrides: Partial<Record<string, unknown>> = {}) {
 describe("account and character API foundation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionMock.getGuestUserId.mockResolvedValue(null);
+  });
+
+  it("picks starting grade independently from selected age", () => {
+    const spy = vi.spyOn(Math, "random").mockReturnValueOnce(0.01).mockReturnValueOnce(0.01);
+
+    expect(pickRandomGradeYear(18)).toBe(1);
+    expect(pickRandomGradeYear(35)).toBe(1);
+
+    spy.mockRestore();
+  });
+
+  it("offers broad random majors across career-relevant fields", () => {
+    expect(randomMajors.length).toBeGreaterThanOrEqual(90);
+    expect(randomMajors).toEqual(expect.arrayContaining([
+      "경영학과",
+      "회계학과",
+      "금융학과",
+      "법학과",
+      "영어영문학과",
+      "통번역학과",
+      "의학과",
+      "약학과",
+      "간호학과",
+      "시각디자인학과",
+      "음악학과",
+      "연극영화학과",
+      "컴퓨터공학과",
+      "인공지능학과",
+      "경찰행정학과",
+    ]));
+  });
+
+  it("uses age and chosen grade as character profile, not grade selection logic", () => {
+    const profile = buildCharacterProfile({ age: 26, startGradeYear: 1 });
+    const hiddenState = buildInitialHiddenState({
+      age: 26,
+      startGradeYear: 1,
+      major: "사회학과",
+      residence: "studio",
+      preferredStats: ["academic", "mental"],
+    });
+    const stats = buildInitialStats(["academic", "mental"], { age: 26, startGradeYear: 1 });
+
+    expect(profile).toMatchObject({
+      ageBand: "older",
+      gradeBand: "early",
+      background: "비정형 학적 리듬",
+    });
+    expect(hiddenState.eventFlags).toEqual(expect.objectContaining({ characterProfile: profile }));
+    expect(stats.practical).toBeGreaterThanOrEqual(1);
+    expect(stats.practical).toBeLessThanOrEqual(10);
   });
 
   it("signup creates a lowercase account with a hashed password, not the submitted password", async () => {
@@ -145,7 +201,17 @@ describe("account and character API foundation", () => {
                 currentGradeYear: 2,
                 major: "사회학과",
                 stats: { create: expect.objectContaining({ academic: expect.any(Number), charm: expect.any(Number) }) },
-                hiddenState: { create: expect.objectContaining({ burnoutRisk: 18 }) },
+                hiddenState: {
+                  create: expect.objectContaining({
+                    burnoutRisk: 2,
+                    eventFlags: expect.objectContaining({
+                      characterProfile: expect.objectContaining({ ageBand: "standard", gradeBand: "middle" }),
+                      lifeStage: { id: "college_mid" },
+                      academicTerm: expect.objectContaining({ gradeYear: 2, semester: 1, label: "2학년 1학기" }),
+                      graduation: { state: "normal" },
+                    }),
+                  }),
+                },
               }),
             );
             expect(data.relationships).toBeUndefined();
@@ -195,6 +261,8 @@ describe("account and character API foundation", () => {
     expect(prismaMock.characterRun.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: "user-1" } }));
     expect(body.characters).toHaveLength(1);
     expect(body.characters[0].name).toBe("한서윤");
+    expect(body.characters[0].progressLabel).toBe("2학년 1학기");
+    expect(body.characters[0].lifeStage.lifeStage).toBe("college_mid");
   });
 
   it("fetches a character through an owner-scoped lookup", async () => {
@@ -229,6 +297,6 @@ describe("account and character API foundation", () => {
 
     expect(response.status).toBe(200);
     expect(body.user.email).toBe("player@example.com");
-    expect(body.aiUsage).toEqual({ date: "2026-07-06", count: 7, limit: 30, remaining: 23 });
+    expect(body.aiUsage).toEqual({ date: "2026-07-06", count: 7, limit: null, remaining: null });
   });
 });
