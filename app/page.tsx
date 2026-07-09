@@ -320,6 +320,7 @@ export default function AppPage() {
   const [audioReady, setAudioReady] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const musicGainRef = useRef<GainNode | null>(null);
@@ -961,6 +962,14 @@ export default function AppPage() {
         type="button"
       >
         ⚙
+      </button>
+      <button
+        aria-label="닫기"
+        className="chrome-icon-button chrome-close-button"
+        onClick={() => setShowExitConfirm(true)}
+        type="button"
+      >
+        ✕
       </button>
       {menuOpen && (
         <div className="app-popover app-menu-popover">
@@ -1800,6 +1809,42 @@ export default function AppPage() {
           }
         }
       `}</style>
+      {showExitConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setShowExitConfirm(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="앱 종료 확인"
+        >
+          <div
+            className="pixel-panel relative flex w-full max-w-sm flex-col items-center gap-6 bg-[#fffaf0] p-8 text-center shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-lg font-black text-[#2a241e]">미니앱을 종료하시겠어요?</p>
+            <p className="text-sm leading-relaxed text-[#706b62]">지금까지의 진행 상황은 자동으로 저장됩니다.</p>
+            <div className="flex w-full gap-3">
+              <button
+                className="pixel-button flex-1 px-4 py-3 text-sm font-bold"
+                onClick={() => setShowExitConfirm(false)}
+                type="button"
+              >
+                취소
+              </button>
+              <button
+                className="pixel-button-dark flex-1 px-4 py-3 text-sm font-bold"
+                onClick={() => {
+                  setShowExitConfirm(false);
+                  stopMusic();
+                }}
+                type="button"
+              >
+                나가기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
     </>
   );
