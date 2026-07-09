@@ -575,7 +575,8 @@ function normalizeCategory(tag: string) {
   if (["범죄", "위험", "도박", "다단계", "사기"].includes(tag)) return "위험";
   if (["해외", "워홀"].includes(tag)) return "해외";
   if (["취업", "진로", "면접", "지원서", "기업"].includes(tag)) return "진로";
-  if (["건강", "멘탈", "운동", "번아웃"].includes(tag)) return "건강";
+  if (["건강", "운동", "병원", "감기", "부상"].includes(tag)) return "건강";
+  if (["멘탈", "번아웃", "스트레스", "우울", "불안"].includes(tag)) return "멘탈";
   if (["동아리", "학생회"].includes(tag)) return "동아리";
   return tag;
 }

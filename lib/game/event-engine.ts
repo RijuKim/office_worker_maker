@@ -1182,18 +1182,55 @@ export function buildDropoutNextStepEvent(): StaticEvent {
   };
 }
 
+export function buildHealthCrisisEvent(): StaticEvent {
+  return {
+    title: "건강 이상 신호",
+    body: `아침에 일어나자 몸이 평소와 다르다. 열이 오른 것 같고, 목은 칼칼하며, 온몸이 무겁게 가라앉는다. 거울 속 얼굴은 창백하고 눈 밑에는 그늘이 졌다.
+
+당신은 이 신호를 무시하고 평소처럼 하루를 보낼 수도 있다. 하지만 몸이 보내는 경고를 계속 외면하면 더 큰 대가를 치를 수도 있다. 지금 필요한 것은 회복을 위한 선택이다.`,
+    choices: [
+      {
+        id: "visit_hospital",
+        label: "병원에 가서 제대로 진료를 받는다.",
+        summary: "당신은 병원에서 진료를 받고 약을 처방받아 회복에 집중했다.",
+        statDelta: { health: 10, mental: 2, wealth: -15, practical: -3, academic: -2 },
+        relationshipDelta: [],
+        flagDelta: { healthCrisisResolved: "hospital" },
+      },
+      {
+        id: "rest_at_home",
+        label: "집에서 푹 쉰다. 약이라도 먹고.",
+        summary: "당신은 집에서 휴식을 취하며 컨디션을 회복했다.",
+        statDelta: { health: 6, mental: 3, wealth: -3, practical: -2, academic: -1 },
+        relationshipDelta: [],
+        flagDelta: { healthCrisisResolved: "rest" },
+      },
+      {
+        id: "ask_for_help",
+        label: "가족이나 친구에게 도움을 요청한다.",
+        summary: "당신은 주변의 도움을 받으며 몸과 마음을 추스렸다.",
+        statDelta: { health: 5, mental: 4, charm: 1, wealth: -5, practical: -1 },
+        relationshipDelta: [],
+        flagDelta: { healthCrisisResolved: "social" },
+      },
+    ],
+    tags: ["위기", "건강", "회복"],
+    source: "FORCED" as const,
+  };
+}
+
 export function buildBurnoutEvent(): StaticEvent {
   return {
     title: "번아웃 위기",
-    body: `당신은 알람이 세 번 울린 뒤에도 몸을 일으키지 못한다. 머리는 물에 젖은 솜처럼 무겁고, 휴대폰 화면에는 과제 마감과 약속 알림이 겹쳐 쌓여 있다. 이상하게도 해야 할 일은 많은데, 어느 것부터 시작해야 하는지 생각하는 것만으로도 숨이 막힌다.
+    body: `아침에 눈을 떴지만, 일어날 의욕이 전혀 들지 않는다. 머리는 안개가 낀 것처럼 흐릿하고, 아무것도 하고 싶지 않다. 해야 할 일은 산처럼 쌓여 있지만, 그걸 생각할수록 더 깊은 무기력이 밀려온다.
 
-당신은 이 상태가 단순한 게으름이 아니라는 것을 안다. 계속 밀어붙이면 오늘 하루를 넘길 수는 있겠지만, 그 다음 날의 당신은 더 망가져 있을지도 모른다. 지금 필요한 것은 의지가 아니라 회복 방식의 선택이다.`,
+당신은 이 상태가 단순한 게으름이 아니라는 것을 안다. 정신적으로 지친 것이다. 계속 밀어붙이면 당장은 버틸 수 있겠지만, 그 대가는 점점 커질 것이다. 지금 필요한 것은 멘탈 회복을 위한 선택이다.`,
     choices: [
       {
         id: "rest_properly",
-        label: "며칠 푹 쉰다. 컨디션 회복이 우선이다.",
-        summary: "당신은 충분한 휴식을 통해 번아웃에서 회복하기 시작했다.",
-        statDelta: { health: 8, mental: 10, academic: -3, practical: -2 },
+        label: "며칠 푹 쉰다. 아무 생각도 하지 않는다.",
+        summary: "당신은 충분한 휴식을 통해 정신적 피로를 회복하기 시작했다.",
+        statDelta: { mental: 10, health: 4, academic: -3, practical: -2 },
         relationshipDelta: [],
         flagDelta: { burnoutRecovered: "rest" },
       },
@@ -1201,20 +1238,20 @@ export function buildBurnoutEvent(): StaticEvent {
         id: "seek_counseling",
         label: "학교 상담센터를 방문한다.",
         summary: "당신은 전문가의 도움을 받으며 정신 건강을 관리했다.",
-        statDelta: { mental: 12, health: 4, reputation: 1 },
+        statDelta: { mental: 12, health: 2, reputation: 1 },
         relationshipDelta: [],
         flagDelta: { burnoutRecovered: "counseling" },
       },
       {
         id: "talk_to_friend",
         label: "가까운 친구에게 속마음을 털어놓는다.",
-        summary: "당신은 친구에게 마음을 열고 위로를 받았다.",
-        statDelta: { mental: 6, charm: 2, health: 2 },
+        summary: "당신은 친구에게 마음을 열고 정서적 지지를 받았다.",
+        statDelta: { mental: 8, charm: 2, health: 1 },
         relationshipDelta: [],
         flagDelta: { burnoutRecovered: "social_support" },
       },
     ],
-    tags: ["위기", "번아웃", "회복"],
+    tags: ["위기", "멘탈", "번아웃", "회복"],
     source: "FORCED" as const,
   };
 }

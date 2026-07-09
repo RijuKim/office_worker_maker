@@ -78,7 +78,11 @@ export function applyFlagDeltas(
 
 export function checkForcedEvent(
   hiddenState: { burnoutRisk: number },
-): { type: "burnout" } | null {
+  stats?: { health: number; mental: number },
+): { type: "burnout" } | { type: "health_crisis" } | null {
+  if (stats && stats.health <= 2) {
+    return { type: "health_crisis" };
+  }
   if (hiddenState.burnoutRisk >= BURNOUT_THRESHOLD) {
     return { type: "burnout" };
   }

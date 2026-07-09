@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { buildBurnoutEvent } from "@/lib/game/event-engine";
+import { buildBurnoutEvent, buildHealthCrisisEvent } from "@/lib/game/event-engine";
 import { checkForcedEvent } from "@/lib/game/game-rules";
 import { applyLifeStageTransition, getDropoutReason, getLeaveReason, readRiskDebt } from "@/lib/game/life-stage";
 import { prisma } from "@/lib/server/prisma";
@@ -52,7 +52,9 @@ export async function POST(request: Request, context: RouteContext) {
   const dropoutReason = stats ? getDropoutReason(stats, riskDebt) : false;
   const leaveReason = stats ? getLeaveReason(stats, character.hiddenState.burnoutRisk) : false;
   const forcedByLifeStage = dropoutReason || leaveReason;
-  const forced = forcedByLifeStage ? { type: "burnout" as const } : checkForcedEvent(character.hiddenState);
+  const forced = forcedByLifeStage
+    ? { type: "burnout" as const }
+    : checkForcedEvent(character.hiddenState, stats);
 
   if (!forced) {
     return NextResponse.json({ forced: false });
@@ -66,17 +68,17 @@ export async function POST(request: Request, context: RouteContext) {
     });
   }
 
-  const burnoutEvent = buildBurnoutEvent();
+  const forcedEvent = forced.type === "health_crisis" ? buildHealthCrisisEvent() : buildBurnoutEvent();
 
   const newEvent = await prisma.event.create({
     data: {
       characterRunId: id,
-      title: burnoutEvent.title,
-      body: burnoutEvent.body,
+      title: forcedEvent.title,
+      body: forcedEvent.body,
       source: "FORCED",
       status: "ACTIVE",
-      choices: burnoutEvent.choices as object[],
-      tags: burnoutEvent.tags,
+      choices: forcedEvent.choices as object[],
+      tags: forcedEvent.tags,
       safetyChecked: true,
     },
   });
@@ -122,6 +124,7 @@ export async function POST(request: Request, context: RouteContext) {
     userId,
     characterId: id,
     eventId: newEvent.id,
+    eventType: forced.type,
     reason: forcedByLifeStage ? (dropoutReason || leaveReason) : "game_rule",
   });
 
