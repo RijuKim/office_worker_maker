@@ -328,6 +328,16 @@ export async function POST(request: Request, context: RouteContext) {
     lifeStage: lifeStageTransition.state.lifeStage,
   });
 
+  let endingRecordId: string | null = null;
+  if (endingRecord) {
+    const latest = await prisma.careerEndingRecord.findFirst({
+      where: { characterRunId: id },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+    endingRecordId = latest?.id ?? null;
+  }
+
   return NextResponse.json({
     result: {
       choiceId: choice.id,
@@ -338,6 +348,7 @@ export async function POST(request: Request, context: RouteContext) {
       relationshipDelta: choice.relationshipDelta,
       eventResolved: true,
       endingTriggered: Boolean(endingRecord),
+      endingRecordId,
       resultType: endingType ?? (shouldCreateFinalEnding ? "선택의 결과" : lifeStageTransition.reasons.find((reason) => reason !== "no_transition") ?? null),
       lifeStage: lifeStageTransition.state,
     },

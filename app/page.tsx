@@ -2,6 +2,7 @@
 
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toPng } from "html-to-image";
 import { EndingArt, getEndingArtType } from "@/lib/game/ending-art";
 
 type Screen = "auth" | "create" | "play" | "records" | "character_detail" | "relationships";
@@ -95,15 +96,39 @@ function trustHearts(trust: number) {
 function getEventScene(event: EventData) {
   const text = `${event.title} ${event.body}`.toLowerCase();
   if (event.source === "FORCED" || text.includes("번아웃") || text.includes("건강") || text.includes("병원")) return "burnout";
-  if (text.includes("스펙") || text.includes("토익") || text.includes("자격증") || text.includes("인턴") || text.includes("공모전")) return "spec";
-  if (text.includes("취업") || text.includes("서류") || text.includes("면접") || text.includes("코딩테스트") || text.includes("합격")) return "job";
-  if (text.includes("진로") || text.includes("워홀") || text.includes("임용") || text.includes("회계사") || text.includes("로스쿨")) return "career";
-  if (text.includes("연애") || text.includes("고백") || text.includes("호감") || text.includes("동아리")) return "social";
-  if (text.includes("돈") || text.includes("알바") || text.includes("월세") || text.includes("빚")) return "money";
+  if (text.includes("코딩테스트") || text.includes("알고리즘") || text.includes("github") || text.includes("깃허브")) return "coding";
+  if (text.includes("면접") || text.includes("인성검사") || text.includes("면접관")) return "interview";
+  if (text.includes("서류") || text.includes("채용") || text.includes("회사") || text.includes("취업") || text.includes("합격")) return "job";
+  if (text.includes("토익") || text.includes("토플") || text.includes("어학") || text.includes("자격증") || text.includes("공모전") || text.includes("포트폴리오") || text.includes("스펙")) return "spec";
+  if (text.includes("인턴")) return "internship";
+  if (text.includes("워홀") || text.includes("해외") || text.includes("유학") || text.includes("공항") || text.includes("교환학생")) return "overseas";
+  if (text.includes("임용") || text.includes("회계사") || text.includes("로스쿨") || text.includes("변리사") || text.includes("국가고시") || text.includes("고시")) return "exam";
+  if (text.includes("교수") || text.includes("연구실") || text.includes("추천서") || text.includes("대학원") || text.includes("석사") || text.includes("박사")) return "professor";
+  if (text.includes("미대") || text.includes("작업실") || text.includes("음악") || text.includes("연습실") || text.includes("전시") || text.includes("공연") || text.includes("디자인")) return "art";
+  if (text.includes("의대") || text.includes("간호") || text.includes("약대") || text.includes("실습") || text.includes("병동") || text.includes("환자")) return "medical";
+  if (text.includes("법학") || text.includes("법학관") || text.includes("판례") || text.includes("리걸") || text.includes("소송")) return "law";
+  if (text.includes("창업") || text.includes("스타트업") || text.includes("mvp") || text.includes("투자") || text.includes("사업")) return "startup";
+  if (text.includes("동아리") || text.includes("모임") || text.includes("연애") || text.includes("고백") || text.includes("호감")) return "club";
+  if (text.includes("카페") || text.includes("커피")) return "cafe";
+  if (text.includes("운동") || text.includes("헬스") || text.includes("러닝") || text.includes("체육관")) return "exercise";
+  if (text.includes("게임") || text.includes("취미") || text.includes("여가")) return "hobby";
+  if (text.includes("가족") || text.includes("부모") || text.includes("본가") || text.includes("결혼") || text.includes("아이")) return "family";
+  if (text.includes("돈") || text.includes("알바") || text.includes("월세") || text.includes("빚") || text.includes("생활비")) return "money";
+  if (text.includes("식당") || text.includes("학식") || text.includes("점심")) return "cafeteria";
+  if (text.includes("도서관") || text.includes("열람실")) return "library";
   if (text.includes("발표") || text.includes("프로젝트") || text.includes("mvp") || text.includes("앱")) return "project";
-  if (text.includes("수업") || text.includes("시험") || text.includes("과제") || text.includes("도서관")) return "study";
-  if (text.includes("회사") || text.includes("채용")) return "job";
+  if (text.includes("수업") || text.includes("강의실") || text.includes("시험") || text.includes("과제")) return "classroom";
+  if (text.includes("자취") || text.includes("기숙사") || text.includes("방에서") || text.includes("침대")) return "home";
   return "campus";
+}
+
+function getChoiceFeedbackTone(feedback: ChoiceFeedback) {
+  const deltas = Object.entries(feedback.statDelta);
+  if (deltas.some(([key, delta]) => (key === "health" || key === "mental") && delta < 0)) return "warning";
+  if (feedback.relationshipDelta.some((rel) => rel.trust > 0)) return "relationship";
+  if (deltas.some(([key, delta]) => key === "wealth" && delta > 0)) return "money";
+  if (deltas.some(([key, delta]) => (key === "academic" || key === "practical" || key === "reputation") && delta > 0)) return "growth";
+  return "default";
 }
 
 function getRecordTone(record: Record<string, unknown>) {
@@ -147,6 +172,7 @@ function stripRouteGradeText(value: unknown) {
     .replace(/\b(?:GOOD|MIXED|HARD)\s+ROUTE\b/gi, "")
     .replace(/[ABC]등급/g, "")
     .replace(/\b[ABC]\b/g, "")
+    .replace(/(학점|학업|지식|실무|실무력|건강|멘탈|정신|자산|돈|평판|명성|매력|네트워크|관계|academic|practical|health|mental|wealth|reputation|charm|network)\s*(?:수치|점수|스탯|stat)?\s*(?:은|는|이|가|의)?\s*[:：]?\s*(?:10|[0-9])\b/gi, "$1")
     .replace(/\s{2,}/g, " ")
     .trim();
 }
@@ -178,6 +204,14 @@ function PixelPortrait({ name, compact = false, variant }: { name?: string; comp
   else if (refName.includes("혜진")) variantClass = "variant-hyejin";
   else if (refName.includes("명수")) variantClass = "variant-myeongsu";
   else if (refName.includes("상혁")) variantClass = "variant-sanghyuk";
+  else if (refName.includes("교수")) variantClass = "variant-professor";
+  else if (refName.includes("조교")) variantClass = "variant-assistant";
+  else if (refName.includes("동기")) variantClass = "variant-peer";
+  else if (refName.includes("선배")) variantClass = "variant-senior";
+  else if (refName.includes("면접")) variantClass = "variant-interviewer";
+  else if (refName.includes("사장") || refName.includes("대표")) variantClass = "variant-founder";
+  else if (refName.includes("가족") || refName.includes("부모")) variantClass = "variant-parents";
+  else if (refName.includes("해외") || refName.includes("emma") || refName.includes("엠마")) variantClass = "variant-overseas";
 
   return (
     <div className={`pixel-portrait ${compact ? "pixel-portrait-compact" : ""} ${variantClass}`} aria-hidden="true">
@@ -186,6 +220,20 @@ function PixelPortrait({ name, compact = false, variant }: { name?: string; comp
         <span>{initial}</span>
       </div>
       <div className="portrait-body" />
+    </div>
+  );
+}
+
+function ChoiceResultArt({ tone }: { tone: string }) {
+  return (
+    <div className={`choice-result-art result-${tone}`} aria-hidden="true">
+      <div className="result-burst" />
+      <div className="result-icon result-icon-a" />
+      <div className="result-icon result-icon-b" />
+      <div className="result-character">
+        <div className="result-head" />
+        <div className="result-body" />
+      </div>
     </div>
   );
 }
@@ -241,6 +289,7 @@ export default function AppPage() {
   const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
   const [pendingNext, setPendingNext] = useState(false);
   const [endingNotice, setEndingNotice] = useState("");
+  const [latestRecordId, setLatestRecordId] = useState<string | null>(null);
   const [choiceFeedback, setChoiceFeedback] = useState<ChoiceFeedback | null>(null);
   const [mobileStatsOpen, setMobileStatsOpen] = useState(false);
 
@@ -352,6 +401,9 @@ export default function AppPage() {
         const payload = JSON.parse(dataLine.slice(5).trim());
         if (eventName === "body_delta" && typeof payload.text === "string") {
           setStreamingEventBody((current) => current + payload.text);
+        }
+        if (eventName === "replace_body" && typeof payload.text === "string") {
+          setStreamingEventBody(payload.text);
         }
         if (eventName === "status") {
           setStreamingNextEvent(true);
@@ -501,6 +553,7 @@ export default function AppPage() {
       setCurrentEvent(null);
       if (data.result?.endingTriggered) {
         setPendingNext(false);
+        setLatestRecordId(data.result?.endingRecordId ?? null);
         setEndingNotice("선택의 결과가 기록되었습니다. 선택의 결과 기록에서 확인할 수 있습니다.");
       } else {
         setPendingNext(false);
@@ -532,9 +585,63 @@ export default function AppPage() {
     setLoading(true);
     try {
       const { ok, data } = await doFetch("/api/records");
-      if (ok) setRecords(data.records ?? []);
+      const nextRecords = ok ? data.records ?? [] : [];
+      if (ok) setRecords(nextRecords);
+      return nextRecords as Record<string, unknown>[];
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const showLatestRecord = useCallback(async () => {
+    const nextRecords = await loadRecords();
+    const latestRecord = nextRecords[0];
+    setExpandedRecord(typeof latestRecord?.id === "string" ? latestRecord.id : null);
+    setScreen("records");
+  }, [loadRecords]);
+
+  const shareRecord = useCallback(async (recordId: string) => {
+    const shareUrl = `${window.location.origin}/share/${recordId}`;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setError("");
+      alert("공유 링크가 복사되었습니다!");
+    } catch {
+      setError("링크 복사에 실패했습니다.");
+    }
+  }, []);
+
+  const shareRecordImage = useCallback(async (recordId: string) => {
+    const cardEl = document.getElementById(`record-card-${recordId}`);
+    if (!cardEl) {
+      setError("이미지 생성에 실패했습니다.");
+      return;
+    }
+    try {
+      const dataUrl = await toPng(cardEl, { quality: 0.95, pixelRatio: 2 });
+      const link = document.createElement("a");
+      link.download = `career-record-${recordId.slice(0, 8)}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch {
+      setError("이미지 저장에 실패했습니다.");
+    }
+  }, []);
+
+  const shareRecordSocial = useCallback(async (platform: string, recordId: string) => {
+    const shareUrl = `${window.location.origin}/share/${recordId}`;
+    const text = "대학생 커리어 시뮬레이터 - 선택의 결과";
+    const urls: Record<string, string> = {
+      twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`,
+      instagram: "", // Instagram doesn't support direct URL sharing
+      kakaotalk: `https://share.kakao.com/talk/share?url=${encodeURIComponent(shareUrl)}`,
+    };
+    const url = urls[platform];
+    if (url) {
+      window.open(url, "_blank", "noopener,noreferrer");
+    } else {
+      await navigator.clipboard.writeText(shareUrl);
+      alert("공유 링크가 복사되었습니다!");
     }
   }, []);
 
@@ -555,7 +662,7 @@ export default function AppPage() {
               <p className="text-center text-sm leading-6 text-[#3a332d]">현재 진행은 계정에 저장됩니다.</p>
               <button className="pixel-button-dark w-full px-4 py-3 text-sm font-bold" onClick={() => setScreen(currentChar ? "play" : "create")}>돌아가기</button>
               <button className="pixel-button w-full px-4 py-3 text-sm font-bold" onClick={startNewCharacter}>새 게임</button>
-              <button className="pixel-button w-full px-4 py-3 text-sm font-bold" onClick={() => { setScreen("records"); loadRecords(); }}>기록 보기</button>
+              <button className="pixel-button w-full px-4 py-3 text-sm font-bold" onClick={showLatestRecord}>기록 보기</button>
               <button className="pixel-button w-full px-4 py-3 text-sm font-bold" onClick={() => signOut()}>로그아웃</button>
             </div>
           ) : (
@@ -591,7 +698,7 @@ export default function AppPage() {
             <h1 className="text-2xl font-black">NEW RUN</h1>
             <div className="flex gap-3">
               {status === "authenticated" && (
-                <button className="text-sm text-[#d9c9b5] underline" onClick={() => { setScreen("records"); loadRecords(); }}>
+                <button className="text-sm text-[#d9c9b5] underline" onClick={() => { setExpandedRecord(null); setScreen("records"); loadRecords(); }}>
                   기록
                 </button>
               )}
@@ -603,6 +710,9 @@ export default function AppPage() {
           <h2 className="mb-3 text-sm font-bold text-[#d9c9b5]">새 이야기</h2>
           {error && <p className="mb-4 border-2 border-[#b3423c] bg-[#ffe1db] p-2 text-sm font-bold text-[#8d2f2a]">{error}</p>}
           <div className="pixel-panel space-y-5 p-6">
+            <div className="create-hero-art overflow-hidden border-4 border-[#2a2018]">
+              <PixelScene scene="intro" label="새 게임 인트로" />
+            </div>
             <div className="space-y-3 border-b border-[#eee8dd] pb-5 text-[15px] leading-7 text-[#3a332d]">
               <p>눈을 뜨니 새벽 6시 47분. 휴대폰에는 읽지 않은 메시지가 수북하다. 수강 정정 알림, 학과 단체 채팅, 아르바이트 면접 확인, 그리고 저장되지 않은 번호의 짧은 문장. “오늘 고른 첫 선택이 졸업식까지 따라갑니다.” 장난 같지만, 왠지 모르게 진짜일 것 같은 예감이 든다.</p>
               <p>당신은 아직 자신이 어떤 학생으로 기억될지 모릅니다. 이름과 나이, 오늘 눈뜬 장소, 끝까지 믿고 싶은 능력만 정하면 나머지 전공, 학년, 첫 사건은 이 세계가 당신에게 붙여줄 것입니다.</p>
@@ -685,7 +795,7 @@ export default function AppPage() {
               const narrativeText = recordText(r, "longNarrative");
               const narrativePreview = narrativeText.length > 150 ? narrativeText.slice(0, 150) + "..." : narrativeText;
               return (
-                <div className={`record-card record-card-${getRecordTone(r)} pixel-panel overflow-hidden`} key={r.id as string}>
+                <div className={`record-card record-card-${getRecordTone(r)} pixel-panel overflow-hidden`} id={`record-card-${r.id as string}`} key={r.id as string}>
                   <button
                     className="grid w-full grid-cols-[156px_minmax(0,1fr)_32px] items-center gap-5 p-5 text-left max-[720px]:grid-cols-[96px_minmax(0,1fr)_24px] max-[520px]:grid-cols-1"
                     onClick={() => setExpandedRecord(isExpanded ? null : r.id as string)}
@@ -716,6 +826,32 @@ export default function AppPage() {
                         <span className="border-2 border-[#ded9ce] bg-[#f2efe7] px-2.5 py-1 text-xs font-bold">{careerPath}</span>
                         <span className="border-2 border-[#ded9ce] bg-[#f2efe7] px-2.5 py-1 text-xs">{healthState}</span>
                         <span className="border-2 border-[#ded9ce] bg-[#f2efe7] px-2.5 py-1 text-xs">관계: {relationshipStateText}</span>
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-2 border-t-2 border-[#f2efe7] pt-4">
+                        <button
+                          className="pixel-button-dark px-3 py-2 text-xs font-bold"
+                          onClick={() => shareRecord(r.id as string)}
+                        >
+                          🔗 링크 복사
+                        </button>
+                        <button
+                          className="pixel-button-dark px-3 py-2 text-xs font-bold"
+                          onClick={() => shareRecordImage(r.id as string)}
+                        >
+                          🖼️ 이미지 저장
+                        </button>
+                        <button
+                          className="pixel-button px-3 py-2 text-xs font-bold"
+                          onClick={() => shareRecordSocial("twitter", r.id as string)}
+                        >
+                          𝕏 공유
+                        </button>
+                        <button
+                          className="pixel-button px-3 py-2 text-xs font-bold"
+                          onClick={() => shareRecordSocial("kakaotalk", r.id as string)}
+                        >
+                          💬 카톡 공유
+                        </button>
                       </div>
                     </div>
                   )}
@@ -754,7 +890,7 @@ export default function AppPage() {
           <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "play" ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`} onClick={() => setScreen("play")}>진행</button>
           <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "character_detail" ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`} onClick={() => setScreen("character_detail")}>캐릭터</button>
           <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "relationships" ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`} onClick={() => setScreen("relationships")}>관계</button>
-          <button className="rounded-lg px-2.5 py-2 text-left text-sm text-[#d9c9b5]" onClick={() => { setScreen("records"); loadRecords(); }}>기록</button>
+          <button className="rounded-lg px-2.5 py-2 text-left text-sm text-[#d9c9b5]" onClick={() => { setExpandedRecord(null); setScreen("records"); loadRecords(); }}>기록</button>
           <button
             aria-expanded={mobileStatsOpen}
             className={`mobile-stats-toggle rounded-lg px-2.5 py-2 text-left text-sm ${mobileStatsOpen ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`}
@@ -827,19 +963,24 @@ export default function AppPage() {
             {error && <p className="mb-4 rounded bg-red-50 p-2 text-sm text-red-600">{error}</p>}
             {choiceFeedback && (
               <div className="feedback-pop pixel-panel mb-5 p-4">
-                <p className="text-sm font-black text-[#6d4a2f]">선택의 결과</p>
-                {choiceFeedback.summary && <p className="mt-2 text-sm leading-6">{choiceFeedback.summary}</p>}
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {Object.entries(choiceFeedback.statDelta).map(([key, delta]) => (
-                    <span className={`border-2 px-2 py-1 text-xs font-bold ${delta > 0 ? "border-[#305d73] bg-[#d5edf6] text-[#244c5e]" : "border-[#b3423c] bg-[#ffe1db] text-[#7b2d29]"}`} key={key}>
-                      {statLabels[key] ?? key} {key === "wealth" ? `${delta > 0 ? "+" : ""}${delta}만원` : `${delta > 0 ? "+" : ""}${delta}`}
-                    </span>
-                  ))}
-                  {choiceFeedback.relationshipDelta.map((rel) => (
-                    <span className={`border-2 px-2 py-1 text-xs font-bold ${rel.trust > 0 ? "border-[#a53f66] bg-[#ffe1ec] text-[#842b50]" : "border-[#2b3348] bg-[#dce2f5] text-[#26304a]"}`} key={`${rel.name}-${rel.trust}`}>
-                      {rel.name} {rel.trust > 0 ? "♥+" : "💀"}{rel.trust}
-                    </span>
-                  ))}
+                <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-4 max-[520px]:grid-cols-1">
+                  <ChoiceResultArt tone={getChoiceFeedbackTone(choiceFeedback)} />
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-[#6d4a2f]">선택의 결과</p>
+                    {choiceFeedback.summary && <p className="mt-2 text-sm leading-6">{choiceFeedback.summary}</p>}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {Object.entries(choiceFeedback.statDelta).map(([key, delta]) => (
+                        <span className={`border-2 px-2 py-1 text-xs font-bold ${delta > 0 ? "border-[#305d73] bg-[#d5edf6] text-[#244c5e]" : "border-[#b3423c] bg-[#ffe1db] text-[#7b2d29]"}`} key={key}>
+                          {statLabels[key] ?? key} {key === "wealth" ? `${delta > 0 ? "+" : ""}${delta}만원` : `${delta > 0 ? "+" : ""}${delta}`}
+                        </span>
+                      ))}
+                      {choiceFeedback.relationshipDelta.map((rel) => (
+                        <span className={`border-2 px-2 py-1 text-xs font-bold ${rel.trust > 0 ? "border-[#a53f66] bg-[#ffe1ec] text-[#842b50]" : "border-[#2b3348] bg-[#dce2f5] text-[#26304a]"}`} key={`${rel.name}-${rel.trust}`}>
+                          {rel.name} {rel.trust > 0 ? "♥+" : "💀"}{rel.trust}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -853,7 +994,17 @@ export default function AppPage() {
                     <p className="text-xs font-black text-[#8a4f2d]">RESULT UNLOCKED</p>
                     <p className="mt-1 text-2xl font-black">선택의 결과</p>
                     <p className="mt-2 text-sm leading-6">{endingNotice}</p>
-                    <button className="pixel-button mt-4 px-4 py-2 text-sm font-bold" onClick={startNewCharacter}>새로 시작하기</button>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button className="pixel-button-dark px-4 py-2 text-sm font-bold" onClick={showLatestRecord}>결과 바로 보기</button>
+                      <button className="pixel-button px-4 py-2 text-sm font-bold" onClick={startNewCharacter}>새로 시작하기</button>
+                    </div>
+                    {latestRecordId && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button className="pixel-button-dark px-3 py-2 text-xs font-bold" onClick={() => shareRecord(latestRecordId)}>🔗 링크 복사</button>
+                        <button className="pixel-button px-3 py-2 text-xs font-bold" onClick={() => shareRecordSocial("twitter", latestRecordId)}>𝕏 공유</button>
+                        <button className="pixel-button px-3 py-2 text-xs font-bold" onClick={() => shareRecordSocial("kakaotalk", latestRecordId)}>💬 카톡 공유</button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

@@ -20,6 +20,7 @@
   "dependencies": {
     "@prisma/adapter-pg": "7.8.0",
     "@prisma/client": "7.8.0",
+    "html-to-image": "^1.11.13",
     "next": "16.2.10",
     "next-auth": "4.24.14",
     "pg": "8.16.3",
