@@ -34,7 +34,15 @@ export function getEndingArtType(careerPath: string, tags: string[]): EndingArtT
   return "default";
 }
 
-export function EndingArt({ type, size = 200 }: { type: EndingArtType; size?: number }): ReactElement {
+export function EndingArt({
+  type,
+  size = 200,
+  locked = false,
+}: {
+  type: EndingArtType;
+  size?: number;
+  locked?: boolean;
+}): ReactElement {
   const s = size;
   const half = s / 2;
 
@@ -42,13 +50,18 @@ export function EndingArt({ type, size = 200 }: { type: EndingArtType; size?: nu
 
   return (
     <svg
-      aria-hidden="true"
+      aria-hidden={locked ? undefined : "true"}
+      aria-label={locked ? "잠긴 항목" : undefined}
       className="ending-art"
       height={s}
       viewBox={`0 0 ${s} ${s}`}
+      role={locked ? "img" : undefined}
       width={s}
       xmlns="http://www.w3.org/2000/svg"
-      style={{ imageRendering: "pixelated" }}
+      style={{
+        imageRendering: "pixelated",
+        ...(locked ? { filter: "grayscale(1) brightness(0.3) contrast(1.2)" } : {}),
+      }}
     >
       <rect fill="#16130f" height={s} width={s} />
       {art}
