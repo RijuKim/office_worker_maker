@@ -327,31 +327,6 @@ export async function POST(request: Request, context: RouteContext) {
           const { type, event } = selectNextEvent(selectionContext, excludedEventTitles);
           selectedEvent = event;
           source = type === "forced" ? "FORCED" : event.source;
-          if (source !== "FORCED") {
-            const staticEvaluation = evaluateCandidateEvent(source, selectedEvent, qualityContext);
-            if (staticEvaluation.verdict.status !== "pass") {
-              const fallback = findValidatedStaticFallback({
-                preferredEvent: selectedEvent,
-                selectionContext,
-                excludedEventTitles,
-                qualityContext,
-              });
-              if (fallback) {
-                selectedEvent = fallback.event;
-                source = "FALLBACK";
-                fallbackUsed = true;
-              } else {
-                log.error("스트림 이벤트 품질 fallback_failed", {
-                  characterId: id,
-                  source,
-                  reasons: staticEvaluation.verdict.reasons,
-                  diversityScore: staticEvaluation.verdict.diversityScore,
-                });
-                send("error", { error: "다음 사건을 생성하지 못했습니다." });
-                return;
-              }
-            }
-          }
         }
 
         const newEvent = await prisma.event.create({
