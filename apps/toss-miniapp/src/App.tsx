@@ -220,8 +220,9 @@ export function App() {
       )}
 
       <section className="hero-panel">
-        <p className="eyebrow">Apps in Toss Miniapp</p>
+        <p className="eyebrow">취준 생활 시뮬레이션</p>
         <h1>일어나보니 대한민국 취준생</h1>
+        <p className="hero-copy">스펙, 멘탈, 통장잔고까지 관리해야 하는 가상 취준 생활을 직접 굴려보세요.</p>
         <div className="status-row">
           <span>{progressLabel(currentCharacter)}</span>
           <span>{apiBaseLabel}</span>
@@ -303,8 +304,8 @@ export function App() {
             </article>
           ) : (
             <div className="list-panel">
-              <p className="muted">현재 진행 가능한 사건이 없습니다.</p>
-              <button className="primary-button" type="button" onClick={() => currentCharacter && void api.nextEvent(currentCharacter.id).then(() => openCharacter(currentCharacter))}>다음 사건</button>
+              <p className="muted">현재 진행 가능한 상황이 없습니다.</p>
+              <button className="primary-button" type="button" onClick={() => currentCharacter && void api.nextEvent(currentCharacter.id).then(() => openCharacter(currentCharacter))}>다음 상황</button>
             </div>
           )}
         </section>
@@ -314,7 +315,7 @@ export function App() {
         <section className="screen-stack">
           <div className="action-grid">
             <button className="secondary-button" type="button" onClick={() => void loadRecords()}>새로고침</button>
-            <button className="secondary-button" type="button" onClick={() => setScreen("home")}>진행으로</button>
+            <button className="secondary-button" type="button" onClick={() => setScreen("home")}>이어가기</button>
           </div>
           {records.map((record) => (
             <article className="record-panel" key={record.id}>

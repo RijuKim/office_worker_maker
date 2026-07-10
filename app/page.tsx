@@ -589,7 +589,7 @@ export default function AppPage() {
           receivedFinalEvent = true;
         }
         if (eventName === "error") {
-          setError(payload.error ?? "다음 사건을 생성하지 못했습니다.");
+          setError(payload.error ?? "다음 상황을 생성하지 못했습니다.");
         }
       }
     }
@@ -924,8 +924,8 @@ export default function AppPage() {
   const topChrome = (
     <div className="app-top-chrome">
       <div className="chrome-brand">
-        <span className="chrome-brand-icon">🎮</span>
-        <span className="chrome-brand-name">취준생게임</span>
+        <span className="chrome-brand-icon">취준</span>
+        <span className="chrome-brand-name">취준 생활 시뮬레이션</span>
       </div>
       <button
         aria-expanded={menuOpen}
@@ -990,7 +990,7 @@ export default function AppPage() {
             }}
             type="button"
           >
-            새 게임
+            새 시뮬레이션
           </button>
           <button
             onClick={() => {
@@ -1033,7 +1033,7 @@ export default function AppPage() {
             <div className="space-y-3">
               <p className="text-center text-sm leading-6 text-[#3a332d]">현재 진행은 계정에 저장됩니다.</p>
               <button className="pixel-button-dark w-full px-4 py-3 text-sm font-bold" onClick={() => setScreen(currentChar ? "play" : "create")}>돌아가기</button>
-              <button className="pixel-button w-full px-4 py-3 text-sm font-bold" onClick={startNewCharacter}>새 게임</button>
+              <button className="pixel-button w-full px-4 py-3 text-sm font-bold" onClick={startNewCharacter}>새 시뮬레이션</button>
               <button className="pixel-button w-full px-4 py-3 text-sm font-bold" onClick={showLatestRecord}>기록 보기</button>
               <button className="pixel-button w-full px-4 py-3 text-sm font-bold" onClick={() => signOut()}>로그아웃</button>
             </div>
@@ -1071,7 +1071,7 @@ export default function AppPage() {
           <div className="w-full max-w-[560px]">
             <div className="create-header mb-5 text-[#fff3d7]">
             <div>
-              <p className="mb-1 text-xs font-black text-[#b8d7a3]">NEW RUN</p>
+              <p className="mb-1 text-xs font-black text-[#b8d7a3]">취준 생활 시뮬레이션</p>
               <h1 className="create-title text-2xl font-black leading-tight">일어나보니 대한민국 취준생</h1>
             </div>
           </div>
@@ -1079,11 +1079,13 @@ export default function AppPage() {
           {error && <p className="mb-4 border-2 border-[#b3423c] bg-[#ffe1db] p-2 text-sm font-bold text-[#8d2f2a]">{error}</p>}
           <div className="pixel-panel create-panel space-y-5 p-6">
             <div className="create-hero-art overflow-hidden border-4 border-[#2a2018]">
-              <PixelScene scene="intro" label="새 게임 인트로" />
+              <PixelScene scene="intro" label="취준 시뮬레이션 인트로" />
             </div>
             <div className="space-y-3 border-b border-[#eee8dd] pb-5 text-[15px] leading-7 text-[#3a332d]">
+              <p className="font-bold">스펙, 멘탈, 통장잔고까지 관리해야 하는 가상 취준 생활을 직접 굴려보세요.</p>
               <p>눈을 뜨니 새벽 6시 47분. 휴대폰에는 읽지 않은 메시지가 수북하다. 수강 정정 알림, 학과 단체 채팅, 아르바이트 면접 확인, 그리고 저장되지 않은 번호의 짧은 문장. “오늘 고른 첫 선택이 졸업식까지 따라갑니다.” 장난 같지만, 왠지 모르게 진짜일 것 같은 예감이 든다.</p>
               <p>당신은 아직 자신이 어떤 학생으로 기억될지 모릅니다. 이름과 나이, 오늘 눈뜬 장소, 끝까지 믿고 싶은 능력만 정하면 나머지 전공, 학년, 첫 사건은 이 세계가 당신에게 붙여줄 것입니다.</p>
+              <p className="text-xs text-[#706b62]">이 콘텐츠는 실제 진로 예측이 아닌 재미를 위한 허구의 시뮬레이션입니다.</p>
             </div>
             <div>
               <label className="mb-1 block text-sm font-bold">당신의 이름은?</label>
@@ -1149,12 +1151,12 @@ export default function AppPage() {
             <div>
               <p className="mb-2 text-xs font-black text-[#8a4f2d]">ARCHIVE</p>
               <h1 className="text-3xl font-black leading-tight">선택의 결과 기록</h1>
-              <p className="mt-2 text-sm text-[#706b62]">플레이가 남긴 직업, 관계, 생활의 스냅샷</p>
+              <p className="mt-2 text-sm text-[#706b62]">가상 취준 생활이 남긴 직업, 관계, 생활의 스냅샷</p>
             </div>
             <div className="record-actions flex items-center gap-4 max-[720px]:mt-4">
               <button className="record-action" onClick={loadRecords} type="button">새로고침</button>
               <button className="record-action" onClick={runCompleted ? startNewCharacter : () => { setScreen("play"); }} type="button">
-                {runCompleted ? "새로 시작" : "진행으로"}
+                {runCompleted ? "새로 시작" : "이어가기"}
               </button>
             </div>
           </div>
@@ -1166,7 +1168,7 @@ export default function AppPage() {
               role="tab"
               aria-selected={recordsTab === "records"}
             >
-              내 기록
+              지난 루트
             </button>
             <button
               className={recordsTab === "codex" ? "active" : ""}
@@ -1175,7 +1177,7 @@ export default function AppPage() {
               role="tab"
               aria-selected={recordsTab === "codex"}
             >
-              도감
+              결말 모음
             </button>
           </div>
 
@@ -1257,7 +1259,7 @@ export default function AppPage() {
               {records.length === 0 && (
                 <div className="pixel-panel border-dashed p-10 text-center">
                   <p className="text-sm text-[#706b62]">아직 저장된 기록이 없습니다.</p>
-                  <p className="mt-2 text-xs text-[#a9967d]">게임을 플레이하고 충분한 사건을 경험하면 기록을 생성할 수 있습니다.</p>
+                  <p className="mt-2 text-xs text-[#a9967d]">시뮬레이션을 충분히 진행하면 선택의 결과를 남길 수 있습니다.</p>
                 </div>
               )}
             </div>
@@ -1361,7 +1363,7 @@ export default function AppPage() {
         )}
         <section className="sidebar-notice mt-3.5 rounded-lg border border-[#4d3d2f] bg-[#1b1612] p-3.5">
           <h2 className="font-bold">패러디 안내</h2>
-          <p className="mt-2 text-[13px] leading-relaxed text-[#c4b39c]">이 게임의 기업, 인물, 사건은 허구 및 패러디입니다.</p>
+          <p className="mt-2 text-[13px] leading-relaxed text-[#c4b39c]">이 시뮬레이션의 기업, 인물, 사건은 허구 및 패러디입니다.</p>
         </section>
       </aside>
 
@@ -1483,7 +1485,7 @@ export default function AppPage() {
                 }}
               >
                 <p className="text-lg leading-8 text-[#3a332d]">
-                  {pendingNext ? "다음 사건을 준비 중입니다." : "새 사건을 준비 중입니다."}
+                  {pendingNext ? "다음 상황을 준비 중입니다." : "새 상황을 준비 중입니다."}
                 </p>
                 {loading && <p className="mt-3 text-sm text-[#706b62]">선택의 시간이 다가오고 있습니다...</p>}
               </div>
