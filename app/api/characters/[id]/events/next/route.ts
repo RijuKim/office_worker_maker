@@ -473,7 +473,7 @@ function buildDiversityGuidance(eventHistory: Array<{
   const avoidPeople = Object.entries(peopleCounts)
     .filter(([, count]) => count >= 2)
     .map(([name]) => name);
-  const allCategories = ["돈", "가족", "연애", "건강", "알바", "동아리", "해외", "위험", "진로", "생활"];
+  const allCategories = ["돈", "가족", "연애", "건강", "알바", "동아리/학생회", "해외/여행", "위험", "진로", "생활", "SNS/디지털", "취미/문화", "스펙/경쟁", "주거", "멘탈"];
   const preferCategories = allCategories
     .filter((category) => !tagCounts[category])
     .slice(0, 4);
@@ -501,10 +501,14 @@ function normalizeCategory(tag: string) {
   if (["가족", "본가", "압박"].includes(tag)) return "가족";
   if (["연애", "결혼", "관계"].includes(tag)) return "연애";
   if (["범죄", "위험", "도박", "다단계", "사기"].includes(tag)) return "위험";
-  if (["해외", "워홀"].includes(tag)) return "해외";
+  if (["해외", "워홀", "여행", "교환학생"].includes(tag)) return "해외/여행";
   if (["취업", "진로", "면접", "지원서", "기업"].includes(tag)) return "진로";
   if (["건강", "운동", "병원", "감기", "부상"].includes(tag)) return "건강";
   if (["멘탈", "번아웃", "스트레스", "우울", "불안"].includes(tag)) return "멘탈";
-  if (["동아리", "학생회"].includes(tag)) return "동아리";
+  if (["동아리", "학생회", "리더십"].includes(tag)) return "동아리/학생회";
+  if (["SNS", "인스타", "유튜브", "커뮤니티", "온라인", "디지털"].includes(tag)) return "SNS/디지털";
+  if (["취미", "문화", "전시", "영화", "게임", "독서", "음악", "밴드"].includes(tag)) return "취미/문화";
+  if (["스펙", "인턴", "어학", "공모전", "포트폴리오", "코딩테스트", "인성검사"].includes(tag)) return "스펙/경쟁";
+  if (["기숙사", "자취", "월세", "룸메", "하숙"].includes(tag)) return "주거";
   return tag;
 }

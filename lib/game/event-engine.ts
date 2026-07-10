@@ -1140,10 +1140,19 @@ export function pickRandomStaticEvent(excludeTitles?: string[], context?: EventS
     ? STATIC_EVENTS.filter((e) => !excludeTitles.includes(e.title))
     : STATIC_EVENTS)
     .filter((event) => !context || isEventAllowedForLifeStage(event, context))
-    .filter((event) => !hasChosenCareerPath || !event.tags.includes("진로"));
+    .filter((event) => !hasChosenCareerPath || !event.tags.includes("진로"))
+    .filter((event) => !context || event.tags.some((tag) => ARC_PHASE_TAGS[arc.phase]?.includes(tag)));
   const pool = filteredPool.length > 0 ? filteredPool : STATIC_EVENTS;
   return pickWeightedStaticEvent(pool, context);
 }
+
+const ARC_PHASE_TAGS: Record<string, string[]> = {
+  "발단": ["학업", "일상", "동아리", "사교", "알바", "건강", "가족", "취미", "SNS", "문화", "여행", "운동", "도서관", "중간고사", "교수", "기숙사", "자취"],
+  "전개": ["연애", "관계", "알바", "자산", "동아리", "스터디", "시험", "갈등", "SNS", "취미", "문화", "인턴", "공모전", "팀플", "회식", "리더십", "본가"],
+  "위기": ["압박", "멘탈", "갈등", "위험", "범죄", "번아웃", "건강", "돈", "가족", "SNS", "평판", "도박", "다단계", "사기", "빚", "스트레스", "우울", "불안", "소문"],
+  "절정": ["진로", "취업", "면접", "기업", "창업", "시험", "자격증", "스펙", "인턴", "어학", "공모전", "포트폴리오", "서류", "지원서", "코딩테스트", "인성검사", "발표", "심사", "추천서"],
+  "결말": ["진로", "취업", "결혼", "해외", "워홀", "자퇴", "졸업", "면접", "기업", "전문직", "공공", "합격", "불합격", "고시", "대학원", "연구실", "결과"],
+};
 
 export function buildDropoutNextStepEvent(): StaticEvent {
   return {
@@ -1555,20 +1564,37 @@ function scoreLifeStageBonus(event: Pick<StaticEvent, "tags">, context: EventSel
   const tags = new Set(event.tags);
   const lifeStage = context.lifeStage;
 
-  if (lifeStage === "college_late") {
-    if (tags.has("스펙") || tags.has("취업") || tags.has("면접") || tags.has("진로") ||
-        tags.has("합격") || tags.has("불합격") || tags.has("기업") || tags.has("공공") ||
-        tags.has("전문직") || tags.has("창업") || tags.has("지원서") || tags.has("시험") ||
-        tags.has("인턴") || tags.has("어학") || tags.has("자격증")) return 8;
-    if (tags.has("해외") || tags.has("워홀") || tags.has("고시")) return 6;
-    if (tags.has("돈") || tags.has("가족") || tags.has("멘탈") || tags.has("건강") ||
-        tags.has("알바") || tags.has("자산") || tags.has("범죄") || tags.has("위험")) return 3;
+  if (lifeStage === "college_early") {
+    if (tags.has("학업") || tags.has("동아리") || tags.has("사교") || tags.has("일상") ||
+        tags.has("취미") || tags.has("운동") || tags.has("SNS") || tags.has("문화") ||
+        tags.has("여행") || tags.has("기숙사") || tags.has("자취") || tags.has("중간고사")) return 8;
+    if (tags.has("알바") || tags.has("돈") || tags.has("가족") || tags.has("건강") ||
+        tags.has("멘탈") || tags.has("관계")) return 4;
+    if (tags.has("취업") || tags.has("면접") || tags.has("기업") || tags.has("스펙")) return -4;
     return 0;
   }
 
   if (lifeStage === "college_mid") {
-    if (tags.has("스펙") || tags.has("인턴") || tags.has("어학") || tags.has("자격증")) return 4;
+    if (tags.has("연애") || tags.has("관계") || tags.has("알바") || tags.has("동아리") ||
+        tags.has("스터디") || tags.has("시험") || tags.has("갈등") || tags.has("SNS") ||
+        tags.has("취미") || tags.has("문화") || tags.has("인턴") || tags.has("공모전") ||
+        tags.has("팀플") || tags.has("회식") || tags.has("본가") || tags.has("여행")) return 6;
+    if (tags.has("스펙") || tags.has("어학") || tags.has("자격증")) return 4;
     if (tags.has("취업") || tags.has("면접") || tags.has("기업")) return -2;
+    return 0;
+  }
+
+  if (lifeStage === "college_late") {
+    if (tags.has("스펙") || tags.has("취업") || tags.has("면접") || tags.has("진로") ||
+        tags.has("합격") || tags.has("불합격") || tags.has("기업") || tags.has("공공") ||
+        tags.has("전문직") || tags.has("창업") || tags.has("지원서") || tags.has("시험") ||
+        tags.has("인턴") || tags.has("어학") || tags.has("자격증") || tags.has("서류") ||
+        tags.has("코딩테스트") || tags.has("인성검사") || tags.has("발표") || tags.has("심사") ||
+        tags.has("추천서")) return 8;
+    if (tags.has("해외") || tags.has("워홀") || tags.has("고시") || tags.has("대학원")) return 6;
+    if (tags.has("돈") || tags.has("가족") || tags.has("멘탈") || tags.has("건강") ||
+        tags.has("알바") || tags.has("자산") || tags.has("범죄") || tags.has("위험") ||
+        tags.has("번아웃") || tags.has("스트레스")) return 3;
     return 0;
   }
 
@@ -1597,7 +1623,7 @@ function scoreEventDiversity(event: Pick<StaticEvent, "title" | "tags" | "choice
 
   if (event.tags.every((tag) => !recentTags.includes(tag))) score += 4;
   if (relationshipNames.size > 0 && [...relationshipNames].every((name) => !recentNames.includes(name))) score += 3;
-  if (event.tags.some((tag) => ["돈", "가족", "연애", "범죄", "위험", "해외", "건강", "알바", "자취", "본가"].includes(tag))) {
+  if (event.tags.some((tag) => ["돈", "가족", "연애", "범죄", "위험", "해외", "건강", "알바", "자취", "본가", "SNS", "취미", "문화", "여행", "게임", "독서", "음악", "밴드", "전시", "영화", "커뮤니티", "온라인", "디지털", "인스타", "유튜브", "기숙사", "룸메", "하숙"].includes(tag))) {
     score += 2;
   }
   if ((context.coreEventCount ?? 0) <= 4) {
