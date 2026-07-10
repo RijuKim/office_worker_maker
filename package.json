@@ -6,6 +6,9 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
+    "toss:dev": "vite --host 0.0.0.0 --config apps/toss-miniapp/vite.config.ts",
+    "toss:build": "vite build --config apps/toss-miniapp/vite.config.ts",
+    "toss:preview": "vite preview --host 0.0.0.0 --config apps/toss-miniapp/vite.config.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -47,6 +50,7 @@
     "tailwindcss": "4.3.2",
     "tsx": "^4.23.0",
     "typescript": "6.0.3",
+    "vite": "^7.3.6",
     "vitest": "3.2.4"
   },
   "engines": {

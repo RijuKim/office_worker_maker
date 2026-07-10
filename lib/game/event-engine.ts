@@ -57,11 +57,11 @@ interface ConditionalEvent extends StaticEvent {
 type StoryArcId = "settling" | "commitment" | "pressure" | "consequence" | "future";
 
 export const STORY_ARCS: { id: StoryArcId; title: string; phase: string; eventRange: [number, number]; openThread: string }[] = [
-  { id: "settling", title: "첫 학기와 생활 기반", phase: "발단", eventRange: [0, 4], openThread: "수업, 주거, 돈, 첫 관계의 리듬을 잡아야 한다" },
-  { id: "commitment", title: "소속과 첫 약속", phase: "전개", eventRange: [5, 9], openThread: "동아리, 알바, 연구실, 스터디 중 하나가 생활의 중심이 된다" },
-  { id: "pressure", title: "압박과 유혹", phase: "위기", eventRange: [10, 14], openThread: "돈과 평판, 가족 압박, 위험한 제안이 같은 시기에 겹친다" },
-  { id: "consequence", title: "선택의 청구서", phase: "절정", eventRange: [15, 19], openThread: "이전 선택이 사람과 사건을 통해 되돌아온다" },
-  { id: "future", title: "졸업 직전의 방향", phase: "결말", eventRange: [20, 24], openThread: "중도 이탈을 피했다면 마지막 관문을 거쳐 선택의 결과로 수렴한다" },
+  { id: "settling", title: "첫 학기와 생활 기반", phase: "발단", eventRange: [0, 3], openThread: "수업, 주거, 돈, 첫 관계의 리듬을 잡아야 한다" },
+  { id: "commitment", title: "소속과 첫 약속", phase: "전개", eventRange: [4, 6], openThread: "동아리, 알바, 연구실, 스터디 중 하나가 생활의 중심이 된다" },
+  { id: "pressure", title: "압박과 유혹", phase: "위기", eventRange: [7, 9], openThread: "돈과 평판, 가족 압박, 위험한 제안이 같은 시기에 겹친다" },
+  { id: "consequence", title: "선택의 청구서", phase: "절정", eventRange: [10, 13], openThread: "이전 선택이 사람과 사건을 통해 되돌아온다" },
+  { id: "future", title: "졸업 직전의 방향", phase: "결말", eventRange: [14, 24], openThread: "중도 이탈을 피했다면 마지막 관문을 거쳐 선택의 결과로 수렴한다" },
 ];
 
 export const STATIC_EVENTS: StaticEvent[] = [
@@ -1285,7 +1285,118 @@ function pickBaseEvent(
     return { type: "forced", event: buildBurnoutEvent() };
   }
 
+  const contextualGate = buildContextualCareerGateEvent(currentHiddenState, recentEventTitles);
+  if (contextualGate) {
+    return { type: "normal", event: contextualGate };
+  }
+
   return { type: "normal", event: pickRandomStaticEvent(recentEventTitles, currentHiddenState) };
+}
+
+function buildContextualCareerGateEvent(
+  context: EventSelectionContext,
+  recentEventTitles: string[],
+): StaticEvent | null {
+  const isLateGate =
+    context.lifeStage === "college_late" &&
+    (context.graduation === "gate_ready" || (context.coreEventCount ?? 0) >= 14);
+  if (!isLateGate) return null;
+
+  const activeApplication = context.jobApplications?.find((app) => app.isActive);
+  const activeSpec = context.specs?.find((spec) => spec.status === "IN_PROGRESS");
+  const activePath = context.careerPaths?.find((path) => path.status !== "COMPLETED" && path.status !== "FAILED");
+  const trustedPerson = [...(context.relationships ?? [])].sort((a, b) => b.trust - a.trust)[0];
+  const lastSummary = context.previousChoiceSummary?.trim();
+  const lowStat = Object.entries(context.stats ?? {})
+    .filter(([key]) => ["health", "mental", "wealth", "reputation"].includes(key))
+    .sort((a, b) => a[1] - b[1])[0]?.[0];
+
+  const focus = activeApplication
+    ? `${activeApplication.companyName} ${formatApplicationStage(activeApplication.currentStage)}`
+    : activeSpec
+      ? `${activeSpec.specName} 마감`
+      : activePath
+        ? `${activePath.pathName || activePath.pathType} 진로 점검`
+        : "졸업 전 마지막 진로 점검";
+
+  const title = activeApplication
+    ? `${activeApplication.companyName} ${formatApplicationStage(activeApplication.currentStage)} 전날`
+    : activeSpec
+      ? `${activeSpec.specName} 마감 전날`
+      : activePath
+        ? `${activePath.pathName || "진로 트랙"} 마지막 점검`
+        : "졸업 전 마지막 갈림길";
+
+  if (recentEventTitles.includes(title)) return null;
+
+  const continuity = lastSummary
+    ? `지난 선택의 여파는 아직 남아 있다. ${lastSummary}`
+    : "지나온 선택들은 성적표보다 더 복잡한 모양으로 당신의 책상 위에 쌓여 있다.";
+  const relationshipLine = trustedPerson
+    ? `${trustedPerson.name}에게 연락하면 도움은 받을 수 있겠지만, 그 관계에도 부담이 생길 것이다.`
+    : "이번에는 대신 결정해 줄 사람이 없다.";
+  const pressureLine = lowStat
+    ? `${formatStatName(lowStat)}이 부족하다는 감각도 계속 발목을 잡는다.`
+    : "능력치는 충분해 보여도, 마지막 문턱 앞에서는 작은 빈틈이 크게 보인다.";
+
+  return {
+    title,
+    body: `${continuity}
+
+오늘의 초점은 ${focus}이다. 서류 한 줄, 면접 답변 하나, 포트폴리오의 순서, 추천을 부탁할 사람까지 모두 지난 몇 년의 행보를 다시 묻고 있다. ${relationshipLine}
+
+${pressureLine} 이번 선택은 단순히 합격과 불합격을 고르는 문제가 아니다. 지금까지 만든 기록 중 무엇을 앞세우고, 무엇을 감추고, 어떤 길을 포기하지 않을지 정해야 한다.`,
+    choices: [
+      {
+        id: "contextual_gate_use_history",
+        label: "지금까지 해낸 일을 직무와 연결해 정리한다.",
+        summary: "당신은 흩어진 경험을 하나의 지원 논리로 엮었다.",
+        statDelta: { practical: 3, reputation: 1, mental: -3, health: -1 },
+        relationshipDelta: [],
+        flagDelta: { careerGateAttempt: { path: "contextual", approach: "history_based" }, contextualCareerGate: true },
+      },
+      {
+        id: "contextual_gate_ask_support",
+        label: trustedPerson ? `${trustedPerson.name}에게 조언을 구한다.` : "믿을 만한 사람에게 조언을 구한다.",
+        summary: "당신은 혼자 판단하지 않고 관계 속에서 마지막 전략을 조정했다.",
+        statDelta: { charm: 2, reputation: 1, mental: -2, wealth: -1 },
+        relationshipDelta: trustedPerson ? [{ name: trustedPerson.name, trust: 3 }] : [],
+        flagDelta: { careerGateAttempt: { path: "contextual", approach: "relationship_support" }, contextualCareerGate: true },
+      },
+      {
+        id: "contextual_gate_widen_options",
+        label: "한 곳에 매달리지 않고 다른 선택지도 같이 열어둔다.",
+        summary: "당신은 마지막 관문을 하나의 문으로만 보지 않기로 했다.",
+        statDelta: { mental: 2, practical: 1, reputation: -1, wealth: -2 },
+        relationshipDelta: [],
+        flagDelta: { careerGateAttempt: { path: "contextual", approach: "portfolio_of_options" }, contextualCareerGate: true },
+      },
+    ],
+    tags: ["졸업", "진로", "지원서", "면접"],
+    source: "FALLBACK",
+  };
+}
+
+function formatApplicationStage(stage: string) {
+  const labels: Record<string, string> = {
+    DOCUMENT: "서류 전형",
+    PERSONALITY_TEST: "인성검사",
+    CODING_TEST: "코딩테스트",
+    FIRST_INTERVIEW: "1차 면접",
+    SECOND_INTERVIEW: "2차 면접",
+    FINAL_RESULT: "최종 결과",
+  };
+  return labels[stage] ?? stage;
+}
+
+function formatStatName(stat: string) {
+  const labels: Record<string, string> = {
+    health: "건강",
+    mental: "멘탈",
+    wealth: "자산",
+    reputation: "평판",
+  };
+  return labels[stat] ?? stat;
 }
 
 export function getStoryArc(coreEventCount: number) {

@@ -219,6 +219,10 @@ function buildCareerDiversityPrompt(state: AiEventPromptState) {
   if (state.lifeStage === "college_late") {
     guidance.push("4학년 후반이면 서류, 인성검사, 코딩테스트, 1차/2차 면접, 최종 발표, 불합격 통보, 합격 후 조건 협상 같은 한국 취준 전형을 현실적으로 다룰 것");
   }
+  if (state.lifeStage === "college_late" || state.graduation === "gate_ready") {
+    guidance.push("졸업 직전 관문 사건은 반드시 최근 선택, 진행 중인 지원 전형, 스펙, 관계 중 최소 두 가지를 본문에 반영할 것. 일반적인 취준 템플릿처럼 쓰지 말고 이 캐릭터가 실제로 지나온 행보의 결과처럼 보여야 한다");
+    guidance.push("최종 관문 선택지는 합격/불합격을 직접 고르는 버튼이 아니라, 무엇을 앞세울지, 누구에게 도움을 청할지, 어떤 리스크를 감수할지처럼 행동 전략으로 구성할 것");
+  }
   if (state.major.includes("교육")) {
     guidance.push("교육 계열이면 임용고시가 선택지로 가능하지만, 다른 전공에는 임용을 억지로 넣지 말 것");
   }

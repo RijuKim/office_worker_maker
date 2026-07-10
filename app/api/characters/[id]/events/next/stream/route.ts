@@ -166,7 +166,7 @@ export async function POST(request: Request, context: RouteContext) {
         let aiAttempted = false;
         let aiFailed = false;
         let retryUsed = false;
-        let fallbackUsed = false;
+        const fallbackUsed = false;
 
         if (character.stats && canUseAiForLifeStage(lifeStage.lifeStage, character.academicStatus)) {
           aiAttempted = true;

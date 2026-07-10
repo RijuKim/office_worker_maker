@@ -254,7 +254,7 @@ describe("account and character API foundation", () => {
     sessionMock.requireCurrentUserId.mockResolvedValueOnce("user-1");
     prismaMock.characterRun.findMany.mockResolvedValueOnce([characterRecord()]);
 
-    const response = await listCharacters();
+    const response = await listCharacters(new Request("http://localhost/api/characters"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -292,7 +292,7 @@ describe("account and character API foundation", () => {
     });
     prismaMock.aiUsage.findUnique.mockResolvedValueOnce({ date: "2026-07-06", count: 7 });
 
-    const response = await getMe();
+    const response = await getMe(new Request("http://localhost/api/me"));
     const body = await response.json();
 
     expect(response.status).toBe(200);

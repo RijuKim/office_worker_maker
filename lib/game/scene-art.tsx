@@ -35,15 +35,18 @@ export function SceneArt({ type }: { type: SceneArtType }): ReactElement {
 
 const PX = (x: number, y: number, w = 4, h = 4) => ({ x, y, width: w, height: h });
 
+type PixelRectSpec = ReturnType<typeof PX>;
+type PixelGroupChild = PixelRectSpec | PixelRectSpec[] | PixelRectSpec[][];
+
 function PixelRect({ fill, x, y, width: w, height: h }: { fill: string; x: number; y: number; width: number; height: number }) {
   return <rect fill={fill} height={h} width={w} x={x} y={y} />;
 }
 
-function PixelGroup({ children, fill }: { children: any; fill: string }) {
-  const flat = Array.isArray(children) ? children.flat(Infinity) : [children];
+function PixelGroup({ children, fill }: { children: PixelGroupChild; fill: string }) {
+  const flat = (Array.isArray(children) ? children.flat(2) : [children]) as PixelRectSpec[];
   return (
     <g>
-      {flat.map((p: any, i: number) => (
+      {flat.map((p, i) => (
         <PixelRect fill={fill} key={i} x={p.x} y={p.y} width={p.width} height={p.height} />
       ))}
     </g>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CATEGORY_ORDER, CODEX_CATALOG, getCategoryHint, type CodexCategory } from "@/lib/game/codex-catalog";
 import type { EndingArtType } from "@/lib/game/ending-art";
+import type { CareerEndingRecord } from "@prisma/client";
 
 const KNOWN_CAREER_PATHS = [
   "삼슨전자 신입 실무자",
@@ -42,7 +43,7 @@ const KNOWN_CAREER_PATHS = [
 
 const EXEMPT_CAREER_PATHS = ["obsolete_ending_v0"] as const;
 
-const makeRecord = (careerPath: string) => ({ careerPath, tags: [] } as any);
+const makeRecord = (careerPath: string) => ({ careerPath, tags: [] }) as unknown as CareerEndingRecord;
 
 describe("codex catalog integrity", () => {
   it("모든 slot에 필수 필드 존재", () => {
