@@ -137,7 +137,7 @@ export const CODEX_CATALOG = [
 
   // 기타
   slot("misc-danger-money", "위험한 돈에서 겨우 발을 뺀 생존자", "기타", "default", exactCareerPath("위험한 돈에서 겨우 발을 뺀 생존자")),
-  slot("misc-private-investigator", "사설 조사 보조원", "기타", "default", exactCareerPath("사설 조사 보조원")),
+  slot("misc-part-time-career", "아르바이트 경력자", "기타", "default", exactCareerPath("아르바이트 경력자")),
   slot("misc-marketing-content", "마케팅·콘텐츠 직무", "기타", "default", exactCareerPath("마케팅·콘텐츠 직무")),
   slot("misc-company-reapply", "기업 채용 재도전", "기타", "company", exactCareerPath("기업 채용 재도전")),
   slot("misc-first-job", "첫 직장 신입 실무자", "기타", "company", exactCareerPath("첫 직장 신입 실무자")),

@@ -239,11 +239,11 @@ const MATCH_TEMPLATES: CareerEndingRecord[] = [
     similarityKey: "template-risk-money",
   }),
   buildTemplate({
-    careerPath: "사설 조사 보조원",
-    title: "사설 조사 보조원",
-    summary: "사설 조사 보조원으로 일했다.",
-    longNarrative: "정보를 모으고 현장을 뛰며 조사 보조 일을 익혔다.",
-    similarityKey: "template-investigator",
+    careerPath: "아르바이트 경력자",
+    title: "아르바이트 경력자",
+    summary: "아르바이트 경력으로 자리잡았다.",
+    longNarrative: "여러 아르바이트를 거치며 실무 감각과 자산을 쌓아 독립적인 생활을 시작했다.",
+    similarityKey: "template-part-time",
   }),
   buildTemplate({
     careerPath: "마케팅·콘텐츠 직무",

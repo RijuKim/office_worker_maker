@@ -218,7 +218,7 @@ export async function POST(request: Request, context: RouteContext) {
     (lifeStageTransition.state.lifeStage === "post_graduation" &&
      lifeStageTransition.state.graduation === "graduated" &&
      coreEventCount >= 36) ||
-    coreEventCount >= 40
+    (coreEventCount >= 40 && lifeStageTransition.state.lifeStage !== "college_early")
   );
   const endingRecord = endingType ? await buildImmediateBadEndingRecord({
     userId,
@@ -1009,16 +1009,16 @@ function pickCareerPath(stats: Record<string, number>, gate: { status: string; p
   }
 
   if (stats.reputation <= 2 && stats.wealth >= 6) return "위험한 돈에서 겨우 발을 뺀 생존자";
-  if (stats.practical >= 8 && stats.reputation <= 5) return "사설 조사 보조원";
-  if (stats.health >= 7 && stats.academic >= 6 && stats.reputation >= 5) return "공공안전 직무 준비생";
-  if (stats.charm >= 8 && stats.mental >= 6) return "연애와 결혼을 선택한 생활인";
-  if (stats.mental >= 8 && stats.charm <= 5) return "혼자 살며 조용히 안정된 사람";
-  if (stats.wealth <= 4 && stats.charm >= 6) return "해외 워홀 이후 다시 길을 찾은 사람";
-  if (stats.wealth >= 7 && stats.practical >= 6) return "창업 또는 자영업";
-  if (stats.academic >= 8 && stats.mental >= 6) return "전문직 시험 준비생";
-  if (stats.reputation >= 7 && stats.practical >= 6) return "기업 채용 재도전";
-  if (stats.academic >= 7 && stats.health >= 5) return "공공기관 또는 공무원 준비";
-  if (stats.charm >= 7) return "마케팅·콘텐츠 직무";
+  if (stats.practical >= 6 && stats.wealth >= 5) return "아르바이트 경력자";
+  if (stats.health >= 6 && stats.academic >= 5 && stats.reputation >= 4) return "공공안전 직무 준비생";
+  if (stats.charm >= 7 && stats.mental >= 5) return "연애와 결혼을 선택한 생활인";
+  if (stats.mental >= 7 && stats.charm <= 5) return "혼자 살며 조용히 안정된 사람";
+  if (stats.wealth <= 5 && stats.charm >= 5) return "해외 워홀 이후 다시 길을 찾은 사람";
+  if (stats.wealth >= 6 && stats.practical >= 5) return "창업 또는 자영업";
+  if (stats.academic >= 7 && stats.mental >= 5) return "전문직 시험 준비생";
+  if (stats.reputation >= 6 && stats.practical >= 5) return "기업 채용 재도전";
+  if (stats.academic >= 6 && stats.health >= 4) return "공공기관 또는 공무원 준비";
+  if (stats.charm >= 6) return "마케팅·콘텐츠 직무";
   return "불확실하지만 계속되는 취업 준비";
 }
 
