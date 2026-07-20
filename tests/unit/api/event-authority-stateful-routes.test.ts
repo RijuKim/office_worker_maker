@@ -163,6 +163,17 @@ function eventFromSse(text: string) {
   return JSON.parse(line.slice(6)).event;
 }
 
+function spyOnSerializedLoggerOutput() {
+  const spies = [
+    vi.spyOn(console, "info").mockImplementation(() => {}),
+    vi.spyOn(console, "warn").mockImplementation(() => {}),
+    vi.spyOn(console, "error").mockImplementation(() => {}),
+  ];
+  return {
+    serialized: () => JSON.stringify(spies.flatMap((spy) => spy.mock.calls)),
+  };
+}
+
 describe("stateful JSON/SSE event authority", () => {
   afterEach(() => {
     delete process.env.OLLAMA_API_KEY;
@@ -273,6 +284,7 @@ describe("stateful JSON/SSE event authority", () => {
     const secret = "PRIMARY_ROUTE_KEY_SENTINEL_7c93";
     const prompt = "PRIMARY_PROMPT_STATE_SENTINEL_14bd";
     const raw = "PRIMARY_RAW_PROVIDER_SENTINEL_826a";
+    const providerError = "PRIMARY_PROVIDER_ERROR_SENTINEL_3e71";
     process.env.OLLAMA_API_KEY = secret;
     delete process.env.OPENROUTER_API_KEY;
     fixture.characterName = prompt;
@@ -283,21 +295,26 @@ describe("stateful JSON/SSE event authority", () => {
       choices: routeEvent.choices,
     };
     const providerResponseBody = JSON.stringify({
-      choices: [{ message: { content: JSON.stringify({ ...aiEvent, providerDebug: raw }) } }],
+      choices: [{ message: { content: JSON.stringify({ ...aiEvent, providerDebug: raw, providerError }) } }],
     });
     const actual = await vi.importActual<typeof import("@/lib/game/openrouter")>("@/lib/game/openrouter");
     aiMocks.generateAiEvent.mockImplementation(actual.generateAiEvent);
+    const providerInputs: string[] = [];
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(() => new Promise((resolve) => {
-      setTimeout(() => resolve(new Response(providerResponseBody)), 12_000);
+      setTimeout(() => {
+        providerInputs.push(providerResponseBody);
+        resolve(new Response(providerResponseBody));
+      }, 12_000);
     }));
-    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const logger = spyOnSerializedLoggerOutput();
+    const info = vi.mocked(console.info);
 
     const pending = nextJson(new Request("http://localhost/api/characters/run-1/events/next", { method: "POST" }), { params: Promise.resolve({ id: "run-1" }) });
     await vi.advanceTimersByTimeAsync(12_000);
     const response = await pending;
     const payload = await response.json();
     const serializedResponse = JSON.stringify(payload);
-    const serializedLogs = JSON.stringify(info.mock.calls);
+    const serializedLogs = logger.serialized();
     const serializedRequest = JSON.stringify(fetchMock.mock.calls);
 
     expect(response.status).toBe(200);
@@ -312,8 +329,9 @@ describe("stateful JSON/SSE event authority", () => {
     }));
     expect(serializedRequest).toContain(secret);
     expect(serializedRequest).toContain(prompt);
-    expect(providerResponseBody).toContain(raw);
-    for (const sentinel of [secret, prompt, raw]) {
+    expect(JSON.stringify(providerInputs)).toContain(raw);
+    expect(JSON.stringify(providerInputs)).toContain(providerError);
+    for (const sentinel of [secret, prompt, raw, providerError]) {
       expect(serializedResponse).not.toContain(sentinel);
       expect(serializedLogs).not.toContain(sentinel);
     }
@@ -344,15 +362,23 @@ describe("stateful JSON/SSE event authority", () => {
     const actual = await vi.importActual<typeof import("@/lib/game/openrouter")>("@/lib/game/openrouter");
     aiMocks.generateAiEvent.mockImplementation(actual.generateAiEvent);
     let attempt = 0;
+    const providerInputs: string[] = [];
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(() => new Promise((resolve) => {
       attempt += 1;
       if (attempt === 1) {
-        setTimeout(() => resolve(new Response(primaryRaw, { status: 429 })), 5_000);
+        setTimeout(() => {
+          providerInputs.push(primaryRaw);
+          resolve(new Response(primaryRaw, { status: 429 }));
+        }, 5_000);
         return;
       }
-      setTimeout(() => resolve(new Response(secondaryResponseBody)), 7_000);
+      setTimeout(() => {
+        providerInputs.push(secondaryResponseBody);
+        resolve(new Response(secondaryResponseBody));
+      }, 7_000);
     }));
-    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const logger = spyOnSerializedLoggerOutput();
+    const info = vi.mocked(console.info);
 
     const pending = nextJson(new Request("http://localhost/api/characters/run-1/events/next", { method: "POST" }), { params: Promise.resolve({ id: "run-1" }) });
     await vi.advanceTimersByTimeAsync(5_000);
@@ -360,7 +386,7 @@ describe("stateful JSON/SSE event authority", () => {
     const response = await pending;
     const payload = await response.json();
     const serializedResponse = JSON.stringify(payload);
-    const serializedLogs = JSON.stringify(info.mock.calls);
+    const serializedLogs = logger.serialized();
     const serializedRequests = JSON.stringify(fetchMock.mock.calls);
 
     expect(response.status).toBe(200);
@@ -377,8 +403,9 @@ describe("stateful JSON/SSE event authority", () => {
     for (const sentinel of [primarySecret, secondarySecret, prompt]) {
       expect(serializedRequests).toContain(sentinel);
     }
-    expect(primaryRaw).toContain("RETRY_PRIMARY_ERROR_SENTINEL");
-    expect(secondaryResponseBody).toContain(secondaryRaw);
+    expect(fetchMock.mock.calls).toHaveLength(2);
+    expect(JSON.stringify(providerInputs)).toContain(primaryRaw);
+    expect(JSON.stringify(providerInputs)).toContain(secondaryRaw);
     for (const sentinel of [primarySecret, secondarySecret, prompt, primaryRaw, secondaryRaw]) {
       expect(serializedResponse).not.toContain(sentinel);
       expect(serializedLogs).not.toContain(sentinel);
