@@ -61,18 +61,31 @@ type CreateStep = "intro" | "name" | "age" | "residence" | "abilities";
 type BrowserAudioContext = typeof AudioContext;
 
 function safelyPlay(audio: HTMLAudioElement) {
+  const play = audio.play;
+  if (typeof play !== "function") return;
   try {
-    void Promise.resolve(audio.play()).catch(() => undefined);
+    void Promise.resolve(play.call(audio)).catch(() => undefined);
   } catch {
     // Unsupported or permission-blocked audio is a non-blocking no-op.
   }
 }
 
 function safelyPause(audio: HTMLAudioElement) {
+  const pause = audio.pause;
+  if (typeof pause !== "function") return;
   try {
-    audio.pause();
+    pause.call(audio);
   } catch {
     // Unsupported media controls are a non-blocking no-op.
+  }
+}
+
+function safelyVibrate(pattern: number | number[]) {
+  if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") return;
+  try {
+    navigator.vibrate(pattern);
+  } catch {
+    // Optional WebView haptics are a non-blocking enhancement.
   }
 }
 
@@ -374,6 +387,9 @@ export default function AppPage() {
   const musicStepRef = useRef(0);
   const bgmAudioRef = useRef<HTMLAudioElement | null>(null);
   const loadedAudioSettingsRef = useRef(false);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const menuPanelRef = useRef<HTMLDivElement | null>(null);
+  const menuWasOpenedRef = useRef(false);
 
   const careerRecords = useMemo(() => records as unknown as CareerEndingRecord[], [records]);
   const codexState: CodexState = useMemo(() => deriveCodexState(careerRecords, CODEX_CATALOG), [careerRecords]);
@@ -392,8 +408,8 @@ export default function AppPage() {
 
   const [charName, setCharName] = useState("");
   const [charAge, setCharAge] = useState("21");
-  const [charResidence, setCharResidence] = useState("studio");
-  const [preferredStats, setPreferredStats] = useState<string[]>(["academic", "mental"]);
+  const [charResidence, setCharResidence] = useState("");
+  const [preferredStats, setPreferredStats] = useState<string[]>([]);
   const [createStep, setCreateStep] = useState<CreateStep>("intro");
 
   const mountedRef = useRef(false);
@@ -451,14 +467,14 @@ export default function AppPage() {
   }, []);
 
   const pulseHaptic = useCallback((kind: AudioKind) => {
-    if (!audioSettings.haptics || typeof navigator === "undefined" || !("vibrate" in navigator)) return;
+    if (!audioSettings.haptics) return;
     const pattern: Record<AudioKind, number | number[]> = {
       tap: 12,
       success: [18, 28, 18],
       warning: [32, 24, 32],
       ending: [24, 32, 24, 48, 36],
     };
-    navigator.vibrate(pattern[kind]);
+    safelyVibrate(pattern[kind]);
   }, [audioSettings.haptics]);
 
   const playSound = useCallback(async (kind: AudioKind) => {
@@ -736,6 +752,27 @@ export default function AppPage() {
   }, [audioSettings]);
 
   useEffect(() => {
+    if (menuOpen) {
+      menuWasOpenedRef.current = true;
+      menuPanelRef.current?.querySelector<HTMLElement>("button, a, input")?.focus();
+    } else if (menuWasOpenedRef.current) {
+      menuButtonRef.current?.focus();
+    }
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [menuOpen]);
+
+  useEffect(() => {
     if (audioSettings.music) {
       void startMusic();
     } else {
@@ -816,6 +853,10 @@ export default function AppPage() {
     setSpecs([]);
     setJobApps([]);
     setCareerPaths([]);
+    setCharName("");
+    setCharAge("21");
+    setCharResidence("");
+    setPreferredStats([]);
     setCreateStep("intro");
     setScreen("create");
   }, [playFeedbackCue]);
@@ -953,6 +994,12 @@ export default function AppPage() {
             <input
               checked={audioSettings[key]}
               onChange={(event) => updateAudioSetting(key, event.target.checked)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  event.currentTarget.click();
+                }
+              }}
               onPointerDown={() => {
                 if (key === "music" && !audioSettings.music) {
                   void ensureAudio();
@@ -971,6 +1018,7 @@ export default function AppPage() {
         aria-expanded={menuOpen}
         aria-label="메뉴"
         className="chrome-icon-button chrome-menu-button"
+        ref={menuButtonRef}
         onClick={() => {
           setMenuOpen((open) => !open);
         }}
@@ -981,7 +1029,16 @@ export default function AppPage() {
         <span />
       </button>
       {menuOpen && (
-        <div className="app-popover app-menu-popover">
+        <div
+          className="app-popover app-menu-popover"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              setMenuOpen(false);
+            }
+          }}
+          ref={menuPanelRef}
+        >
           {currentChar && <button
             onClick={() => {
               setScreen("play");
@@ -1024,6 +1081,12 @@ export default function AppPage() {
             className="menu-row"
             href="/privacy"
             onClick={() => setMenuOpen(false)}
+            onKeyDown={(event) => {
+              if (event.key === " ") {
+                event.preventDefault();
+                event.currentTarget.click();
+              }
+            }}
           >
             개인정보처리방침
           </a>
@@ -1130,7 +1193,7 @@ export default function AppPage() {
                   </button>
                 ))}
               </div>
-              <div className="onboarding-actions"><button onClick={() => setCreateStep("age")}>이전</button><button onClick={() => setCreateStep("abilities")}>다음</button></div>
+              <div className="onboarding-actions"><button onClick={() => setCreateStep("age")}>이전</button><button disabled={!charResidence} onClick={() => setCreateStep("abilities")}>다음</button></div>
             </section>}
             {createStep === "abilities" && <section className="create-step">
               <h2 className="create-question">당신이 믿고 싶은 능력 두 가지는 무엇인가요? ({preferredStats.length}/2)</h2>

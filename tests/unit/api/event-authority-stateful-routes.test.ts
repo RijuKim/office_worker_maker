@@ -23,6 +23,7 @@ const fixture = vi.hoisted(() => ({
   commitDelayMs: 0,
   characterName: "한서윤",
   age: 21,
+  residence: "studio",
 }));
 
 const routeEvent = vi.hoisted(() => ({
@@ -46,7 +47,7 @@ function fullCharacter() {
       academic: 50, practical: 50, communication: 50, creativity: 50, health: 8,
       mental: 50, network: 50, wealth: 50, reputation: 50, charm: 50,
     } : null,
-    hiddenState: { burnoutRisk: 10, eventFlags: fixture.hiddenFlags, familyState: {} },
+    hiddenState: { burnoutRisk: 10, eventFlags: fixture.hiddenFlags, familyState: { residence: fixture.residence } },
     relationships: [], specs: [], jobApplications: [], careerPaths: [], eventHistory: [], records: [],
     events: [...fixture.events.values()].filter((event) => event.status === "ACTIVE"),
   };
@@ -241,35 +242,59 @@ describe("stateful JSON/SSE event authority", () => {
     fixture.commitDelayMs = 0;
     fixture.characterName = "한서윤";
     fixture.age = 21;
+    fixture.residence = "studio";
     aiMocks.checkDailyAiLimit.mockResolvedValue({ allowed: true });
     engineMocks.selectNextEvent.mockReturnValue({ type: "static", event: routeEvent });
   });
 
   it.each([
-    { kind: "JSON", age: 18 }, { kind: "JSON", age: 40 }, { kind: "JSON", age: 80 },
-    { kind: "SSE", age: 18 }, { kind: "SSE", age: 40 }, { kind: "SSE", age: 80 },
-  ] as const)("passes persisted age $age through the $kind generation context", async ({ kind, age }) => {
+    { kind: "JSON", age: 18, residence: "family_home" }, { kind: "JSON", age: 40, residence: "studio" }, { kind: "JSON", age: 80, residence: "dorm" },
+    { kind: "SSE", age: 18, residence: "family_home" }, { kind: "SSE", age: 40, residence: "studio" }, { kind: "SSE", age: 80, residence: "dorm" },
+  ] as const)("returns $kind event content derived from age $age and $residence", async ({ kind, age, residence }) => {
     fixture.age = age;
+    fixture.residence = residence;
     fixture.aiEnabled = true;
-    const success = {
-      success: true as const,
-      event: routeEvent,
+    const generated = (state: { age: number; residence: string }) => ({
+      success: true as const, event: {
+        ...routeEvent,
+        title: `${state.age}세 ${state.residence}의 아침`,
+        body: `${state.age}세 주인공이 ${state.residence}에서 받은 사건입니다.`,
+      },
       providerId: "ollama",
       providerElapsedMs: 5,
       totalElapsedMs: 5,
       slow: false,
       providerFailures: [],
-    };
-    aiMocks.generateAiEvent.mockResolvedValue(success);
-    aiMocks.generateAiEventStream.mockResolvedValue(success);
+    });
+    aiMocks.generateAiEvent.mockImplementation(async (state) => generated(state));
+    aiMocks.generateAiEventStream.mockImplementation(async (state) => generated(state));
 
     const response = kind === "JSON"
       ? await nextJson(new Request("http://localhost/api/characters/run-1/events/next", { method: "POST" }), { params: Promise.resolve({ id: "run-1" }) })
       : await nextStream(new Request("http://localhost/api/characters/run-1/events/next/stream", { method: "POST" }), { params: Promise.resolve({ id: "run-1" }) });
-    await response.text();
+    const text = await response.text();
+    const event = kind === "JSON" ? JSON.parse(text).event : eventFromSse(text);
+    expect(event.title).toContain(`${age}세 ${residence}`);
+    expect(event.body).toContain(`${age}세 주인공이 ${residence}`);
+  });
 
-    expect(kind === "JSON" ? aiMocks.generateAiEvent : aiMocks.generateAiEventStream)
-      .toHaveBeenCalledWith(expect.objectContaining({ age }), expect.anything(), ...(kind === "SSE" ? [expect.anything()] : []));
+  it.each(["JSON", "SSE"] as const)("derives validated %s fallback content from age and residence context", async (kind) => {
+    fixture.age = 80;
+    fixture.residence = "dorm";
+    fixture.aiEnabled = true;
+    engineMocks.selectNextEvent.mockImplementation((context: { age: number; residence: string }) => ({
+      type: "static",
+      event: { ...routeEvent, title: `${context.age}세의 대안`, body: `${context.residence} 생활에 맞춘 검증된 대안입니다.` },
+    }));
+    const failure = { success: false as const, reason: "timeout", providerId: "ollama", providerElapsedMs: 5, totalElapsedMs: 5, slow: false, providerFailures: [] };
+    aiMocks.generateAiEvent.mockResolvedValue(failure);
+    aiMocks.generateAiEventStream.mockResolvedValue(failure);
+    const response = kind === "JSON"
+      ? await nextJson(new Request("http://localhost/api/characters/run-1/events/next", { method: "POST" }), { params: Promise.resolve({ id: "run-1" }) })
+      : await nextStream(new Request("http://localhost/api/characters/run-1/events/next/stream", { method: "POST" }), { params: Promise.resolve({ id: "run-1" }) });
+    const text = await response.text();
+    const event = kind === "JSON" ? JSON.parse(text).event : eventFromSse(text);
+    expect(event).toMatchObject({ title: expect.stringContaining("80세의 대안"), body: expect.stringContaining("dorm 생활"), source: "FALLBACK" });
   });
 
   it("preserves nested and cyclic Error logger arguments for leakage detection", () => {

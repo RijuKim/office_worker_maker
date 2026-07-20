@@ -161,6 +161,7 @@ export async function POST(request: Request, context: RouteContext) {
           const aiState = {
             name: character.name,
             age: character.age,
+            residence: selectionContext.residence,
             major: character.major,
             gradeYear: character.currentGradeYear,
             coreEventCount: character.coreEventCount,

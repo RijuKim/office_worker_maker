@@ -101,20 +101,28 @@ describe("Home page scaffold", () => {
     expect(container.textContent).toContain("이 이야기는 실제 진로 예측이 아닌 재미를 위한 허구의 시뮬레이션입니다.");
     expect(container.textContent).not.toContain("취준 생활 시뮬레이션");
     expect(container.textContent).not.toContain("새 이야기");
-    const intro = container.querySelector("[data-testid='onboarding-intro']")?.textContent;
-    expect(intro).toContain("눈을 뜨니 오전 6시 07분입니다. 휴대폰에는 읽지 않은 카톡 알림이 수북하게 쌓여 있습니다.");
-    expect(intro).toContain("학과 단체방 공지, 새로 올라온 동아리 모집 글, 아르바이트 연락, 그리고 아직 열어보지 않은 메시지 하나가 화면 위에 겹쳐 있습니다. 마지막 메시지에는 짧은 문장만 남아 있습니다. “이번에는 어떤 사람이 될 수 있을까요?”");
-    expect(intro).toContain("오늘은 평범한 학기의 첫날일 수도, 오래 미뤄둔 변화를 시작하는 날일 수도 있습니다. 지금 고르는 작은 선택들은 수업과 관계, 생활과 진로를 조금씩 다른 방향으로 이끌게 될 것입니다.");
-    expect(intro).toContain("이 이야기는 실제 진로 예측이 아닌 재미를 위한 허구의 시뮬레이션입니다.");
-    expect(intro).not.toContain("인터뷰");
-    const art = container.querySelector("[data-testid='pixel-scene-intro']");
-    expect(art?.getAttribute("data-palette")).toBe("blue-lilac-apricot-cream");
-    expect(art?.getAttribute("data-art-structure")).toBe("dawn-room-window-phone-computer");
-    expect(art?.querySelector("svg")).toBeTruthy();
-    expect(art?.querySelector("[data-part='window-cream']")?.getAttribute("fill")).toBe("#f5d7a0");
-    expect(art?.querySelector("[data-part='computer']")).toBeTruthy();
-    expect(art?.querySelector("[data-part*='cross']")).toBeNull();
-    expect(art?.textContent).not.toMatch(/[😀-🙏]/u);
+    const intro = container.querySelector("section.create-step")!;
+    const copy = intro.querySelector(".space-y-3")!;
+    expect(Array.from(copy.children, (node) => node.textContent)).toEqual([
+      "낯선 아침이 시작됩니다.",
+      "눈을 뜨니 오전 6시 07분입니다. 휴대폰에는 읽지 않은 카톡 알림이 수북하게 쌓여 있습니다.",
+      "학과 단체방 공지, 새로 올라온 동아리 모집 글, 아르바이트 연락, 그리고 아직 열어보지 않은 메시지 하나가 화면 위에 겹쳐 있습니다. 마지막 메시지에는 짧은 문장만 남아 있습니다. “이번에는 어떤 사람이 될 수 있을까요?”",
+      "오늘은 평범한 학기의 첫날일 수도, 오래 미뤄둔 변화를 시작하는 날일 수도 있습니다. 지금 고르는 작은 선택들은 수업과 관계, 생활과 진로를 조금씩 다른 방향으로 이끌게 될 것입니다.",
+      "이 이야기는 실제 진로 예측이 아닌 재미를 위한 허구의 시뮬레이션입니다.",
+    ]);
+    const svg = intro.querySelector("svg")!;
+    const rects = Array.from(svg.querySelectorAll("rect"), (rect) => ({
+      x: Number(rect.getAttribute("x") ?? 0), y: Number(rect.getAttribute("y") ?? 0),
+      width: Number(rect.getAttribute("width")), height: Number(rect.getAttribute("height")), fill: rect.getAttribute("fill"),
+    }));
+    expect(rects.map((rect) => rect.fill)).toEqual(expect.arrayContaining(["#536f9b", "#718fbb", "#d98f83", "#f3b477", "#ffd58f"]));
+    expect(rects.some((rect) => rect.x === 16 && rect.y === 17 && rect.width === 136 && rect.height === 100)).toBe(true);
+    expect(rects.some((rect) => rect.x === 207 && rect.y === 70 && rect.width === 62 && rect.height === 37)).toBe(true);
+    expect(rects.some((horizontal) => rects.some((vertical) => horizontal !== vertical
+      && horizontal.y < 70 && vertical.y < 70 && horizontal.x < 269 && horizontal.x + horizontal.width > 207
+      && vertical.x < horizontal.x + horizontal.width && vertical.x + vertical.width > horizontal.x
+      && horizontal.width > horizontal.height * 2 && vertical.height > vertical.width * 2))).toBe(false);
+    expect(intro.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
 
     act(() => (container.querySelector("button[aria-label='메뉴']") as HTMLButtonElement).click());
     expect(container.textContent).toContain("로그인/저장");
@@ -209,7 +217,15 @@ describe("Home page scaffold", () => {
     act(() => findButton(container, "다음").click());
     expect(findButton(container, /^기숙사/).getAttribute("aria-pressed")).toBe("true");
     act(() => findButton(container, "다음").click());
+    expect(container.textContent).toContain("(0/2)");
+    expect(findButton(container, "눈을 뜬다").hasAttribute("disabled")).toBe(true);
+    act(() => findButton(container, /학업/).click());
+    act(() => findButton(container, /멘탈/).click());
     expect(container.textContent).toContain("(2/2)");
+    act(() => findButton(container, /멘탈/).click());
+    expect(container.textContent).toContain("(1/2)");
+    expect(findButton(container, "눈을 뜬다").hasAttribute("disabled")).toBe(true);
+    act(() => findButton(container, /멘탈/).click());
 
     await waitForAssertion(() => expect(findButton(container, "눈을 뜬다").hasAttribute("disabled")).toBe(false));
     const submit = findButton(container, "눈을 뜬다");
@@ -223,12 +239,86 @@ describe("Home page scaffold", () => {
     });
     await waitForAssertion(() => expect(container.textContent).toContain("첫 아침의 선택"));
 
+    act(() => (container.querySelector("button[aria-label='메뉴']") as HTMLButtonElement).click());
+    act(() => findButton(container, "새 시뮬레이션").click());
+    expect(container.textContent).toContain("낯선 아침이 시작됩니다.");
+    act(() => findButton(container, "시작하기").click());
+    expect((container.querySelector("input") as HTMLInputElement).value).toBe("");
+    act(() => findButton(container, "이전").click());
+
     act(() => root.unmount());
     container.remove();
   });
 
-  it("persists every menu setting under the existing key and recovers invalid stored shapes", async () => {
-    window.localStorage.setItem("sano-audio-settings", JSON.stringify({ music: false, sfx: false, haptics: false }));
+  it("enumerates every preserved run menu destination and restores focus", async () => {
+    mockedSessionStatus = "authenticated";
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const path = new URL(String(input), "http://localhost").pathname;
+      if (path === "/api/characters") return Response.json({ characters: [character] });
+      if (path === "/api/characters/char-1") return Response.json({ character, currentEvent: { id: "event-1", title: "현재 사건", body: "진행 중", choices: [], source: "STATIC" } });
+      if (path === "/api/records") return Response.json({ records: [] });
+      return Response.json({});
+    }));
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    await act(async () => root.render(<Home />));
+    await waitForAssertion(() => expect(container.textContent).toContain("현재 사건"));
+    const menu = container.querySelector("button[aria-label='메뉴']") as HTMLButtonElement;
+    menu.focus();
+    act(() => menu.click());
+    const panel = container.querySelector(".app-menu-popover")!;
+    expect(Array.from(panel.children, (node) => node.textContent?.trim())).toEqual([
+      "진행", "기록", "새 시뮬레이션", "계정", "개인정보처리방침", "배경음효과음햅틱",
+    ]);
+    expect(document.activeElement?.textContent?.trim()).toBe("진행");
+    act(() => (document.activeElement as HTMLElement).dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+    expect(container.querySelector(".app-menu-popover")).toBeNull();
+    expect(document.activeElement).toBe(menu);
+    act(() => menu.click());
+    act(() => findButton(container, "기록").click());
+    await waitForAssertion(() => expect(Array.from(container.querySelectorAll("h1"), (heading) => heading.textContent)).toContain("선택의 결과 기록"));
+
+    act(() => menu.click());
+    act(() => findButton(container, "진행").click());
+    expect(container.textContent).toContain("현재 사건");
+
+    act(() => menu.click());
+    act(() => findButton(container, "계정").click());
+    expect(Array.from(container.querySelectorAll("h1"), (heading) => heading.textContent)).toContain("저장된 계정");
+
+    act(() => menu.click());
+    act(() => findButton(container, "새 시뮬레이션").click());
+    expect(container.querySelector("[data-testid='onboarding-intro'] h2")?.textContent).toBe("낯선 아침이 시작됩니다.");
+
+    act(() => menu.click());
+    const privacy = container.querySelector("a[href='/privacy']") as HTMLAnchorElement;
+    expect(privacy.pathname).toBe("/privacy");
+    privacy.addEventListener("click", (event) => event.preventDefault(), { once: true });
+    act(() => privacy.click());
+    expect(container.querySelector(".app-menu-popover")).toBeNull();
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it("opens the unauthenticated login and save destination from the menu", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => root.render(<Home />));
+
+    act(() => (container.querySelector("button[aria-label='메뉴']") as HTMLButtonElement).click());
+    act(() => findButton(container, "로그인/저장").click());
+    expect(Array.from(container.querySelectorAll("h1"), (heading) => heading.textContent)).toContain("진행 저장하기");
+    expect(findButton(container, "로그인")).toBeTruthy();
+    expect(container.querySelector("input[type='email']")).toBeTruthy();
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it("defaults, independently persists settings, and tolerates broken optional WebView APIs", async () => {
     const mount = () => {
       const container = document.createElement("div");
       document.body.appendChild(container);
@@ -240,19 +330,23 @@ describe("Home page scaffold", () => {
     let mounted = mount();
     await act(async () => Promise.resolve());
     const toggles = Array.from(mounted.container.querySelectorAll(".audio-toggle input")) as HTMLInputElement[];
-    expect(toggles.map((toggle) => toggle.checked)).toEqual([false, false, false]);
-    for (const toggle of toggles) act(() => toggle.click());
+    expect(toggles.map((toggle) => toggle.checked)).toEqual([false, true, true]);
+    act(() => toggles[0].click());
     await waitForAssertion(() => expect(JSON.parse(window.localStorage.getItem("sano-audio-settings")!)).toEqual({ music: true, sfx: true, haptics: true }));
+    act(() => toggles[1].click());
+    await waitForAssertion(() => expect(JSON.parse(window.localStorage.getItem("sano-audio-settings")!)).toEqual({ music: true, sfx: false, haptics: true }));
+    act(() => toggles[2].click());
+    await waitForAssertion(() => expect(JSON.parse(window.localStorage.getItem("sano-audio-settings")!)).toEqual({ music: true, sfx: false, haptics: false }));
     act(() => mounted.root.unmount());
     mounted.container.remove();
 
     mounted = mount();
     await act(async () => Promise.resolve());
-    expect(Array.from(mounted.container.querySelectorAll(".audio-toggle input"), (node) => (node as HTMLInputElement).checked)).toEqual([true, true, true]);
+    expect(Array.from(mounted.container.querySelectorAll(".audio-toggle input"), (node) => (node as HTMLInputElement).checked)).toEqual([true, false, false]);
     act(() => mounted.root.unmount());
     mounted.container.remove();
 
-    for (const invalid of ["{broken", JSON.stringify({ music: "yes", sfx: true, haptics: true })]) {
+    for (const invalid of ["{broken", "null", "[]", JSON.stringify({ music: false }), JSON.stringify({ music: "yes", sfx: true, haptics: true })]) {
       window.localStorage.setItem("sano-audio-settings", invalid);
       mounted = mount();
       await act(async () => Promise.resolve());
@@ -260,6 +354,53 @@ describe("Home page scaffold", () => {
       act(() => mounted.root.unmount());
       mounted.container.remove();
     }
+
+    Object.defineProperty(navigator, "vibrate", { configurable: true, value: undefined });
+    vi.mocked(HTMLMediaElement.prototype.play).mockImplementation(() => { throw new Error("play unavailable"); });
+    vi.mocked(HTMLMediaElement.prototype.pause).mockImplementation(() => { throw new Error("pause unavailable"); });
+    window.localStorage.clear();
+    expect(() => {
+      mounted = mount();
+      const inputs = Array.from(mounted.container.querySelectorAll(".audio-toggle input")) as HTMLInputElement[];
+      act(() => inputs[0].click());
+      act(() => inputs[0].click());
+      act(() => inputs[2].click());
+      act(() => inputs[2].click());
+    }).not.toThrow();
+    act(() => mounted.root.unmount());
+    mounted.container.remove();
+
+    Object.defineProperty(HTMLMediaElement.prototype, "play", { configurable: true, value: undefined });
+    Object.defineProperty(HTMLMediaElement.prototype, "pause", { configurable: true, value: undefined });
+    mounted = mount();
+    const missingMediaInputs = Array.from(mounted.container.querySelectorAll(".audio-toggle input")) as HTMLInputElement[];
+    expect(() => { act(() => missingMediaInputs[0].click()); act(() => missingMediaInputs[0].click()); }).not.toThrow();
+    await waitForAssertion(() => expect(JSON.parse(window.localStorage.getItem("sano-audio-settings")!)).toEqual({ music: false, sfx: true, haptics: true }));
+    act(() => mounted.root.unmount());
+    mounted.container.remove();
+
+    Object.defineProperty(HTMLMediaElement.prototype, "play", { configurable: true, value: vi.fn(() => Promise.reject(new Error("autoplay denied"))) });
+    Object.defineProperty(HTMLMediaElement.prototype, "pause", { configurable: true, value: vi.fn() });
+    const unhandled = vi.fn();
+    window.addEventListener("unhandledrejection", unhandled);
+    mounted = mount();
+    await act(async () => Promise.resolve());
+    const rejectingPlayInputs = Array.from(mounted.container.querySelectorAll(".audio-toggle input")) as HTMLInputElement[];
+    act(() => rejectingPlayInputs[0].click());
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(unhandled).not.toHaveBeenCalled();
+    expect(rejectingPlayInputs[0].checked).toBe(true);
+    expect(JSON.parse(window.localStorage.getItem("sano-audio-settings")!)).toEqual({ music: true, sfx: true, haptics: true });
+    window.removeEventListener("unhandledrejection", unhandled);
+    act(() => mounted.root.unmount());
+    mounted.container.remove();
+
+    Object.defineProperty(navigator, "vibrate", { configurable: true, value: () => { throw new Error("vibrate denied"); } });
+    mounted = mount();
+    const haptics = mounted.container.querySelectorAll(".audio-toggle input")[2] as HTMLInputElement;
+    expect(() => { act(() => haptics.click()); act(() => haptics.click()); }).not.toThrow();
+    act(() => mounted.root.unmount());
+    mounted.container.remove();
   });
 
   it("uses life-stage progress on play and character detail surfaces", async () => {

@@ -253,6 +253,7 @@ describe("account and character API foundation", () => {
   it.each([
     { age: 18, residence: "family_home" as const },
     { age: 80, residence: "dorm" as const },
+    { age: 40, residence: "studio" as const },
   ])("accepts and persists boundary age $age with residence $residence", async ({ age, residence }) => {
     sessionMock.requireCurrentUserId.mockResolvedValueOnce("user-1");
     const created = characterRecord({ age, hiddenState: { familyState: { residence } } });
@@ -277,8 +278,10 @@ describe("account and character API foundation", () => {
       startGradeYear: 2,
       major: "사회학과",
     }));
+    const body = await response.json();
 
     expect(response.status).toBe(201);
+    expect(body.character).toMatchObject({ age, hiddenState: { familyState: { residence } } });
     expect(persistedData).toMatchObject({
       age,
       hiddenState: { create: { familyState: { support: "보통", pressure: "낮음", residence } } },

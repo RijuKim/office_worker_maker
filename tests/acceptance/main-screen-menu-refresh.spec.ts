@@ -89,3 +89,55 @@ test("desktop menu is right anchored and new simulation returns to intro", async
   await page.getByRole("button", { name: "새 시뮬레이션", exact: true }).click();
   await expect(page.getByRole("heading", { name: "낯선 아침이 시작됩니다." })).toBeVisible();
 });
+
+test("every menu row has an accessible name and works with Enter and Space", async ({ page }) => {
+  for (const key of ["Enter", "Space"] as const) {
+    await page.goto("/");
+    const menu = page.getByRole("button", { name: "메뉴", exact: true });
+    await menu.focus();
+    await page.keyboard.press(key);
+    await expect(page.getByRole("button", { name: "기록", exact: true })).toBeFocused();
+    await page.keyboard.press(key);
+    await expect(page.getByRole("heading", { name: "선택의 결과 기록", exact: true })).toBeVisible();
+
+    await menu.focus();
+    await page.keyboard.press(key);
+    const newRun = page.getByRole("button", { name: "새 시뮬레이션", exact: true });
+    await expect(newRun).toHaveAccessibleName("새 시뮬레이션");
+    await newRun.focus();
+    await page.keyboard.press(key);
+    await expect(page.getByRole("heading", { name: "낯선 아침이 시작됩니다.", exact: true })).toBeVisible();
+
+    await menu.focus();
+    await page.keyboard.press(key);
+    const login = page.getByRole("button", { name: "로그인/저장", exact: true });
+    await expect(login).toHaveAccessibleName("로그인/저장");
+    await login.focus();
+    await page.keyboard.press(key);
+    await expect(page.getByRole("heading", { name: "진행 저장하기", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "로그인", exact: true })).toBeVisible();
+
+    await menu.focus();
+    await page.keyboard.press(key);
+    const privacy = page.getByRole("link", { name: "개인정보처리방침", exact: true });
+    await expect(privacy).toHaveAccessibleName("개인정보처리방침");
+    await privacy.focus();
+    await page.keyboard.press(key);
+    await expect(page).toHaveURL(/\/privacy$/);
+  }
+
+  for (const key of ["Enter", "Space"] as const) {
+    await page.goto("/");
+    await page.evaluate(() => localStorage.clear());
+    await page.getByRole("button", { name: "메뉴", exact: true }).click();
+    for (const [name, setting] of [["배경음", "music"], ["효과음", "sfx"], ["햅틱", "haptics"]] as const) {
+      const toggle = page.getByRole("checkbox", { name, exact: true });
+      await expect(toggle).toHaveAccessibleName(name);
+      const before = await toggle.isChecked();
+      await toggle.focus();
+      await page.keyboard.press(key);
+      await expect(toggle).toBeChecked({ checked: !before });
+      await expect.poll(() => page.evaluate((keyName) => JSON.parse(localStorage.getItem("sano-audio-settings")!)[keyName], setting)).toBe(!before);
+    }
+  }
+});
