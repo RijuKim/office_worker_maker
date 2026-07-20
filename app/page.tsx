@@ -1071,9 +1071,18 @@ export default function AppPage() {
           <div className="w-full max-w-[560px]">
             <div className="create-header mb-5 text-[#fff3d7]">
             <div>
-              <p className="mb-1 text-xs font-black text-[#b8d7a3]">취준 생활 시뮬레이션</p>
+              <p className="mb-1 text-xs font-black text-[#b8d7a3]">NEW RUN · 취준 생활 시뮬레이션</p>
               <h1 className="create-title text-2xl font-black leading-tight">일어나보니 대한민국 취준생</h1>
             </div>
+            {status !== "authenticated" && (
+              <button
+                className="text-xs font-black text-[#b8d7a3] underline"
+                onClick={() => setScreen("auth")}
+                type="button"
+              >
+                로그인/저장
+              </button>
+            )}
           </div>
           <h2 className="mb-3 text-sm font-bold text-[#d9c9b5]">새 이야기</h2>
           {error && <p className="mb-4 border-2 border-[#b3423c] bg-[#ffe1db] p-2 text-sm font-bold text-[#8d2f2a]">{error}</p>}
