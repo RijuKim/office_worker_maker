@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  requireCurrentUserId: vi.fn(),
   characterFindFirst: vi.fn(),
   eventFindFirst: vi.fn(),
   generateAiEvent: vi.fn(),
@@ -8,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/server/session", () => ({
-  requireCurrentUserId: vi.fn(async () => "user-1"),
+  requireCurrentUserId: mocks.requireCurrentUserId,
 }));
 
 vi.mock("@/lib/server/prisma", () => ({
@@ -54,9 +55,20 @@ const committed = {
 };
 
 function arrangeCommittedCharacter(source: "AI" | "STATIC" | "FORCED" = "AI") {
-  const selected = { ...committed, source };
+  const selected = {
+    ...committed,
+    source,
+    title: "자퇴 뒤 수강 신청",
+    tags: ["수업", "학점"],
+  };
   mocks.characterFindFirst
-    .mockResolvedValueOnce({ id: "run-1", hiddenState: { eventFlags: {} } })
+    .mockResolvedValueOnce({
+      id: "run-1",
+      academicStatus: "DROPPED_OUT",
+      currentGradeYear: 4,
+      coreEventCount: 40,
+      hiddenState: { eventFlags: { lifeStage: { id: "dropout" } } },
+    })
     .mockResolvedValueOnce({ currentEventId: selected.id });
   mocks.eventFindFirst.mockResolvedValueOnce(selected);
   return selected;
@@ -65,6 +77,41 @@ function arrangeCommittedCharacter(source: "AI" | "STATIC" | "FORCED" = "AI") {
 describe("next-event route committed recovery", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.requireCurrentUserId.mockResolvedValue("user-1");
+  });
+
+  it.each([
+    ["JSON", nextJson, "http://localhost/api/characters/run-1/events/next"],
+    ["SSE", nextStream, "http://localhost/api/characters/run-1/events/next/stream"],
+  ] as const)("rejects unauthenticated %s requests before persistence", async (_label, handler, url) => {
+    mocks.requireCurrentUserId.mockResolvedValueOnce(null);
+
+    const response = await handler(new Request(url, { method: "POST" }), {
+      params: Promise.resolve({ id: "run-1" }),
+    });
+
+    expect(response.status).toBe(401);
+    expect(mocks.characterFindFirst).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["JSON", nextJson, "http://localhost/api/characters/run-1/events/next"],
+    ["SSE", nextStream, "http://localhost/api/characters/run-1/events/next/stream"],
+  ] as const)("does not expose a non-owned character through %s", async (label, handler, url) => {
+    mocks.characterFindFirst.mockResolvedValueOnce(null);
+
+    const response = await handler(new Request(url, { method: "POST" }), {
+      params: Promise.resolve({ id: "other-user-run" }),
+    });
+
+    if (label === "JSON") {
+      expect(response.status).toBe(404);
+    } else {
+      expect(await response.text()).toContain("캐릭터를 찾을 수 없습니다.");
+    }
+    expect(mocks.characterFindFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "other-user-run", userId: "user-1" },
+    }));
   });
 
   it.each(["AI", "STATIC", "FORCED"] as const)("returns an ineligible pre-existing %s pointer event unchanged", async (source) => {
@@ -89,7 +136,7 @@ describe("next-event route committed recovery", () => {
   });
 
   it("lets SSE disconnect recovery resolve the same committed event without generation", async () => {
-    arrangeCommittedCharacter();
+    const selected = arrangeCommittedCharacter();
 
     const response = await nextStream(new Request("http://localhost/api/characters/run-1/events/next/stream", {
       method: "POST",
@@ -101,8 +148,8 @@ describe("next-event route committed recovery", () => {
     expect(body).toContain(`event: event\ndata: ${JSON.stringify({
       event: {
         id: committed.id,
-        title: committed.title,
-        body: committed.body,
+        title: selected.title,
+        body: selected.body,
         choices,
         source: "AI",
         forced: false,

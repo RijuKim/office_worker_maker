@@ -31,8 +31,6 @@ export async function GET(request: Request, context: RouteContext) {
       },
       events: {
         where: { status: "ACTIVE" },
-        orderBy: { createdAt: "desc" },
-        take: 1,
       },
       eventHistory: {
         orderBy: { createdAt: "desc" },
@@ -50,9 +48,13 @@ export async function GET(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "캐릭터를 찾을 수 없습니다." }, { status: 404 });
   }
 
+  const currentEvent = character.events.find(
+    (event: { id: string }) => event.id === character.currentEventId,
+  ) ?? null;
+
   return NextResponse.json({
-    character: serializeCharacterRun(character),
-    currentEvent: character.events[0] ?? null,
+    character: serializeCharacterRun({ ...character, events: currentEvent ? [currentEvent] : [] }),
+    currentEvent,
     recordsSummary: {
       recentCount: character.records.length,
       recentTitles: character.records.map((record: { title: string }) => record.title),

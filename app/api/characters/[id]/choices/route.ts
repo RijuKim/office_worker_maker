@@ -49,8 +49,6 @@ export async function POST(request: Request, context: RouteContext) {
       relationships: { orderBy: { createdAt: "asc" } },
       events: {
         where: { status: "ACTIVE" },
-        orderBy: { createdAt: "desc" },
-        take: 1,
       },
       eventHistory: {
         orderBy: { createdAt: "asc" },
@@ -72,7 +70,7 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "캐릭터 데이터가 불완전합니다." }, { status: 500 });
   }
 
-  const activeEvent = character.events[0];
+  const activeEvent = character.events.find((event: { id: string }) => event.id === character.currentEventId);
   if (!activeEvent) {
     return NextResponse.json({ error: "진행 중인 이벤트가 없습니다." }, { status: 400 });
   }
