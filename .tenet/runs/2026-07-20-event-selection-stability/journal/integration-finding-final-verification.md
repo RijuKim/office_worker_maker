@@ -4,6 +4,12 @@ Date: 2026-07-20 (Asia/Seoul)
 Confidence: [implemented-and-tested]
 Scope: verification-report retry; no product code or tests modified
 
+## Interaction E2E classification
+
+- Surface: `none`
+- Layer 2 status: `not_applicable`
+- Reason: this blocking-finding follow-up is explicitly limited to refreshing mechanical verification evidence and the current-run journal artifact. The broader feature harness declares browser UI plus server API, but no browser/API interaction scenario or runtime probe is part of this report-only retry. The required non-browser verification is recorded below.
+
 ## Confirmed commits
 
 All three commits resolve as commits and are ancestors of `HEAD`:
@@ -22,7 +28,7 @@ Command:
 npx vitest run tests/unit/api/life-stage.test.ts tests/unit/api/destination-synthesis.test.ts tests/unit/home-page.test.tsx tests/unit/server/event-selection-stability.acceptance.test.ts
 ```
 
-Result: exit code 0; **4 test files passed (4), 32 tests passed (32)**. Vitest duration: 562 ms. The run emitted the existing React warning that `true` was supplied for the non-boolean `jsx` attribute in `home-page.test.tsx`; it did not affect the result.
+Result: exit code 0; **4 test files passed (4), 32 tests passed (32)**. Vitest duration: 575 ms. The run emitted the existing React warning that `true` was supplied for the non-boolean `jsx` attribute in `home-page.test.tsx`; it did not affect the result.
 
 ### Full Vitest
 
@@ -32,7 +38,7 @@ Command:
 npm test -- --run
 ```
 
-Result: exit code 0; **23 test files passed (23), 283 tests passed (283)**. Vitest duration: 1.55 s.
+Result: exit code 0; **23 test files passed (23), 283 tests passed (283)**. Vitest duration: 1.59 s. Expected mocked-provider diagnostic messages were emitted for timeout, rate-limit, missing-key, API-error, empty-content, malformed-JSON, and in-band SSE error cases; the suite passed.
 
 ### Typecheck
 
@@ -62,18 +68,8 @@ Command:
 npm run build
 ```
 
-Result: exit code 0; Prisma Client generation passed, Next.js 16.2.10 compiled successfully, TypeScript passed, and 11/11 static pages were generated. The build emitted the existing Next.js middleware-convention deprecation warning.
-
-### Frontend smoke check
-
-Command:
-
-```text
-npm run dev -- --hostname 127.0.0.1 --port 3107
-```
-
-Result: the sandbox denied socket binding with `listen EPERM: operation not permitted 127.0.0.1:3107`, so an HTTP request could not be issued from this worker. This is an environment limitation rather than an application 5xx; the production build and route-level tests above passed.
+Result: exit code 0; Prisma Client 7.8.0 generated in 62 ms, Next.js 16.2.10 compiled successfully in 1123 ms, TypeScript finished in 1910 ms, and **11/11 static pages** were generated in 90 ms. The build emitted the existing Next.js middleware-convention deprecation warning.
 
 ## Scope confirmation
 
-Fresh `git diff -- .tenet/project`, `git diff --cached -- .tenet/project`, and `git status --short .tenet/project` produced no output. Therefore **`.tenet/project/**` is unchanged**. No product code or test file was modified during this retry; only this current-run journal artifact is intended for the verification commit.
+Fresh `git diff -- .tenet/project`, `git diff --cached -- .tenet/project`, and `git status --short .tenet/project` produced no output both before the verification work and after all requested commands. Therefore **`.tenet/project/**` is unchanged**. No product code or test file was modified during this retry; only this current-run journal artifact is intended for the verification commit.
