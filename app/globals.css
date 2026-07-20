@@ -704,7 +704,7 @@ button {
 }
 
 .scene-intro {
-  background: linear-gradient(to bottom, #305d73, #8bc0d6);
+  background: linear-gradient(to bottom, #7898d8 0%, #b9b4ea 52%, #ffc99f 100%);
 }
 .scene-intro .scene-sky {
   background: 
@@ -1428,20 +1428,33 @@ button {
   cursor: pointer;
 }
 
-.app-top-chrome {
-  pointer-events: none;
-  position: fixed;
-  inset: 0 0 auto;
+.app-title-header {
+  position: relative;
   z-index: 80;
+  display: flex;
+  width: min(560px, calc(100% - 32px));
+  margin: max(18px, env(safe-area-inset-top)) auto 18px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  color: #fff3d7;
+}
+
+.app-title {
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.app-title span {
+  display: block;
 }
 
 .chrome-icon-button {
-  pointer-events: auto;
-  position: fixed;
-  top: max(12px, env(safe-area-inset-top));
   display: grid;
-  width: 42px;
-  height: 42px;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   border: 3px solid #2a2018;
   background: #fff8e8;
@@ -1452,32 +1465,7 @@ button {
 }
 
 .chrome-menu-button {
-  left: max(12px, env(safe-area-inset-left));
   gap: 4px;
-}
-
-.chrome-brand {
-  pointer-events: none;
-  position: fixed;
-  top: max(12px, env(safe-area-inset-top));
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 42px;
-}
-
-.chrome-brand-icon {
-  font-size: 20px;
-  line-height: 1;
-}
-
-.chrome-brand-name {
-  font-size: 15px;
-  font-weight: 900;
-  color: #2a2018;
-  white-space: nowrap;
 }
 
 .chrome-menu-button span {
@@ -1487,18 +1475,10 @@ button {
   background: #2a2018;
 }
 
-.chrome-settings-button {
-  right: max(52px, calc(env(safe-area-inset-right) + 40px));
-}
-
-.chrome-close-button {
-  right: max(12px, env(safe-area-inset-right));
-}
-
 .app-popover {
-  pointer-events: auto;
-  position: fixed;
-  top: calc(max(12px, env(safe-area-inset-top)) + 52px);
+  position: absolute;
+  top: 52px;
+  right: 0;
   z-index: 81;
   width: min(260px, calc(100vw - 24px));
   border: 3px solid #2a2018;
@@ -1507,13 +1487,16 @@ button {
 }
 
 .app-menu-popover {
-  left: max(12px, env(safe-area-inset-left));
   display: grid;
   padding: 8px;
 }
 
-.app-menu-popover button {
-  min-height: 38px;
+.app-menu-popover button,
+.menu-row {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
   border: 0;
   border-bottom: 2px solid #eadfce;
   background: transparent;
@@ -1521,18 +1504,54 @@ button {
   padding: 8px 10px;
   text-align: left;
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 800;
+  line-height: 1.25;
+  text-decoration: none;
 }
 
 .app-menu-popover button:last-child {
   border-bottom: 0;
 }
 
-.app-settings-popover {
-  right: max(12px, env(safe-area-inset-right));
-  border: 0;
-  background: transparent;
-  box-shadow: none;
+.menu-settings {
+  display: grid;
+}
+
+.pixel-button.is-selected {
+  background: #ffe0a2;
+  box-shadow: inset 0 0 0 2px #d96f4f, 4px 4px 0 #2a2018;
+}
+
+.create-question {
+  margin-bottom: 22px;
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.onboarding-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.onboarding-actions button {
+  min-height: 44px;
+  border: 3px solid #2a2018;
+  background: #fff8e8;
+  box-shadow: 4px 4px 0 #2a2018;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.onboarding-actions button:last-child {
+  background: #2a2018;
+  color: #fff8e8;
+}
+
+.onboarding-actions button:disabled {
+  opacity: .45;
 }
 
 .choice-index {
@@ -1753,7 +1772,15 @@ button {
 
 @media (max-width: 720px) {
   .app-screen {
-    padding-top: max(18px, env(safe-area-inset-top));
+    padding-top: 0;
+  }
+
+  .app-title { font-size: 20px; }
+
+  .app-popover {
+    left: 0;
+    right: 0;
+    width: 100%;
   }
 
   .record-actions {

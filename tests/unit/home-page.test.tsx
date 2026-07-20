@@ -79,7 +79,7 @@ afterEach(() => {
 });
 
 describe("Home page scaffold", () => {
-  it("renders the new run screen when unauthenticated", () => {
+  it("renders the approved intro and combined title menu when unauthenticated", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -88,13 +88,56 @@ describe("Home page scaffold", () => {
       root.render(<Home />);
     });
 
-    expect(container.textContent).toContain("NEW RUN");
-    expect(container.textContent).toContain("새 이야기");
+    expect(container.querySelector(".app-title")?.textContent).toBe("일어나보니대한민국 취준생");
+    expect(container.textContent).toContain("눈을 뜨니 오전 6시 07분입니다.");
+    expect(container.textContent).toContain("이 이야기는 실제 진로 예측이 아닌 재미를 위한 허구의 시뮬레이션입니다.");
+    expect(container.textContent).not.toContain("취준 생활 시뮬레이션");
+    expect(container.textContent).not.toContain("새 이야기");
+
+    act(() => (container.querySelector("button[aria-label='메뉴']") as HTMLButtonElement).click());
     expect(container.textContent).toContain("로그인/저장");
+    expect(container.textContent).toContain("배경음");
+    expect(container.textContent).toContain("효과음");
+    expect(container.textContent).toContain("햅틱");
 
     act(() => {
       root.unmount();
     });
+    container.remove();
+  });
+
+  it("shows one onboarding question at a time and preserves age on back", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => root.render(<Home />));
+
+    act(() => findButton(container, "시작하기").click());
+    expect(container.textContent).toContain("당신의 이름은 무엇인가요?");
+    expect(container.textContent).not.toContain("당신의 나이는 몇 살인가요?");
+
+    const name = container.querySelector("input[aria-label='당신의 이름은 무엇인가요?']") as HTMLInputElement;
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(name, "한서윤");
+      name.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    act(() => findButton(container, "다음").click());
+    const age = container.querySelector("select[aria-label='당신의 나이는 몇 살인가요?']") as HTMLSelectElement;
+    expect(age.options).toHaveLength(63);
+    expect(age.options[0].value).toBe("18");
+    expect(age.options[62].value).toBe("80");
+    act(() => {
+      age.value = "80";
+      age.dispatchEvent(new Event("change", { bubbles: true }));
+      findButton(container, "다음").click();
+    });
+    expect(container.textContent).toContain("본가");
+    expect(container.textContent).not.toContain("선택됨 ·");
+    act(() => findButton(container, "이전").click());
+    expect((container.querySelector("select") as HTMLSelectElement).value).toBe("80");
+
+    act(() => root.unmount());
     container.remove();
   });
 

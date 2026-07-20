@@ -56,6 +56,7 @@ type AudioSettings = {
 };
 
 type AudioKind = "tap" | "success" | "warning" | "ending";
+type CreateStep = "intro" | "name" | "age" | "residence" | "abilities";
 
 type BrowserAudioContext = typeof AudioContext;
 
@@ -319,7 +320,6 @@ export default function AppPage() {
   const [audioSettings, setAudioSettings] = useState<AudioSettings>({ music: false, sfx: true, haptics: true });
   const [audioReady, setAudioReady] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
@@ -348,6 +348,7 @@ export default function AppPage() {
   const [charAge, setCharAge] = useState("21");
   const [charResidence, setCharResidence] = useState("studio");
   const [preferredStats, setPreferredStats] = useState<string[]>(["academic", "mental"]);
+  const [createStep, setCreateStep] = useState<CreateStep>("intro");
 
   const mountedRef = useRef(false);
   const activeScreen = screen;
@@ -666,20 +667,21 @@ export default function AppPage() {
       loadedAudioSettingsRef.current = true;
       return;
     }
-    window.setTimeout(() => {
-      try {
+    try {
         const parsed = JSON.parse(saved) as Partial<AudioSettings>;
-        setAudioSettings({
-          music: parsed.music === true,
-          sfx: parsed.sfx !== false,
-          haptics: parsed.haptics !== false,
-        });
+        if (!parsed || typeof parsed !== "object" || typeof parsed.music !== "boolean" || typeof parsed.sfx !== "boolean" || typeof parsed.haptics !== "boolean") {
+          throw new Error("Invalid audio settings");
+        }
+        queueMicrotask(() => setAudioSettings({
+          music: parsed.music!,
+          sfx: parsed.sfx!,
+          haptics: parsed.haptics!,
+        }));
       } catch {
         window.localStorage.removeItem("sano-audio-settings");
       } finally {
         loadedAudioSettingsRef.current = true;
       }
-    }, 0);
   }, []);
 
   useEffect(() => {
@@ -768,6 +770,7 @@ export default function AppPage() {
     setSpecs([]);
     setJobApps([]);
     setCareerPaths([]);
+    setCreateStep("intro");
     setScreen("create");
   }, [playFeedbackCue]);
 
@@ -893,18 +896,13 @@ export default function AppPage() {
   const academicProgressLabel = getAcademicProgressLabel(currentChar);
   const runCompleted = Boolean(endingNotice);
   const audioControls = (
-    <div className="audio-controls rounded-lg border-2 border-[#4d3d2f] bg-[#1b1612] p-3 text-[#f7efe2]">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-xs font-black text-[#f7d08b]">AUDIO</span>
-        <span className="text-[11px] text-[#a9967d]">{audioReady ? "ON" : "READY"}</span>
-      </div>
-      <div className="grid gap-2">
+      <div className="menu-settings" data-audio-ready={audioReady}>
         {([
-          ["music", "Lo-fi"],
+          ["music", "배경음"],
           ["sfx", "효과음"],
           ["haptics", "햅틱"],
         ] as const).map(([key, label]) => (
-          <label className="audio-toggle flex items-center justify-between gap-3 text-[13px] font-bold" key={key}>
+          <label className="audio-toggle menu-row" key={key}>
             <span>{label}</span>
             <input
               checked={audioSettings[key]}
@@ -919,59 +917,34 @@ export default function AppPage() {
           </label>
         ))}
       </div>
-    </div>
   );
   const topChrome = (
-    <div className="app-top-chrome">
-      <div className="chrome-brand">
-        <span className="chrome-brand-icon">취준</span>
-        <span className="chrome-brand-name">취준 생활 시뮬레이션</span>
-      </div>
+    <header className="app-title-header">
+      <h1 className="app-title"><span>일어나보니</span><span>대한민국 취준생</span></h1>
       <button
         aria-expanded={menuOpen}
         aria-label="메뉴"
         className="chrome-icon-button chrome-menu-button"
         onClick={() => {
           setMenuOpen((open) => !open);
-          setSettingsOpen(false);
         }}
         type="button"
       >
         <span />
         <span />
         <span />
-      </button>
-      <button
-        aria-expanded={settingsOpen}
-        aria-label="설정"
-        className="chrome-icon-button chrome-settings-button"
-        onClick={() => {
-          setSettingsOpen((open) => !open);
-          setMenuOpen(false);
-        }}
-        type="button"
-      >
-        ⚙
-      </button>
-      <button
-        aria-label="닫기"
-        className="chrome-icon-button chrome-close-button"
-        onClick={() => setShowExitConfirm(true)}
-        type="button"
-      >
-        ✕
       </button>
       {menuOpen && (
         <div className="app-popover app-menu-popover">
-          <button
+          {currentChar && <button
             onClick={() => {
-              setScreen(currentChar ? "play" : "create");
+              setScreen("play");
               setMenuOpen(false);
             }}
             type="button"
           >
-            {currentChar ? "진행" : "새 이야기"}
-          </button>
+            진행
+          </button>}
           <button
             onClick={() => {
               setExpandedRecord(null);
@@ -1002,20 +975,16 @@ export default function AppPage() {
             {status === "authenticated" ? "계정" : "로그인/저장"}
           </button>
           <a
-            className="block min-h-[38px] border-0 border-b-2 border-[#eadfce] bg-transparent px-[10px] py-2 text-left text-[14px] font-black leading-[38px] text-[#2a241e] no-underline last:border-b-0 hover:bg-[#f2efe7]"
+            className="menu-row"
             href="/privacy"
             onClick={() => setMenuOpen(false)}
           >
             개인정보처리방침
           </a>
-        </div>
-      )}
-      {settingsOpen && (
-        <div className="app-popover app-settings-popover">
           {audioControls}
         </div>
       )}
-    </div>
+    </header>
   );
 
   if (activeScreen === "auth") {
@@ -1067,51 +1036,41 @@ export default function AppPage() {
     return (
       <>
         {topChrome}
-        <main className="pixel-shell app-screen flex min-h-screen items-start justify-center p-4 pt-10">
+        <main className="pixel-shell app-screen flex min-h-screen items-start justify-center p-4">
           <div className="w-full max-w-[560px]">
-            <div className="create-header mb-5 text-[#fff3d7]">
-            <div>
-              <p className="mb-1 text-xs font-black text-[#b8d7a3]">NEW RUN · 취준 생활 시뮬레이션</p>
-              <h1 className="create-title text-2xl font-black leading-tight">일어나보니 대한민국 취준생</h1>
-            </div>
-            {status !== "authenticated" && (
-              <button
-                className="text-xs font-black text-[#b8d7a3] underline"
-                onClick={() => setScreen("auth")}
-                type="button"
-              >
-                로그인/저장
-              </button>
-            )}
-          </div>
-          <h2 className="mb-3 text-sm font-bold text-[#d9c9b5]">새 이야기</h2>
           {error && <p className="mb-4 border-2 border-[#b3423c] bg-[#ffe1db] p-2 text-sm font-bold text-[#8d2f2a]">{error}</p>}
-          <div className="pixel-panel create-panel space-y-5 p-6">
-            <div className="create-hero-art overflow-hidden border-4 border-[#2a2018]">
+          <div className="pixel-panel create-panel p-6">
+            {createStep === "intro" && <section className="create-step" data-testid="onboarding-intro">
+            <div className="create-hero-art overflow-hidden border-4 border-[#2a2018]" data-testid="intro-dawn-art">
               <PixelScene scene="intro" label="취준 시뮬레이션 인트로" />
             </div>
-            <div className="space-y-3 border-b border-[#eee8dd] pb-5 text-[15px] leading-7 text-[#3a332d]">
-              <p className="font-bold">스펙, 멘탈, 통장잔고까지 관리해야 하는 가상 취준 생활을 직접 굴려보세요.</p>
-              <p>눈을 뜨니 새벽 6시 47분. 휴대폰에는 읽지 않은 메시지가 수북하다. 수강 정정 알림, 학과 단체 채팅, 아르바이트 면접 확인, 그리고 저장되지 않은 번호의 짧은 문장. “오늘 고른 첫 선택이 졸업식까지 따라갑니다.” 장난 같지만, 왠지 모르게 진짜일 것 같은 예감이 든다.</p>
-              <p>당신은 아직 자신이 어떤 학생으로 기억될지 모릅니다. 이름과 나이, 오늘 눈뜬 장소, 끝까지 믿고 싶은 능력만 정하면 나머지 전공, 학년, 첫 사건은 이 세계가 당신에게 붙여줄 것입니다.</p>
-              <p className="text-xs text-[#706b62]">이 콘텐츠는 실제 진로 예측이 아닌 재미를 위한 허구의 시뮬레이션입니다.</p>
+            <div className="space-y-3 pt-5 text-[15px] leading-7 text-[#3a332d]">
+              <p>눈을 뜨니 오전 6시 07분입니다. 휴대폰에는 읽지 않은 카톡 알림이 수북하게 쌓여 있습니다.</p>
+              <p>학과 단체방 공지, 새로 올라온 동아리 모집 글, 아르바이트 연락, 그리고 아직 열어보지 않은 메시지 하나가 화면 위에 겹쳐 있습니다. 마지막 메시지에는 짧은 문장만 남아 있습니다. “이번에는 어떤 사람이 될 수 있을까요?”</p>
+              <p>오늘은 평범한 학기의 첫날일 수도, 오래 미뤄둔 변화를 시작하는 날일 수도 있습니다. 지금 고르는 작은 선택들은 수업과 관계, 생활과 진로를 조금씩 다른 방향으로 이끌게 될 것입니다.</p>
+              <p className="text-xs text-[#706b62]">이 이야기는 실제 진로 예측이 아닌 재미를 위한 허구의 시뮬레이션입니다.</p>
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-bold">당신의 이름은?</label>
-              <input className="pixel-input w-full px-4 py-3 text-sm" maxLength={24} placeholder="한서윤" value={charName} onChange={(e) => setCharName(e.target.value)} />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-bold">당신은 몇 살인가요?</label>
-              <select className="pixel-input w-full px-4 py-3 text-sm" value={charAge} onChange={(e) => setCharAge(e.target.value)}>
-                {Array.from({ length: 18 }, (_, i) => i + 18).map((age) => (<option key={age} value={age}>{age}세</option>))}
+            <button className="pixel-button-dark mt-5 w-full px-4 py-3 text-sm font-bold" onClick={() => setCreateStep("name")}>시작하기</button>
+            </section>}
+            {createStep === "name" && <section className="create-step">
+              <h2 className="create-question">당신의 이름은 무엇인가요?</h2>
+              <input aria-label="당신의 이름은 무엇인가요?" autoFocus className="pixel-input w-full px-4 py-3 text-sm" maxLength={24} placeholder="한서윤" value={charName} onChange={(e) => setCharName(e.target.value)} />
+              <div className="onboarding-actions"><button onClick={() => setCreateStep("intro")}>이전</button><button disabled={!charName.trim()} onClick={() => setCreateStep("age")}>다음</button></div>
+            </section>}
+            {createStep === "age" && <section className="create-step">
+              <h2 className="create-question">당신의 나이는 몇 살인가요?</h2>
+              <select aria-label="당신의 나이는 몇 살인가요?" className="pixel-input w-full px-4 py-3 text-sm" value={charAge} onChange={(e) => setCharAge(e.target.value)}>
+                {Array.from({ length: 63 }, (_, i) => i + 18).map((age) => (<option key={age} value={age}>{age}세</option>))}
               </select>
-            </div>
-            <div>
-              <p className="mb-2 block text-sm font-bold">당신은 어디에서 깨어났나요?</p>
+              <div className="onboarding-actions"><button onClick={() => setCreateStep("name")}>이전</button><button onClick={() => setCreateStep("residence")}>다음</button></div>
+            </section>}
+            {createStep === "residence" && <section className="create-step">
+              <h2 className="create-question">당신은 어디에서 깨어났나요?</h2>
               <div className="grid gap-2">
                 {residenceOptions.map((option) => (
                   <button
-                    className={`pixel-button px-4 py-3 text-left text-sm ${charResidence === option.id ? "bg-[#ffe0a2]" : ""}`}
+                    aria-pressed={charResidence === option.id}
+                    className={`pixel-button px-4 py-3 text-left text-sm ${charResidence === option.id ? "is-selected" : ""}`}
                     key={option.id}
                     onClick={() => {
                       playFeedbackCue("tap");
@@ -1119,14 +1078,15 @@ export default function AppPage() {
                     }}
                     type="button"
                   >
-                    <span className="block font-bold">{charResidence === option.id ? "선택됨 · " : ""}{option.label}</span>
+                    <span className="block font-bold">{option.label}</span>
                     <span className="mt-1 block text-xs leading-5 text-[#706b62]">{option.description}</span>
                   </button>
                 ))}
               </div>
-            </div>
-            <div>
-              <p className="mb-2 block text-sm font-bold">당신이 믿고 싶은 능력 두 가지는? ({preferredStats.length}/2)</p>
+              <div className="onboarding-actions"><button onClick={() => setCreateStep("age")}>이전</button><button onClick={() => setCreateStep("abilities")}>다음</button></div>
+            </section>}
+            {createStep === "abilities" && <section className="create-step">
+              <h2 className="create-question">당신이 믿고 싶은 능력 두 가지는 무엇인가요? ({preferredStats.length}/2)</h2>
               <div className="grid grid-cols-2 gap-2">
                 {Object.entries(statLabels).map(([key, label]) => (
                   <button
@@ -1141,8 +1101,8 @@ export default function AppPage() {
                 ))}
               </div>
               <p className="mt-2 text-xs text-[#706b62]">선택한 두 능력은 첫 능력치에 조금 더 높게 반영됩니다.</p>
-            </div>
-            <button className="pixel-button-dark w-full px-4 py-3 text-sm font-bold disabled:opacity-50" disabled={loading || !charName.trim() || preferredStats.length !== 2} onClick={createCharacter}>눈을 뜬다</button>
+              <div className="onboarding-actions"><button onClick={() => setCreateStep("residence")}>이전</button><button disabled={loading || preferredStats.length !== 2} onClick={createCharacter}>눈을 뜬다</button></div>
+            </section>}
           </div>
           </div>
         </main>
