@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { api } from "./api";
 import { playCue, startBgm, stopBgm, vibrate, type AudioSettings } from "./audio";
+import { getTossAnonymousKey } from "./toss-auth";
 import type { CareerRecord, CharacterData, ChoiceFeedback, EventData, Screen } from "./types";
 
 const statLabels: Record<string, string> = {
@@ -25,9 +26,9 @@ const residenceOptions = [
 type CreateStep = "intro" | "name" | "age" | "residence" | "abilities";
 
 function readAudioSettings(): AudioSettings {
-  const saved = localStorage.getItem("sano-toss-audio");
-  if (!saved) return defaultAudioSettings;
   try {
+    const saved = localStorage.getItem("sano-toss-audio");
+    if (!saved) return defaultAudioSettings;
     const parsed: unknown = JSON.parse(saved);
     if (!parsed || typeof parsed !== "object") throw new Error("invalid settings");
     const candidate = parsed as Partial<AudioSettings>;
@@ -36,8 +37,19 @@ function readAudioSettings(): AudioSettings {
     }
     return { music: candidate.music, sfx: candidate.sfx, haptics: candidate.haptics };
   } catch {
-    localStorage.removeItem("sano-toss-audio");
+    try { localStorage.removeItem("sano-toss-audio"); } catch { /* storage is optional */ }
     return defaultAudioSettings;
+  }
+}
+
+function runOptional(action: () => unknown) {
+  try {
+    const result = action();
+    if (result && typeof (result as PromiseLike<unknown>).then === "function") {
+      void Promise.resolve(result).catch(() => undefined);
+    }
+  } catch {
+    // Audio, haptics, storage, and host capabilities never block interaction.
   }
 }
 
@@ -95,20 +107,24 @@ export function App() {
   const [createStep, setCreateStep] = useState<CreateStep>("intro");
   const [name, setName] = useState("");
   const [age, setAge] = useState(22);
-  const [residence, setResidence] = useState("studio");
-  const [selectedStats, setSelectedStats] = useState<string[]>(["practical", "mental"]);
+  const [residence, setResidence] = useState("");
+  const [selectedStats, setSelectedStats] = useState<string[]>([]);
 
   const apiBaseLabel = useMemo(() => import.meta.env.VITE_API_BASE_URL || "same-origin", []);
 
   const startNewSimulation = useCallback(() => {
     setCreateStep("intro");
+    setName("");
+    setAge(22);
+    setResidence("");
+    setSelectedStats([]);
     setScreen("create");
     setMenuOpen(false);
   }, []);
 
   const cue = useCallback((kind: "tap" | "success" | "warning" | "ending" = "tap") => {
-    playCue(kind, audioSettings.sfx);
-    vibrate(audioSettings.haptics, kind === "warning" ? [16, 20, 16] : 12);
+    runOptional(() => playCue(kind, audioSettings.sfx));
+    runOptional(() => vibrate(audioSettings.haptics, kind === "warning" ? [16, 20, 16] : 12));
   }, [audioSettings.haptics, audioSettings.sfx]);
 
   const openCharacter = useCallback(async (character: CharacterData) => {
@@ -149,6 +165,7 @@ export function App() {
   }, [currentCharacter, openCharacter]);
 
   const createCharacter = useCallback(async () => {
+    if (!name.trim() || !residence || selectedStats.length !== 2) return;
     cue("tap");
     setLoading(true);
     setError("");
@@ -219,30 +236,42 @@ export function App() {
   }, [cue]);
 
   useEffect(() => {
-    localStorage.setItem("sano-toss-audio", JSON.stringify(audioSettings));
-    if (audioSettings.music) void startBgm(true);
-    else stopBgm();
+    runOptional(() => localStorage.setItem("sano-toss-audio", JSON.stringify(audioSettings)));
+    if (audioSettings.music) runOptional(() => startBgm(true));
+    else runOptional(stopBgm);
   }, [audioSettings]);
 
   useEffect(() => {
     const onVisibilityChange = () => {
-      if (document.visibilityState === "hidden") stopBgm();
-      else if (audioSettings.music) void startBgm(true);
+      if (document.visibilityState === "hidden") runOptional(stopBgm);
+      else if (audioSettings.music) runOptional(() => startBgm(true));
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
   }, [audioSettings.music]);
 
   useEffect(() => {
-    history.pushState(null, "", location.href);
-    const blockBack = () => history.pushState(null, "", location.href);
-    window.addEventListener("popstate", blockBack);
     const timer = window.setTimeout(() => {
-      void refreshCharacters();
+      void (async () => {
+        setLoading(true);
+        setError("");
+        try {
+          const hash = await getTossAnonymousKey();
+          const session = await api.createTossSession(hash);
+          if (!session.ok) {
+            setError(session.data.error ?? "사용자 정보를 연결하지 못했습니다.");
+            return;
+          }
+          await refreshCharacters();
+        } catch {
+          // Missing/rejected host permission APIs must leave guest onboarding usable.
+        } finally {
+          setLoading(false);
+        }
+      })();
     }, 0);
     return () => {
       window.clearTimeout(timer);
-      window.removeEventListener("popstate", blockBack);
     };
   }, [refreshCharacters]);
 
@@ -254,7 +283,7 @@ export function App() {
           <button className="menu-button" type="button" aria-label="메뉴" aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}>메뉴</button>
           {menuOpen && (
             <nav className="menu-popover" aria-label="메뉴">
-              <button type="button" onClick={() => { cue(); setScreen("home"); setMenuOpen(false); }}>진행</button>
+              {currentCharacter && <button type="button" onClick={() => { cue(); setScreen("home"); setMenuOpen(false); }}>진행</button>}
               <button type="button" onClick={startNewSimulation}>새 시뮬레이션</button>
               <button type="button" onClick={() => { setMenuOpen(false); void loadRecords(); }}>기록</button>
               <div className="menu-divider" />
@@ -327,15 +356,15 @@ export function App() {
                 <strong>{option.label}</strong><span>{option.description}</span>
               </button>
             ))}</div>
-            <div className="onboarding-actions"><button onClick={() => setCreateStep("age")}>이전</button><button onClick={() => setCreateStep("abilities")}>다음</button></div>
+            <div className="onboarding-actions"><button onClick={() => setCreateStep("age")}>이전</button><button disabled={!residence} onClick={() => setCreateStep("abilities")}>다음</button></div>
           </section>}
           {createStep === "abilities" && <section className="create-step">
             <h2>당신이 믿고 싶은 능력 두 가지는 무엇인가요? ({selectedStats.length}/2)</h2>
             <div className="chip-grid">{preferredStats.map((stat) => (
-              <button aria-pressed={selectedStats.includes(stat)} className={selectedStats.includes(stat) ? "selected" : ""} type="button" key={stat} onClick={() => setSelectedStats((current) => current.includes(stat) ? current.filter((item) => item !== stat) : current.length < 2 ? [...current, stat] : [...current.slice(1), stat])}>{statLabels[stat]}</button>
+              <button aria-pressed={selectedStats.includes(stat)} className={selectedStats.includes(stat) ? "selected" : ""} type="button" key={stat} onClick={() => setSelectedStats((current) => current.includes(stat) ? current.filter((item) => item !== stat) : current.length < 2 ? [...current, stat] : current)}>{statLabels[stat]}</button>
             ))}</div>
             <p className="muted">선택한 두 능력은 첫 능력치에 조금 더 높게 반영됩니다.</p>
-            <div className="onboarding-actions"><button onClick={() => setCreateStep("residence")}>이전</button><button disabled={loading || selectedStats.length !== 2 || !name.trim()} onClick={() => void createCharacter()}>눈을 뜬다</button></div>
+            <div className="onboarding-actions"><button onClick={() => setCreateStep("residence")}>이전</button><button disabled={loading || selectedStats.length !== 2 || !name.trim() || !residence} onClick={() => void createCharacter()}>눈을 뜬다</button></div>
           </section>}
         </section>
       )}
