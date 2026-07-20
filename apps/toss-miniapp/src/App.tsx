@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { api } from "./api";
 import { playCue, startBgm, stopBgm, vibrate, type AudioSettings } from "./audio";
-import { getTossAnonymousKey } from "./toss-auth";
 import type { CareerRecord, CharacterData, ChoiceFeedback, EventData, Screen } from "./types";
 
 const statLabels: Record<string, string> = {
@@ -235,27 +234,15 @@ export function App() {
   }, [audioSettings.music]);
 
   useEffect(() => {
+    history.pushState(null, "", location.href);
+    const blockBack = () => history.pushState(null, "", location.href);
+    window.addEventListener("popstate", blockBack);
     const timer = window.setTimeout(() => {
-      void (async () => {
-        setLoading(true);
-        setError("");
-        try {
-          const hash = await getTossAnonymousKey();
-          const session = await api.createTossSession(hash);
-          if (!session.ok) {
-            setError(session.data.error ?? "사용자 정보를 연결하지 못했습니다.");
-            return;
-          }
-          await refreshCharacters();
-        } catch (authError) {
-          setError(authError instanceof Error ? authError.message : "사용자 정보를 확인하지 못했습니다.");
-        } finally {
-          setLoading(false);
-        }
-      })();
+      void refreshCharacters();
     }, 0);
     return () => {
       window.clearTimeout(timer);
+      window.removeEventListener("popstate", blockBack);
     };
   }, [refreshCharacters]);
 
