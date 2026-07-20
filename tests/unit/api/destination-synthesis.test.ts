@@ -7,8 +7,16 @@ import {
 } from "@/lib/game/destination-synthesis";
 
 describe("synthesizeFallbackCareerPath", () => {
-  it("returns a career path based on high academic stats", () => {
-    const result = synthesizeFallbackCareerPath({ academic: 9, practical: 5, health: 6, mental: 7, wealth: 4, reputation: 5, charm: 3 });
+  it("prefers professional-exam preparation when both professional and public-safety fallbacks qualify", () => {
+    const result = synthesizeFallbackCareerPath({
+      academic: 9,
+      practical: 5,
+      health: 6,
+      mental: 7,
+      wealth: 4,
+      reputation: 5,
+      charm: 3,
+    });
     expect(result.destinationName).toBeNull();
     expect(result.jobRole).toBeNull();
     expect(result.salaryBand).toBeNull();
