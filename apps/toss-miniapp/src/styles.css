@@ -19,7 +19,8 @@ body,
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -29,40 +30,46 @@ button {
 
 .app-shell {
   min-height: 100dvh;
-  padding: max(76px, calc(env(safe-area-inset-top) + 64px)) max(16px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  overflow-x: hidden;
+  padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   background:
     linear-gradient(180deg, rgba(247, 208, 139, 0.08), transparent 36%),
     #17130f;
 }
 
-.top-chrome {
-  position: fixed;
-  z-index: 20;
-  top: max(14px, env(safe-area-inset-top));
-  left: max(14px, env(safe-area-inset-left));
-  right: max(14px, env(safe-area-inset-right));
+.title-row {
+  position: relative;
   display: flex;
+  gap: 16px;
+  align-items: flex-start;
   justify-content: space-between;
-  pointer-events: none;
 }
 
-.icon-button {
-  width: 44px;
-  height: 44px;
+.app-title {
+  display: grid;
+  margin: 0;
+}
+
+.menu-button {
+  flex: 0 0 auto;
+  min-width: 60px;
+  min-height: 44px;
   border: 2px solid #4d3d2f;
   border-radius: 8px;
+  padding: 8px 12px;
   color: #f7efe2;
-  background: #211a14;
-  pointer-events: auto;
+  background: #30261d;
+  font-size: 14px;
+  font-weight: 800;
 }
 
-.popover {
-  position: fixed;
+.menu-popover {
+  position: absolute;
   z-index: 30;
-  top: max(66px, calc(env(safe-area-inset-top) + 54px));
+  top: 52px;
+  right: 0;
   display: grid;
-  gap: 8px;
-  min-width: 168px;
+  width: min(280px, calc(100vw - 64px));
   padding: 10px;
   border: 2px solid #4d3d2f;
   border-radius: 8px;
@@ -70,28 +77,32 @@ button {
   box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
 }
 
-.menu-popover {
-  left: max(14px, env(safe-area-inset-left));
-}
-
-.settings-popover {
-  right: max(14px, env(safe-area-inset-right));
-}
-
-.popover button,
-.popover label {
+.menu-popover button,
+.menu-row {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
   border: 0;
   border-radius: 6px;
   padding: 10px;
   color: #f7efe2;
   background: #30261d;
+  font-size: 14px;
+  font-weight: 800;
   text-align: left;
 }
 
-.popover label {
-  display: flex;
-  gap: 10px;
-  align-items: center;
+.menu-divider {
+  height: 1px;
+  margin: 7px 2px;
+  background: #4d3d2f;
+}
+
+.menu-row input {
+  width: 22px;
+  height: 22px;
+  accent-color: #f7d08b;
 }
 
 .hero-panel,
@@ -108,13 +119,6 @@ button {
 
 .hero-panel {
   padding: 18px;
-}
-
-.eyebrow {
-  margin: 0 0 8px;
-  color: #f7d08b;
-  font-size: 12px;
-  font-weight: 900;
 }
 
 h1,
@@ -256,6 +260,100 @@ h2 {
   background: #211a14;
 }
 
+.onboarding-panel {
+  border: 2px solid #4d3d2f;
+  border-radius: 8px;
+  padding: 18px;
+  background: #211a14;
+}
+
+.create-step {
+  display: grid;
+  gap: 14px;
+}
+
+.create-step h2,
+.create-step p {
+  margin: 0;
+}
+
+.create-step p {
+  color: #d9c9b5;
+  line-height: 1.7;
+}
+
+.create-step .disclaimer {
+  color: #a9967d;
+  font-size: 12px;
+}
+
+.intro-dawn-art {
+  overflow: hidden;
+  border: 4px solid #2a2018;
+  border-radius: 6px;
+}
+
+.pixel-scene-intro svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+
+.text-input {
+  width: 100%;
+  min-height: 48px;
+  border: 2px solid #4d3d2f;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #f7efe2;
+  background: #17130f;
+}
+
+.onboarding-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.onboarding-actions button,
+.residence-grid button {
+  min-height: 48px;
+  border: 2px solid #4d3d2f;
+  border-radius: 8px;
+  padding: 12px;
+  color: #f7efe2;
+  background: #30261d;
+  font-weight: 800;
+}
+
+.onboarding-actions button:last-child {
+  border-color: #f7d08b;
+  color: #17130f;
+  background: #f7d08b;
+}
+
+.residence-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.residence-grid button {
+  display: grid;
+  gap: 5px;
+  text-align: left;
+}
+
+.residence-grid button.selected {
+  border-color: #79b7ad;
+}
+
+.residence-grid span {
+  color: #d9c9b5;
+  font-size: 12px;
+  font-weight: 400;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -309,5 +407,13 @@ button:disabled {
 
   .stats-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .menu-popover {
+    left: 0;
+    right: 0;
+    width: 100%;
   }
 }
