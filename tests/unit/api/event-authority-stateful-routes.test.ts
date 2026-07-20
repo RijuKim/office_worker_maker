@@ -76,7 +76,19 @@ const prismaMock = vi.hoisted(() => ({
     }),
     create: vi.fn(async ({ data }: { data: StoredEvent }) => {
       fixture.generationCalls += 1;
-      const stored = { ...data, status: "DISCARDED" };
+      const candidateNumber = fixture.generationCalls;
+      const stored = {
+        ...data,
+        title: `${data.title} 후보 ${candidateNumber}`,
+        body: `${data.body} 후보 본문 ${candidateNumber}`,
+        tags: [...data.tags, `후보-${candidateNumber}`],
+        choices: data.choices.map((choice, index) => ({
+          ...(choice as Record<string, unknown>),
+          id: `candidate-${candidateNumber}-choice-${index + 1}`,
+          summary: `후보 ${candidateNumber}의 선택 ${index + 1}`,
+        })),
+        status: "DISCARDED",
+      };
       fixture.events.set(stored.id, stored);
       if (fixture.generationBarrier) {
         await new Promise<void>((resolve) => {
@@ -161,10 +173,25 @@ describe("stateful JSON/SSE event authority", () => {
     const jsonEvent = (await jsonResponse.json()).event;
     const active = [...fixture.events.values()].filter((event) => event.status === "ACTIVE");
     const losers = [...fixture.events.values()].filter((event) => event.id !== fixture.pointer);
+    const persistedWinner = fixture.events.get(fixture.pointer!);
+    const winnerPayload = persistedWinner && {
+      id: persistedWinner.id,
+      title: persistedWinner.title,
+      body: persistedWinner.body,
+      source: persistedWinner.source,
+      choices: persistedWinner.choices,
+      forced: false,
+    };
 
     expect(jsonEvent).toEqual(streamEvent);
-    expect(jsonEvent).toMatchObject({ id: fixture.pointer, body: routeEvent.body, choices: routeEvent.choices });
+    expect(jsonEvent).toEqual(winnerPayload);
     expect(fixture.generationCalls).toBe(2);
+    expect(losers[0]).not.toMatchObject({
+      title: persistedWinner?.title,
+      body: persistedWinner?.body,
+      choices: persistedWinner?.choices,
+      tags: persistedWinner?.tags,
+    });
     expect(active).toHaveLength(1);
     expect(active[0].id).toBe(fixture.pointer);
     expect(losers).toHaveLength(1);
@@ -193,9 +220,10 @@ describe("stateful JSON/SSE event authority", () => {
     const getPayload = await getResponse.json();
     const jsonPayload = await jsonResponse.json();
 
-    expect(getPayload.currentEvent).toMatchObject({ id: committedId, body: routeEvent.body });
+    const persistedWinner = fixture.events.get(committedId!);
+    expect(getPayload.currentEvent).toMatchObject({ id: committedId, body: persistedWinner?.body });
     expect(getPayload.currentEvent.id).not.toBe("orphan-newer");
-    expect(jsonPayload.event).toMatchObject({ id: committedId, body: routeEvent.body, choices: routeEvent.choices });
+    expect(jsonPayload.event).toMatchObject({ id: committedId, body: persistedWinner?.body, choices: persistedWinner?.choices });
     expect(fixture.generationCalls).toBe(1);
   });
 
@@ -217,7 +245,7 @@ describe("stateful JSON/SSE event authority", () => {
     expect(fixture.pointer).toBeNull();
     expect(fixture.hiddenFlags.choiceCommittedAfterGeneration).toBe(true);
     expect(prismaMock.hiddenState.update).not.toHaveBeenCalled();
-    const lateCandidate = [...fixture.events.values()].find((event) => event.title === routeEvent.title);
+    const lateCandidate = [...fixture.events.values()].find((event) => event.title.startsWith(routeEvent.title));
     expect(lateCandidate?.status).toBe("DISCARDED");
     expect([...fixture.events.values()].some((event) => event.status === "ACTIVE")).toBe(false);
   });

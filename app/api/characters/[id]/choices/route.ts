@@ -31,6 +31,8 @@ import { logger } from "@/lib/server/logger";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
+class StaleEventChoiceError extends Error {}
+
 export async function POST(request: Request, context: RouteContext) {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   const log = logger.withRequestId(requestId);
@@ -249,73 +251,86 @@ export async function POST(request: Request, context: RouteContext) {
     relationshipEndingType,
     parentingEndingType,
   }) : null;
-  const jobApplicationWrites = buildJobApplicationWrites({
-    characterRunId: id,
-    specScore: character.specScore,
-    stats: updatedStats,
-    activeApplication: character.jobApplications[0],
-    flagDelta: resolvedFlagDelta,
-  });
+  try {
+    await prisma.$transaction(async (tx) => {
+      const claim = await tx.characterRun.updateMany({
+        where: { id, userId, currentEventId: activeEvent.id },
+        data: { currentEventId: null },
+      });
+      if (claim.count !== 1) throw new StaleEventChoiceError();
 
-  await prisma.$transaction([
-    prisma.characterStats.update({
-      where: { characterRunId: id },
-      data: updatedStats,
-    }),
-    prisma.hiddenState.update({
-      where: { characterRunId: id },
-      data: {
-        burnoutRisk: updatedBurnoutRisk,
-        eventFlags: finalEventFlags as object,
-      },
-    }),
-    prisma.event.update({
-      where: { id: activeEvent.id },
-      data: { status: "RESOLVED" },
-    }),
-    prisma.eventHistory.create({
-      data: {
+      const jobApplicationWrites = buildJobApplicationWrites(tx, {
         characterRunId: id,
-        eventId: activeEvent.id,
-        choiceId: choice.id,
-        summary: resolvedSummary,
-        statDelta: statDelta as object,
-        relationshipDelta: choice.relationshipDelta as object,
-        flagDelta: { ...resolvedFlagDelta, ...storyFlagDelta, ...lifeStageTransition.flagDelta } as object,
-      },
-    }),
-    ...updatedRelationships.map((rel) =>
-      prisma.relationship.updateMany({
-        where: { characterRunId: id, name: rel.name },
-        data: { trust: rel.trust },
-      }),
-    ),
-    ...newRelationships.map((rel) => prisma.relationship.create({ data: rel })),
-    ...jobApplicationWrites,
-    ...(endingRecord ? [
-      prisma.careerEndingRecord.create({ data: endingRecord }),
-      prisma.characterRun.update({
-        where: { id },
-        data: {
-          currentEventId: null,
-          coreEventCount: { increment: 1 },
-          currentGradeYear: lifeStageTransition.state.term.gradeYear,
-          academicStatus: endingType ? "DROPPED_OUT" : "GRADUATED",
-        },
-      }),
-    ] : [
-      prisma.characterRun.update({
-        where: { id },
-        data: {
-          currentEventId: null,
-          coreEventCount: { increment: 1 },
-          currentGradeYear: lifeStageTransition.state.term.gradeYear,
-          academicStatus: getAcademicStatusForLifeStage(lifeStageTransition.state.lifeStage, character.academicStatus),
-          majorEventCount: Math.min(5, Math.floor((character.coreEventCount + 1) / 3) + 1),
-        },
-      }),
-    ]),
-  ]);
+        specScore: character.specScore,
+        stats: updatedStats,
+        activeApplication: character.jobApplications[0],
+        flagDelta: resolvedFlagDelta,
+      });
+
+      await Promise.all([
+        tx.characterStats.update({
+          where: { characterRunId: id },
+          data: updatedStats,
+        }),
+        tx.hiddenState.update({
+          where: { characterRunId: id },
+          data: {
+            burnoutRisk: updatedBurnoutRisk,
+            eventFlags: finalEventFlags as object,
+          },
+        }),
+        tx.event.update({
+          where: { id: activeEvent.id },
+          data: { status: "RESOLVED" },
+        }),
+        tx.eventHistory.create({
+          data: {
+            characterRunId: id,
+            eventId: activeEvent.id,
+            choiceId: choice.id,
+            summary: resolvedSummary,
+            statDelta: statDelta as object,
+            relationshipDelta: choice.relationshipDelta as object,
+            flagDelta: { ...resolvedFlagDelta, ...storyFlagDelta, ...lifeStageTransition.flagDelta } as object,
+          },
+        }),
+        ...updatedRelationships.map((rel) =>
+          tx.relationship.updateMany({
+            where: { characterRunId: id, name: rel.name },
+            data: { trust: rel.trust },
+          }),
+        ),
+        ...newRelationships.map((rel) => tx.relationship.create({ data: rel })),
+        ...jobApplicationWrites,
+        ...(endingRecord ? [
+          tx.careerEndingRecord.create({ data: endingRecord }),
+          tx.characterRun.update({
+            where: { id },
+            data: {
+              coreEventCount: { increment: 1 },
+              currentGradeYear: lifeStageTransition.state.term.gradeYear,
+              academicStatus: endingType ? "DROPPED_OUT" : "GRADUATED",
+            },
+          }),
+        ] : [
+          tx.characterRun.update({
+            where: { id },
+            data: {
+              coreEventCount: { increment: 1 },
+              currentGradeYear: lifeStageTransition.state.term.gradeYear,
+              academicStatus: getAcademicStatusForLifeStage(lifeStageTransition.state.lifeStage, character.academicStatus),
+              majorEventCount: Math.min(5, Math.floor((character.coreEventCount + 1) / 3) + 1),
+            },
+          }),
+        ]),
+      ]);
+    });
+  } catch (error) {
+    if (error instanceof StaleEventChoiceError) {
+      return NextResponse.json({ error: "진행 중인 이벤트가 없습니다." }, { status: 400 });
+    }
+    throw error;
+  }
 
   log.info("선택 처리 완료", {
     userId,
@@ -377,7 +392,7 @@ function getImmediateBadEnding(stats: Record<string, number>, collapseEndingType
   return null;
 }
 
-function buildJobApplicationWrites(input: {
+function buildJobApplicationWrites(client: Pick<Prisma.TransactionClient, "jobApplication">, input: {
   characterRunId: string;
   specScore: number;
   stats: Record<string, number>;
@@ -394,7 +409,7 @@ function buildJobApplicationWrites(input: {
   const writes: Prisma.PrismaPromise<unknown>[] = [];
   const init = readRecord(input.flagDelta.jobApplicationInit);
   if (init && typeof init.companyName === "string" && typeof init.companyType === "string") {
-    writes.push(prisma.jobApplication.create({
+    writes.push(client.jobApplication.create({
       data: {
         characterRunId: input.characterRunId,
         companyName: init.companyName,
@@ -423,7 +438,7 @@ function buildJobApplicationWrites(input: {
   const isTerminal = active.currentStage === "FINAL_RESULT" || currentIndex < 0 || currentIndex + 1 >= stages.length;
   const previousResults = Array.isArray(active.stageResults) ? active.stageResults.filter((item) => typeof item === "object" && item !== null) : [];
 
-  writes.push(prisma.jobApplication.update({
+  writes.push(client.jobApplication.update({
     where: { id: active.id },
     data: {
       currentStage: stageResult.passed && !isTerminal ? nextStage as never : active.currentStage as never,

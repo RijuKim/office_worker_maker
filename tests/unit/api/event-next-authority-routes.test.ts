@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   eventFindFirst: vi.fn(),
   generateAiEvent: vi.fn(),
   generateAiEventStream: vi.fn(),
+  isEventAllowedForLifeStage: vi.fn(),
 }));
 
 vi.mock("@/lib/server/session", () => ({
@@ -35,6 +36,11 @@ vi.mock("@/lib/game/openrouter", () => ({
   generateAiEventStream: mocks.generateAiEventStream,
   incrementAiUsage: vi.fn(),
 }));
+
+vi.mock("@/lib/game/event-engine", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/game/event-engine")>();
+  return { ...actual, isEventAllowedForLifeStage: mocks.isEventAllowedForLifeStage };
+});
 
 import { POST as nextJson } from "@/app/api/characters/[id]/events/next/route";
 import { POST as nextStream } from "@/app/api/characters/[id]/events/next/stream/route";
@@ -91,6 +97,7 @@ describe("next-event route committed recovery", () => {
     });
 
     expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: "로그인이 필요합니다." });
     expect(mocks.characterFindFirst).not.toHaveBeenCalled();
   });
 
@@ -106,8 +113,14 @@ describe("next-event route committed recovery", () => {
 
     if (label === "JSON") {
       expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toEqual({ error: "캐릭터를 찾을 수 없습니다." });
     } else {
-      expect(await response.text()).toContain("캐릭터를 찾을 수 없습니다.");
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toContain("text/event-stream");
+      expect(await response.text()).toBe(
+        'event: status\ndata: {"message":"선택의 시간이 다가오고 있습니다..."}\n\n' +
+        'event: error\ndata: {"error":"캐릭터를 찾을 수 없습니다."}\n\n',
+      );
     }
     expect(mocks.characterFindFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: "other-user-run", userId: "user-1" },
@@ -133,6 +146,7 @@ describe("next-event route committed recovery", () => {
       },
     });
     expect(mocks.generateAiEvent).not.toHaveBeenCalled();
+    expect(mocks.isEventAllowedForLifeStage).not.toHaveBeenCalled();
   });
 
   it("lets SSE disconnect recovery resolve the same committed event without generation", async () => {
