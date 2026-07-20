@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { EventSource } from "@prisma/client";
 
 import { getStoryArc, isEventAllowedForLifeStage, selectNextEvent, type StaticEvent } from "@/lib/game/event-engine";
-import { buildAiRetryGuidance, evaluateCandidateEvent } from "@/lib/game/event-quality-policy";
+import { evaluateCandidateEvent, findValidatedStaticFallback } from "@/lib/game/event-quality-policy";
 import { deriveLifeStageState } from "@/lib/game/life-stage";
 import { checkDailyAiLimit, generateAiEvent, incrementAiUsage } from "@/lib/game/openrouter";
 import { recordEventQualityLog } from "@/lib/server/event-quality-log";
@@ -156,8 +156,13 @@ export async function POST(request: Request, context: RouteContext) {
   let source: EventSource = "FALLBACK";
   let aiAttempted = false;
   let aiFailed = false;
-  let retryUsed = false;
-  const fallbackUsed = false;
+  const retryUsed = false;
+  let fallbackUsed = false;
+  const generationStartedAt = Date.now();
+  let providerElapsedMs = 0;
+  let generationReason: string | null = null;
+  let generationSlow = false;
+  let providerId: string | null = null;
 
   if (character.stats && canUseAiForLifeStage(selectionLifeStage.lifeStage, character.academicStatus)) {
     aiAttempted = true;
@@ -199,6 +204,9 @@ export async function POST(request: Request, context: RouteContext) {
       avoidPeople: diversityGuidance.avoidPeople,
     };
     const aiResult = await generateAiEvent(aiState, { skipPrimary: !limit.allowed });
+    providerElapsedMs = aiResult.providerElapsedMs ?? 0;
+    generationSlow = aiResult.slow ?? false;
+    providerId = aiResult.providerId ?? null;
 
     if (aiResult.success) {
       if (aiResult.providerId === "ollama") {
@@ -237,84 +245,45 @@ export async function POST(request: Request, context: RouteContext) {
         source = "AI";
       } else if (initialEvaluation.verdict.hardFailure) {
         aiFailed = true;
-        if (initialEvaluation.verdict.retryRecommended) {
-          retryUsed = true;
-          const retryResult = await generateAiEvent({
-            ...aiState,
-            recentSummaries: [...recentSummaries, buildAiRetryGuidance(initialEvaluation.verdict)],
-          }, { skipPrimary: !limit.allowed });
-
-          if (retryResult.success) {
-            if (retryResult.providerId === "ollama") {
-              await incrementAiUsage(userId);
-            }
-            const retryEvent = {
-              title: retryResult.event.title,
-              body: retryResult.event.body,
-              choices: retryResult.event.choices.map((choice) => ({
-                ...choice,
-                relationshipDelta: choice.relationshipDelta ?? [],
-                flagDelta: { aiGenerated: true, storyPhase: storyArc.phase },
-              })),
-              tags: retryResult.event.tags,
-              source: "FALLBACK" as const,
-            };
-            const retryEvaluation = evaluateCandidateEvent("AI", retryEvent, qualityContext);
-            recordEventQualityLog({
-              characterRunId: id,
-              eventId: null,
-              phase: "retry_ai",
-              source: "AI",
-              verdict: retryEvaluation.verdict,
-              reasons: retryEvaluation.verdict.reasons,
-              diversityScore: retryEvaluation.verdict.diversityScore,
-              continuityExemptions: retryEvaluation.verdict.continuityExemptions,
-              retryUsed: true,
-              fallbackUsed: false,
-              selectedFallbackTitle: null,
-              durationMs: retryEvaluation.durationMs,
-              createdAt: new Date().toISOString(),
-            });
-
-            if (retryEvaluation.verdict.status === "pass" && isEventAllowedForLifeStage({ title: retryEvent.title, tags: retryEvent.tags }, selectionContext)) {
-              selectedEvent = retryEvent;
-              source = "AI";
-              aiFailed = false;
-            }
-          }
-        }
+        generationReason = "post_parse_quality_failure";
       } else {
         selectedEvent = aiEvent;
         source = "AI";
       }
     } else {
       aiFailed = true;
-      const retryResult = await generateAiEvent(aiState, { skipPrimary: !limit.allowed });
-      if (retryResult.success) {
-        aiFailed = false;
-        if (retryResult.providerId === "ollama") {
-          await incrementAiUsage(userId);
-        }
-        selectedEvent = {
-          title: retryResult.event.title,
-          body: retryResult.event.body,
-          choices: retryResult.event.choices.map((choice) => ({
-            ...choice,
-            relationshipDelta: choice.relationshipDelta ?? [],
-            flagDelta: { aiGenerated: true, storyPhase: storyArc.phase },
-          })),
-          tags: retryResult.event.tags,
-          source: "FALLBACK",
-        };
-        source = "AI";
-      }
+      generationReason = aiResult.reason;
     }
   }
 
   if (!selectedEvent) {
     const { type, event } = selectNextEvent(selectionContext, excludedEventTitles);
-    selectedEvent = event;
-    source = type === "forced" ? "FORCED" : event.source;
+    if (aiAttempted && type !== "forced") {
+      const fallback = findValidatedStaticFallback({
+        preferredEvent: event,
+        selectionContext,
+        excludedEventTitles,
+        qualityContext,
+      });
+      if (!fallback) {
+        log.error("검증된 대체 이벤트 없음", { userId, characterId: id, generationReason });
+        return NextResponse.json({ error: "다음 사건을 생성하지 못했습니다." }, { status: 500 });
+      }
+      selectedEvent = fallback.event;
+      source = "FALLBACK";
+      recordEventQualityLog({
+        characterRunId: id, eventId: null, phase: "static_fallback", source,
+        verdict: fallback.evaluation.verdict, reasons: fallback.evaluation.verdict.reasons,
+        diversityScore: fallback.evaluation.verdict.diversityScore,
+        continuityExemptions: fallback.evaluation.verdict.continuityExemptions,
+        retryUsed, fallbackUsed: true, selectedFallbackTitle: fallback.event.title,
+        durationMs: fallback.evaluation.durationMs, createdAt: new Date().toISOString(),
+      });
+    } else {
+      selectedEvent = event;
+      source = type === "forced" ? "FORCED" : event.source;
+    }
+    fallbackUsed = aiAttempted;
   }
 
   let newEvent;
@@ -360,6 +329,11 @@ export async function POST(request: Request, context: RouteContext) {
     aiFailed,
     retryUsed,
     fallbackUsed,
+    generationReason,
+    providerId,
+    providerElapsedMs,
+    totalElapsedMs: Date.now() - generationStartedAt,
+    slow: generationSlow,
     lifeStage: selectionLifeStage.lifeStage,
   });
 

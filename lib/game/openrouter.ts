@@ -36,7 +36,18 @@ const fallbackProvider = (): AiProvider => ({
 const aiProviders = (options: AiProviderOptions = {}) =>
   options.skipPrimary ? [fallbackProvider()] : [primaryProvider(), fallbackProvider()];
 
-const AI_TIMEOUT_MS = 30_000;
+const DEFAULT_AI_TIMEOUT_MS = 30_000;
+const MIN_AI_TIMEOUT_MS = 5_000;
+const MAX_AI_TIMEOUT_MS = 120_000;
+export const SLOW_AI_GENERATION_MS = 10_000;
+
+export function getOpenRouterTimeoutMs(raw = process.env.OPENROUTER_TIMEOUT_MS): number {
+  if (raw === undefined || !/^\d+$/.test(raw.trim())) return DEFAULT_AI_TIMEOUT_MS;
+  const parsed = Number(raw);
+  return parsed >= MIN_AI_TIMEOUT_MS && parsed <= MAX_AI_TIMEOUT_MS
+    ? parsed
+    : DEFAULT_AI_TIMEOUT_MS;
+}
 
 const aiEventSchema = z.object({
   title: z.string().min(1).max(100),
@@ -258,11 +269,33 @@ export interface OpenRouterResult {
   event: AiEventResponse;
   providerId?: AiProvider["id"];
   providerLabel?: string;
+  providerElapsedMs: number;
+  totalElapsedMs: number;
+  slow: boolean;
 }
+
+export type AiEventFailureReason =
+  | "no_key"
+  | "timeout"
+  | "rate_limited"
+  | "api_error"
+  | "empty_content"
+  | "malformed_json"
+  | "narrative_schema"
+  | "choice_count"
+  | "choice_field"
+  | "choice_stat_range"
+  | "choice_schema";
 
 export interface OpenRouterFailure {
   success: false;
-  reason: "no_key" | "timeout" | "rate_limited" | "invalid_response" | "api_error";
+  reason: AiEventFailureReason | "invalid_response";
+  providerId?: AiProvider["id"];
+  providerLabel?: string;
+  providerElapsedMs?: number;
+  totalElapsedMs?: number;
+  slow?: boolean;
+  issues?: string[];
 }
 
 export interface OpenRouterEndingResult {
@@ -276,13 +309,16 @@ export async function generateAiEvent(
   state: AiEventPromptState,
   options: AiProviderOptions = {},
 ): Promise<OpenRouterResult | OpenRouterFailure> {
+  const totalStartedAt = Date.now();
   let lastFailure: OpenRouterFailure = { success: false, reason: "no_key" };
 
   for (const provider of aiProviders(options)) {
     const result = await generateAiEventWithProvider(provider, state);
-    if (result.success) return result;
-    lastFailure = result;
-    console.warn("AI event provider failed", { provider: provider.label, reason: result.reason });
+    const totalElapsedMs = Date.now() - totalStartedAt;
+    const measured = { ...result, totalElapsedMs, slow: totalElapsedMs > SLOW_AI_GENERATION_MS };
+    if (measured.success) return measured;
+    lastFailure = measured;
+    console.warn("AI event provider failed", { provider: provider.label, reason: measured.reason });
   }
 
   return lastFailure;
@@ -294,8 +330,17 @@ async function generateAiEventWithProvider(
 ): Promise<OpenRouterResult | OpenRouterFailure> {
   if (!provider.key) return { success: false, reason: "no_key" };
 
+  const startedAt = Date.now();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), getOpenRouterTimeoutMs());
+  const failure = (reason: AiEventFailureReason, issues?: string[]): OpenRouterFailure => ({
+    success: false,
+    reason,
+    providerId: provider.id,
+    providerLabel: provider.label,
+    providerElapsedMs: Date.now() - startedAt,
+    issues,
+  });
 
   try {
     const response = await fetch(
@@ -313,7 +358,7 @@ async function generateAiEventWithProvider(
     );
 
     if (response.status === 429) {
-      return { success: false, reason: "rate_limited" };
+      return failure("rate_limited");
     }
 
     if (!response.ok) {
@@ -321,27 +366,27 @@ async function generateAiEventWithProvider(
         provider: provider.label,
         status: response.status,
       });
-      return { success: false, reason: "api_error" };
+      return failure("api_error");
     }
 
     const data = await response.json();
     const content = data?.choices?.[0]?.message?.content;
 
     if (!content) {
-      return { success: false, reason: "invalid_response" };
+      return failure("empty_content");
     }
 
-    const event = parseAiEventContent(content);
-    if (!event) {
-      return { success: false, reason: "invalid_response" };
+    const parsed = parseAiEventContentDetailed(content);
+    if (!parsed.success) {
+      return failure(parsed.reason, parsed.issues);
     }
 
-    return { success: true, event, providerId: provider.id, providerLabel: provider.label };
+    return { success: true, event: parsed.event, providerId: provider.id, providerLabel: provider.label, providerElapsedMs: Date.now() - startedAt, totalElapsedMs: 0, slow: false };
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
-      return { success: false, reason: "timeout" };
+      return failure("timeout");
     }
-    return { success: false, reason: "api_error" };
+    return failure("api_error");
   } finally {
     clearTimeout(timeout);
   }
@@ -352,6 +397,7 @@ export async function generateAiEventStream(
   onBodyDelta: (delta: string) => void,
   options: AiProviderOptions = {},
 ): Promise<OpenRouterResult | OpenRouterFailure> {
+  const totalStartedAt = Date.now();
   let lastFailure: OpenRouterFailure = { success: false, reason: "no_key" };
 
   for (const provider of aiProviders(options)) {
@@ -360,9 +406,11 @@ export async function generateAiEventStream(
       providerSentBody = true;
       onBodyDelta(delta);
     });
-    if (result.success) return result;
-    lastFailure = result;
-    console.warn("AI event stream provider failed", { provider: provider.label, reason: result.reason });
+    const totalElapsedMs = Date.now() - totalStartedAt;
+    const measured = { ...result, totalElapsedMs, slow: totalElapsedMs > SLOW_AI_GENERATION_MS };
+    if (measured.success) return measured;
+    lastFailure = measured;
+    console.warn("AI event stream provider failed", { provider: provider.label, reason: measured.reason });
     if (providerSentBody) break;
   }
 
@@ -376,8 +424,13 @@ async function generateAiEventStreamWithProvider(
 ): Promise<OpenRouterResult | OpenRouterFailure> {
   if (!provider.key) return { success: false, reason: "no_key" };
 
+  const startedAt = Date.now();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), getOpenRouterTimeoutMs());
+  const failure = (reason: AiEventFailureReason, issues?: string[]): OpenRouterFailure => ({
+    success: false, reason, providerId: provider.id, providerLabel: provider.label,
+    providerElapsedMs: Date.now() - startedAt, issues,
+  });
 
   try {
     const response = await fetch(`${provider.baseUrl}/chat/completions`, {
@@ -391,28 +444,26 @@ async function generateAiEventStreamWithProvider(
       signal: controller.signal,
     });
 
-    if (response.status === 429) return { success: false, reason: "rate_limited" };
+    if (response.status === 429) return failure("rate_limited");
     if (!response.ok || !response.body) {
       console.warn("AI event stream provider returned non-ok response", {
         provider: provider.label,
         status: response.status,
         hasBody: Boolean(response.body),
       });
-      return { success: false, reason: "api_error" };
+      return failure("api_error");
     }
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
     let content = "";
-    let rawResponse = "";
     let sentBody = "";
 
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
       const decoded = decoder.decode(value, { stream: true });
-      rawResponse += decoded;
       buffer += decoded;
       const lines = buffer.split("\n");
       buffer = lines.pop() ?? "";
@@ -423,6 +474,7 @@ async function generateAiEventStreamWithProvider(
         const payload = trimmed.slice(5).trim();
         if (!payload || payload === "[DONE]") continue;
         const parsed = safeJson(payload);
+        if (readRecord(parsed)?.error) return failure("api_error");
         const token = extractChatToken(parsed);
         if (typeof token !== "string") continue;
 
@@ -444,13 +496,14 @@ async function generateAiEventStreamWithProvider(
       }
     }
 
-    const event = parseAiEventContent(content) ?? parseChatCompletionEvent(rawResponse);
-    return event ? { success: true, event, providerId: provider.id, providerLabel: provider.label } : { success: false, reason: "invalid_response" };
+    const parsed = parseAiEventContentDetailed(content);
+    if (!parsed.success) return failure(parsed.reason, parsed.issues);
+    return { success: true, event: parsed.event, providerId: provider.id, providerLabel: provider.label, providerElapsedMs: Date.now() - startedAt, totalElapsedMs: 0, slow: false };
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
-      return { success: false, reason: "timeout" };
+      return failure("timeout");
     }
-    return { success: false, reason: "api_error" };
+    return failure("api_error");
   } finally {
     clearTimeout(timeout);
   }
@@ -488,13 +541,33 @@ For streaming responsiveness, output the JSON object in this field order exactly
 }
 
 export function parseAiEventContent(content: string) {
+  const parsed = parseAiEventContentDetailed(content);
+  return parsed.success ? parsed.event : null;
+}
+
+type AiEventParseFailureReason = Exclude<AiEventFailureReason, "no_key" | "timeout" | "rate_limited" | "api_error" | "empty_content">;
+
+export type AiEventParseResult =
+  | { success: true; event: AiEventResponse }
+  | { success: false; reason: AiEventParseFailureReason; issues: string[] };
+
+export function parseAiEventContentDetailed(content: string): AiEventParseResult {
+  let raw: unknown;
   try {
-    const parsed = extractJson(content);
-    const validated = aiEventSchema.safeParse(normalizeAiEvent(parsed));
-    return validated.success ? validated.data : null;
+    raw = extractJson(content);
   } catch {
-    return null;
+    return { success: false, reason: "malformed_json", issues: ["json"] };
   }
+  const validated = aiEventSchema.safeParse(normalizeAiEvent(raw));
+  if (validated.success) return { success: true, event: validated.data };
+  const issues = validated.error.issues.map((issue) => issue.path.join(".") || "event");
+  const choiceIssues = validated.error.issues.filter((issue) => issue.path[0] === "choices");
+  let reason: AiEventParseFailureReason = "narrative_schema";
+  if (choiceIssues.some((issue) => issue.path.length === 1 && (issue.code === "too_small" || issue.code === "too_big"))) reason = "choice_count";
+  else if (choiceIssues.some((issue) => issue.path.includes("statDelta") && (issue.code === "too_small" || issue.code === "too_big"))) reason = "choice_stat_range";
+  else if (choiceIssues.some((issue) => issue.path.some((part) => part === "label" || part === "summary" || part === "id"))) reason = "choice_field";
+  else if (choiceIssues.length > 0) reason = "choice_schema";
+  return { success: false, reason, issues };
 }
 
 export async function generateAiEnding(state: {
@@ -539,7 +612,7 @@ async function generateAiEndingWithProvider(
   if (!provider.key) return { success: false, reason: "no_key" };
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), getOpenRouterTimeoutMs());
 
   try {
     const response = await fetch(provider.baseUrl + "/chat/completions", {
@@ -807,30 +880,6 @@ function extractChatToken(payload: unknown) {
   return typeof messageContent === "string" ? messageContent : null;
 }
 
-function parseChatCompletionEvent(rawResponse: string) {
-  const candidates = rawResponse
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => line.startsWith("data:") ? line.slice(5).trim() : line)
-    .filter((line) => line !== "[DONE]");
-
-  for (const candidate of candidates.reverse()) {
-    const content = extractChatToken(safeJson(candidate));
-    if (typeof content !== "string") continue;
-    const event = parseAiEventContent(content);
-    if (event) return event;
-  }
-
-  const direct = safeJson(rawResponse.trim());
-  const directContent = extractChatToken(direct);
-  if (typeof directContent === "string") {
-    return parseAiEventContent(directContent);
-  }
-
-  return null;
-}
-
 function normalizeAiEvent(raw: unknown) {
   if (typeof raw !== "object" || raw === null) return raw;
   const container = raw as Record<string, unknown>;
@@ -862,8 +911,7 @@ function normalizeChoice(raw: unknown, index: number) {
       .map(([key, value]) => [key, Number(value)] as const)
       .filter(([key, value]) => allowedStats.includes(key as typeof allowedStats[number]) && Number.isFinite(value))
       .map(([key, value]) => {
-        const rounded = Math.round(value);
-        return [key, key === "health" ? Math.max(-1, Math.min(15, rounded)) : Math.max(-15, Math.min(15, rounded))];
+        return [key, Math.round(value)];
       }),
   );
   const adjustedStatDelta = ensureChoiceCost(statDelta, index);
@@ -1018,7 +1066,7 @@ async function generateAiBranchProposalsWithProvider(
   if (!provider.key) return { success: false, reason: "no_key" };
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), getOpenRouterTimeoutMs());
 
   try {
     const response = await fetch(provider.baseUrl + "/chat/completions", {
