@@ -53,11 +53,13 @@ const committed = {
   tags: ["진로"],
 };
 
-function arrangeCommittedCharacter() {
+function arrangeCommittedCharacter(source: "AI" | "STATIC" | "FORCED" = "AI") {
+  const selected = { ...committed, source };
   mocks.characterFindFirst
     .mockResolvedValueOnce({ id: "run-1", hiddenState: { eventFlags: {} } })
-    .mockResolvedValueOnce({ currentEventId: committed.id });
-  mocks.eventFindFirst.mockResolvedValueOnce(committed);
+    .mockResolvedValueOnce({ currentEventId: selected.id });
+  mocks.eventFindFirst.mockResolvedValueOnce(selected);
+  return selected;
 }
 
 describe("next-event route committed recovery", () => {
@@ -65,8 +67,8 @@ describe("next-event route committed recovery", () => {
     vi.clearAllMocks();
   });
 
-  it("returns the pointer event unchanged from the JSON route without generation", async () => {
-    arrangeCommittedCharacter();
+  it.each(["AI", "STATIC", "FORCED"] as const)("returns an ineligible pre-existing %s pointer event unchanged", async (source) => {
+    const selected = arrangeCommittedCharacter(source);
 
     const response = await nextJson(new Request("http://localhost/api/characters/run-1/events/next", {
       method: "POST",
@@ -75,12 +77,12 @@ describe("next-event route committed recovery", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       event: {
-        id: committed.id,
-        title: committed.title,
-        body: committed.body,
+        id: selected.id,
+        title: selected.title,
+        body: selected.body,
         choices,
-        source: "AI",
-        forced: false,
+        source,
+        forced: source === "FORCED",
       },
     });
     expect(mocks.generateAiEvent).not.toHaveBeenCalled();

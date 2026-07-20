@@ -15,7 +15,7 @@ export type EventCandidate = PersistedEvent;
 export interface EventAuthorityStore {
   getCurrent(): Promise<PersistedEvent | null>;
   createCandidate(candidate: EventCandidate): Promise<PersistedEvent>;
-  claimIfEmpty(candidateId: string): Promise<boolean>;
+  claimIfEmpty(candidateId: string, onClaim?: (transaction: unknown) => Promise<void>): Promise<boolean>;
   discardCandidate(candidateId: string): Promise<void>;
 }
 
@@ -38,14 +38,15 @@ export async function acquireAuthoritativeEvent({
 }: {
   store: EventAuthorityStore;
   generate: () => Promise<EventCandidate>;
-  onCommitted?: (event: PersistedEvent) => Promise<void>;
+  onCommitted?: (event: PersistedEvent, transaction: unknown) => Promise<void>;
 }): Promise<PersistedEvent> {
   const current = await store.getCurrent();
   if (current) return current;
 
   const candidate = await store.createCandidate(await generate());
-  if (await store.claimIfEmpty(candidate.id)) {
-    await onCommitted?.(candidate);
+  if (await store.claimIfEmpty(candidate.id, onCommitted ? async (transaction) => {
+    await onCommitted(candidate, transaction);
+  } : undefined)) {
     return candidate;
   }
 
@@ -104,7 +105,7 @@ export function createPrismaEventAuthorityStore({
       });
     },
 
-    async claimIfEmpty(candidateId) {
+    async claimIfEmpty(candidateId, onClaim) {
       return client.$transaction(async (tx) => {
         const claimed = await tx.characterRun.updateMany({
           where: { id: characterRunId, userId, currentEventId: null },
@@ -118,6 +119,7 @@ export function createPrismaEventAuthorityStore({
           if (promoted.count !== 1) {
             throw new Error("Claimed event candidate could not be promoted to ACTIVE.");
           }
+          await onClaim?.(tx);
         }
         return claimed.count === 1;
       });

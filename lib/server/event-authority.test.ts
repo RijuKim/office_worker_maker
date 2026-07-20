@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   acquireAuthoritativeEvent,
   createPrismaEventAuthorityStore,
+  EventAuthorityLostError,
   toPublicEvent,
   type EventAuthorityStore,
   type PersistedEvent,
@@ -91,5 +92,62 @@ describe("event authority", () => {
       data: { currentEventId: "candidate-1" },
     });
     expect(discardMany).not.toHaveBeenCalled();
+  });
+
+  it("promotes the winner and applies required side effects in the same transaction", async () => {
+    const calls: string[] = [];
+    const tx = {
+      characterRun: { updateMany: vi.fn(async () => { calls.push("claim"); return { count: 1 }; }) },
+      event: { updateMany: vi.fn(async () => { calls.push("promote"); return { count: 1 }; }) },
+      hiddenState: { update: vi.fn(async () => { calls.push("flags"); return {}; }) },
+    };
+    const client = {
+      characterRun: { findFirst: vi.fn() },
+      event: { findFirst: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
+      $transaction: vi.fn(async (operation: (transaction: typeof tx) => Promise<boolean>) => {
+        calls.push("transaction:start");
+        const result = await operation(tx);
+        calls.push("transaction:commit");
+        return result;
+      }),
+    };
+    const store = createPrismaEventAuthorityStore({ client: client as never, characterRunId: "run-1", userId: "user-1" });
+
+    await expect(store.claimIfEmpty("candidate-1", async (transaction) => {
+      await (transaction as typeof tx).hiddenState.update();
+    })).resolves.toBe(true);
+
+    expect(calls).toEqual(["transaction:start", "claim", "promote", "flags", "transaction:commit"]);
+  });
+
+  it("discards a failed-CAS candidate and reports no active event when the winner was consumed", async () => {
+    const candidate = event("late-candidate");
+    const store: EventAuthorityStore = {
+      getCurrent: vi.fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null),
+      createCandidate: vi.fn(async () => candidate),
+      claimIfEmpty: vi.fn(async () => false),
+      discardCandidate: vi.fn(async () => undefined),
+    };
+
+    await expect(acquireAuthoritativeEvent({ store, generate: async () => candidate }))
+      .rejects.toBeInstanceOf(EventAuthorityLostError);
+    expect(store.discardCandidate).toHaveBeenCalledWith(candidate.id);
+    expect(store.claimIfEmpty).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns the failed-CAS winner and leaves the losing candidate non-active", async () => {
+    const winner = event("winner");
+    const loser = event("loser");
+    const store: EventAuthorityStore = {
+      getCurrent: vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(winner),
+      createCandidate: vi.fn(async () => loser),
+      claimIfEmpty: vi.fn(async () => false),
+      discardCandidate: vi.fn(async () => undefined),
+    };
+
+    await expect(acquireAuthoritativeEvent({ store, generate: async () => loser })).resolves.toEqual(winner);
+    expect(store.discardCandidate).toHaveBeenCalledWith(loser.id);
   });
 });

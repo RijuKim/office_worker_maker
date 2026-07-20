@@ -6,7 +6,7 @@ import { buildAiRetryGuidance, evaluateCandidateEvent } from "@/lib/game/event-q
 import { deriveLifeStageState } from "@/lib/game/life-stage";
 import { checkDailyAiLimit, generateAiEvent, incrementAiUsage } from "@/lib/game/openrouter";
 import { recordEventQualityLog } from "@/lib/server/event-quality-log";
-import { acquireAuthoritativeEvent, createPrismaEventAuthorityStore, toPublicEvent } from "@/lib/server/event-authority";
+import { acquireAuthoritativeEvent, createPrismaEventAuthorityStore, EventAuthorityLostError, toPublicEvent } from "@/lib/server/event-authority";
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
 import { logger } from "@/lib/server/logger";
@@ -317,31 +317,40 @@ export async function POST(request: Request, context: RouteContext) {
     source = type === "forced" ? "FORCED" : event.source;
   }
 
-  const newEvent = await acquireAuthoritativeEvent({
-    store: authorityStore,
-    generate: async () => ({
-      id: crypto.randomUUID(),
-      status: "ACTIVE",
-      title: selectedEvent.title,
-      body: selectedEvent.body,
-      source,
-      choices: selectedEvent.choices,
-      tags: selectedEvent.tags,
-    }),
-    onCommitted: async () => {
-      await prisma.hiddenState.update({
-        where: { characterRunId: id },
-        data: {
-          eventFlags: {
-            ...selectionFlags,
-            storyArc,
-            lastEventSource: source,
-            ...(fallbackUsed ? { lastAiFallbackReason: "quality_or_generation_failed" } : {}),
+  let newEvent;
+  try {
+    newEvent = await acquireAuthoritativeEvent({
+      store: authorityStore,
+      generate: async () => ({
+        id: crypto.randomUUID(),
+        status: "ACTIVE",
+        title: selectedEvent.title,
+        body: selectedEvent.body,
+        source,
+        choices: selectedEvent.choices,
+        tags: selectedEvent.tags,
+      }),
+      onCommitted: async (_event, transaction) => {
+        const tx = transaction as Pick<typeof prisma, "hiddenState">;
+        await tx.hiddenState.update({
+          where: { characterRunId: id },
+          data: {
+            eventFlags: {
+              ...selectionFlags,
+              storyArc,
+              lastEventSource: source,
+              ...(fallbackUsed ? { lastAiFallbackReason: "quality_or_generation_failed" } : {}),
+            },
           },
-        },
-      });
-    },
-  });
+        });
+      },
+    });
+  } catch (error) {
+    if (error instanceof EventAuthorityLostError) {
+      return NextResponse.json({ error: "진행 중인 이벤트가 없습니다." }, { status: 400 });
+    }
+    throw error;
+  }
   log.info("이벤트 생성 완료", {
     userId,
     characterId: id,

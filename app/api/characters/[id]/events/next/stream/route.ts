@@ -5,7 +5,7 @@ import { buildAiRetryGuidance, evaluateCandidateEvent } from "@/lib/game/event-q
 import { deriveLifeStageState } from "@/lib/game/life-stage";
 import { checkDailyAiLimit, generateAiEvent, generateAiEventStream, incrementAiUsage } from "@/lib/game/openrouter";
 import { recordEventQualityLog } from "@/lib/server/event-quality-log";
-import { acquireAuthoritativeEvent, createPrismaEventAuthorityStore, toPublicEvent } from "@/lib/server/event-authority";
+import { acquireAuthoritativeEvent, createPrismaEventAuthorityStore, EventAuthorityLostError, toPublicEvent } from "@/lib/server/event-authority";
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
 import { logger } from "@/lib/server/logger";
@@ -321,8 +321,9 @@ export async function POST(request: Request, context: RouteContext) {
             choices: selectedEvent.choices,
             tags: selectedEvent.tags,
           }),
-          onCommitted: async () => {
-            await prisma.hiddenState.update({
+          onCommitted: async (_event, transaction) => {
+            const tx = transaction as Pick<typeof prisma, "hiddenState">;
+            await tx.hiddenState.update({
               where: { characterRunId: id },
               data: {
                 eventFlags: {
@@ -353,6 +354,10 @@ export async function POST(request: Request, context: RouteContext) {
           await streamTextFallback(selectedEvent.body, (text) => send("body_delta", { text }));
         }
       } catch (error) {
+        if (error instanceof EventAuthorityLostError) {
+          send("error", { error: "진행 중인 이벤트가 없습니다." });
+          return;
+        }
         console.error("Next event stream route failed", error);
         log.error("스트림 이벤트 생성 중 예외", { userId, characterId: id, error: String(error) });
         send("error", { error: "다음 사건을 생성하지 못했습니다." });
