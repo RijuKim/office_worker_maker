@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import type { EventSource } from "@prisma/client";
 
 import { getStoryArc, isEventAllowedForLifeStage, selectNextEvent, type StaticEvent } from "@/lib/game/event-engine";
-import { buildAiRetryGuidance, evaluateCandidateEvent, findValidatedStaticFallback } from "@/lib/game/event-quality-policy";
+import { buildAiRetryGuidance, evaluateCandidateEvent } from "@/lib/game/event-quality-policy";
 import { deriveLifeStageState } from "@/lib/game/life-stage";
 import { checkDailyAiLimit, generateAiEvent, incrementAiUsage } from "@/lib/game/openrouter";
 import { recordEventQualityLog } from "@/lib/server/event-quality-log";
+import { acquireAuthoritativeEvent, createPrismaEventAuthorityStore, toPublicEvent } from "@/lib/server/event-authority";
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
 import { logger } from "@/lib/server/logger";
@@ -44,11 +45,6 @@ export async function POST(request: Request, context: RouteContext) {
         take: 20,
         include: { event: true },
       },
-      events: {
-        where: { status: "ACTIVE" },
-        orderBy: { createdAt: "desc" },
-        take: 1,
-      },
     },
   });
 
@@ -58,6 +54,12 @@ export async function POST(request: Request, context: RouteContext) {
 
   if (!character.hiddenState) {
     return NextResponse.json({ error: "캐릭터 데이터가 불완전합니다." }, { status: 500 });
+  }
+
+  const authorityStore = createPrismaEventAuthorityStore({ client: prisma, characterRunId: id, userId });
+  const committedEvent = await authorityStore.getCurrent();
+  if (committedEvent) {
+    return NextResponse.json({ event: toPublicEvent(committedEvent) });
   }
 
   const currentFlags = (character.hiddenState.eventFlags as Record<string, unknown>) ?? {};
@@ -122,34 +124,6 @@ export async function POST(request: Request, context: RouteContext) {
     recentRelationshipNames: diversityGuidance.recentPeople,
     previousChoiceSummary,
   };
-
-  const activeEvent = character.events[0];
-  if (activeEvent) {
-    const activeTags = Array.isArray(activeEvent.tags) ? activeEvent.tags.filter((tag) => typeof tag === "string") : [];
-    if (activeEvent.source === "FORCED" || isEventAllowedForLifeStage({ title: activeEvent.title, tags: activeTags }, selectionContext)) {
-      return NextResponse.json({
-        event: {
-          id: activeEvent.id,
-          title: activeEvent.title,
-          body: activeEvent.body,
-          choices: activeEvent.choices,
-          source: activeEvent.source,
-          forced: activeEvent.source === "FORCED",
-        },
-      });
-    }
-
-    await prisma.$transaction([
-      prisma.event.update({
-        where: { id: activeEvent.id },
-        data: { status: "DISCARDED" },
-      }),
-      prisma.characterRun.update({
-        where: { id },
-        data: { currentEventId: null },
-      }),
-    ]);
-  }
 
   const recentSummaries = character.eventHistory
     .map((h: { summary: string }) => h.summary)
@@ -343,38 +317,31 @@ export async function POST(request: Request, context: RouteContext) {
     source = type === "forced" ? "FORCED" : event.source;
   }
 
-  const newEvent = await prisma.event.create({
-    data: {
-      characterRunId: id,
+  const newEvent = await acquireAuthoritativeEvent({
+    store: authorityStore,
+    generate: async () => ({
+      id: crypto.randomUUID(),
+      status: "ACTIVE",
       title: selectedEvent.title,
       body: selectedEvent.body,
       source,
-      status: "ACTIVE",
-      choices: selectedEvent.choices as object[],
+      choices: selectedEvent.choices,
       tags: selectedEvent.tags,
-      safetyChecked: true,
+    }),
+    onCommitted: async () => {
+      await prisma.hiddenState.update({
+        where: { characterRunId: id },
+        data: {
+          eventFlags: {
+            ...selectionFlags,
+            storyArc,
+            lastEventSource: source,
+            ...(fallbackUsed ? { lastAiFallbackReason: "quality_or_generation_failed" } : {}),
+          },
+        },
+      });
     },
   });
-
-  await prisma.characterRun.update({
-    where: { id },
-    data: {
-      currentEventId: newEvent.id,
-    },
-  });
-
-  await prisma.hiddenState.update({
-    where: { characterRunId: id },
-    data: {
-      eventFlags: {
-        ...selectionFlags,
-        storyArc,
-        lastEventSource: source,
-        ...(fallbackUsed ? { lastAiFallbackReason: "quality_or_generation_failed" } : {}),
-      },
-    },
-  });
-
   log.info("이벤트 생성 완료", {
     userId,
     characterId: id,
@@ -387,16 +354,7 @@ export async function POST(request: Request, context: RouteContext) {
     lifeStage: selectionLifeStage.lifeStage,
   });
 
-  return NextResponse.json({
-    event: {
-      id: newEvent.id,
-      title: newEvent.title,
-      body: newEvent.body,
-      choices: newEvent.choices,
-      source: newEvent.source,
-      forced: source === "FORCED",
-    },
-  });
+  return NextResponse.json({ event: toPublicEvent(newEvent) });
 }
 
 function canUseAiForLifeStage(lifeStage: string, academicStatus: string) {
@@ -405,24 +363,6 @@ function canUseAiForLifeStage(lifeStage: string, academicStatus: string) {
     lifeStage === "college_mid" ||
     lifeStage === "college_late"
   );
-}
-
-async function getRecentlySeenUserEventTitles(userId: string, currentCharacterRunId: string) {
-  const recentHistory = await prisma.eventHistory.findMany({
-    where: {
-      characterRun: {
-        userId,
-        id: { not: currentCharacterRunId },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 40,
-    include: { event: true },
-  });
-
-  return recentHistory
-    .map((history: { event?: { title?: string } }) => history.event?.title)
-    .filter(Boolean) as string[];
 }
 
 function getResidence(rawFamilyState: unknown) {

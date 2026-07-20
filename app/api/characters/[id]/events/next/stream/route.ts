@@ -1,10 +1,11 @@
 import type { EventSource } from "@prisma/client";
 
 import { getStoryArc, isEventAllowedForLifeStage, selectNextEvent, type EventSelectionContext, type StaticEvent } from "@/lib/game/event-engine";
-import { buildAiRetryGuidance, evaluateCandidateEvent, findValidatedStaticFallback } from "@/lib/game/event-quality-policy";
+import { buildAiRetryGuidance, evaluateCandidateEvent } from "@/lib/game/event-quality-policy";
 import { deriveLifeStageState } from "@/lib/game/life-stage";
 import { checkDailyAiLimit, generateAiEvent, generateAiEventStream, incrementAiUsage } from "@/lib/game/openrouter";
 import { recordEventQualityLog } from "@/lib/server/event-quality-log";
+import { acquireAuthoritativeEvent, createPrismaEventAuthorityStore, toPublicEvent } from "@/lib/server/event-authority";
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
 import { logger } from "@/lib/server/logger";
@@ -43,16 +44,18 @@ export async function POST(request: Request, context: RouteContext) {
               take: 20,
               include: { event: true },
             },
-            events: {
-              where: { status: "ACTIVE" },
-              orderBy: { createdAt: "desc" },
-              take: 1,
-            },
           },
         });
 
         if (!character || !character.hiddenState) {
           send("error", { error: character ? "캐릭터 데이터가 불완전합니다." : "캐릭터를 찾을 수 없습니다." });
+          return;
+        }
+
+        const authorityStore = createPrismaEventAuthorityStore({ client: prisma, characterRunId: id, userId });
+        const committedEvent = await authorityStore.getCurrent();
+        if (committedEvent) {
+          send("event", { event: toPublicEvent(committedEvent) });
           return;
         }
 
@@ -113,29 +116,6 @@ export async function POST(request: Request, context: RouteContext) {
           recentTags: diversityGuidance.recentTags,
           recentRelationshipNames: diversityGuidance.recentPeople,
         };
-
-        const activeEvent = character.events[0];
-        if (activeEvent) {
-          const activeTags = Array.isArray(activeEvent.tags) ? activeEvent.tags.filter((tag) => typeof tag === "string") : [];
-          if (activeEvent.source === "FORCED" || isEventAllowedForLifeStage({ title: activeEvent.title, tags: activeTags }, selectionContext)) {
-            send("event", {
-              event: {
-                id: activeEvent.id,
-                title: activeEvent.title,
-                body: activeEvent.body,
-                choices: activeEvent.choices,
-                source: activeEvent.source,
-                forced: activeEvent.source === "FORCED",
-              },
-            });
-            return;
-          }
-
-          await prisma.$transaction([
-            prisma.event.update({ where: { id: activeEvent.id }, data: { status: "DISCARDED" } }),
-            prisma.characterRun.update({ where: { id }, data: { currentEventId: null } }),
-          ]);
-        }
 
         const recentSummaries = character.eventHistory.map((history: { summary: string }) => history.summary).filter(Boolean) as string[];
         const previousChoiceSummary = character.eventHistory[0]?.summary ?? null;
@@ -329,32 +309,32 @@ export async function POST(request: Request, context: RouteContext) {
           source = type === "forced" ? "FORCED" : event.source;
         }
 
-        const newEvent = await prisma.event.create({
-          data: {
-            characterRunId: id,
+        const candidateId = crypto.randomUUID();
+        const newEvent = await acquireAuthoritativeEvent({
+          store: authorityStore,
+          generate: async () => ({
+            id: candidateId,
+            status: "ACTIVE",
             title: selectedEvent.title,
             body: selectedEvent.body,
             source,
-            status: "ACTIVE",
-            choices: selectedEvent.choices as object[],
+            choices: selectedEvent.choices,
             tags: selectedEvent.tags,
-            safetyChecked: true,
+          }),
+          onCommitted: async () => {
+            await prisma.hiddenState.update({
+              where: { characterRunId: id },
+              data: {
+                eventFlags: {
+                  ...currentFlags,
+                  storyArc,
+                  lastEventSource: source,
+                  ...(fallbackUsed ? { lastAiFallbackReason: "quality_or_generation_failed" } : {}),
+                },
+              },
+            });
           },
         });
-
-        await prisma.characterRun.update({ where: { id }, data: { currentEventId: newEvent.id } });
-        await prisma.hiddenState.update({
-          where: { characterRunId: id },
-          data: {
-            eventFlags: {
-              ...currentFlags,
-              storyArc,
-              lastEventSource: source,
-              ...(fallbackUsed ? { lastAiFallbackReason: "quality_or_generation_failed" } : {}),
-            },
-          },
-        });
-
         log.info("스트림 이벤트 생성 완료", {
           userId,
           characterId: id,
@@ -367,18 +347,11 @@ export async function POST(request: Request, context: RouteContext) {
           lifeStage: lifeStage.lifeStage,
         });
 
-        send("event", {
-          event: {
-            id: newEvent.id,
-            title: newEvent.title,
-            body: newEvent.body,
-            choices: newEvent.choices,
-            source: newEvent.source,
-            forced: source === "FORCED",
-          },
-        });
+        send("event", { event: toPublicEvent(newEvent) });
 
-        await streamTextFallback(selectedEvent.body, (text) => send("body_delta", { text }));
+        if (newEvent.id === candidateId) {
+          await streamTextFallback(selectedEvent.body, (text) => send("body_delta", { text }));
+        }
       } catch (error) {
         console.error("Next event stream route failed", error);
         log.error("스트림 이벤트 생성 중 예외", { userId, characterId: id, error: String(error) });
