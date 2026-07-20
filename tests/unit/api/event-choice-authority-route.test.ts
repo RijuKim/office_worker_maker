@@ -8,6 +8,13 @@ const mocks = vi.hoisted(() => ({
   historyCreate: vi.fn(),
   runUpdate: vi.fn(),
   runUpdateMany: vi.fn(),
+  statsUpdate: vi.fn(),
+  hiddenStateUpdate: vi.fn(),
+  relationshipUpdateMany: vi.fn(),
+  relationshipCreate: vi.fn(),
+  jobApplicationUpdate: vi.fn(),
+  jobApplicationCreate: vi.fn(),
+  endingCreate: vi.fn(),
 }));
 
 vi.mock("@/lib/server/session", () => ({
@@ -21,13 +28,13 @@ vi.mock("@/lib/server/prisma", () => ({
       update: mocks.runUpdate,
       updateMany: mocks.runUpdateMany,
     },
-    characterStats: { update: vi.fn(async () => ({})) },
-    hiddenState: { update: vi.fn(async () => ({})) },
+    characterStats: { update: mocks.statsUpdate },
+    hiddenState: { update: mocks.hiddenStateUpdate },
     event: { update: mocks.eventUpdate },
     eventHistory: { create: mocks.historyCreate },
-    relationship: { updateMany: vi.fn(async () => ({ count: 0 })), create: vi.fn(async () => ({})) },
-    careerEndingRecord: { create: vi.fn(async () => ({})), findFirst: vi.fn() },
-    jobApplication: { update: vi.fn(async () => ({})), create: vi.fn(async () => ({})) },
+    relationship: { updateMany: mocks.relationshipUpdateMany, create: mocks.relationshipCreate },
+    careerEndingRecord: { create: mocks.endingCreate, findFirst: vi.fn() },
+    jobApplication: { update: mocks.jobApplicationUpdate, create: mocks.jobApplicationCreate },
     $transaction: mocks.transaction,
   },
 }));
@@ -99,15 +106,22 @@ describe("choice event authority", () => {
     mocks.historyCreate.mockResolvedValue({});
     mocks.runUpdate.mockResolvedValue({});
     mocks.runUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.statsUpdate.mockResolvedValue({});
+    mocks.hiddenStateUpdate.mockResolvedValue({});
+    mocks.relationshipUpdateMany.mockResolvedValue({ count: 0 });
+    mocks.relationshipCreate.mockResolvedValue({});
+    mocks.jobApplicationUpdate.mockResolvedValue({});
+    mocks.jobApplicationCreate.mockResolvedValue({});
+    mocks.endingCreate.mockResolvedValue({});
     mocks.transaction.mockImplementation(async (operation: (tx: unknown) => Promise<unknown>) => operation({
       characterRun: { update: mocks.runUpdate, updateMany: mocks.runUpdateMany },
-      characterStats: { update: vi.fn(async () => ({})) },
-      hiddenState: { update: vi.fn(async () => ({})) },
+      characterStats: { update: mocks.statsUpdate },
+      hiddenState: { update: mocks.hiddenStateUpdate },
       event: { update: mocks.eventUpdate },
       eventHistory: { create: mocks.historyCreate },
-      relationship: { updateMany: vi.fn(async () => ({ count: 0 })), create: vi.fn(async () => ({})) },
-      careerEndingRecord: { create: vi.fn(async () => ({})) },
-      jobApplication: { update: vi.fn(async () => ({})), create: vi.fn(async () => ({})) },
+      relationship: { updateMany: mocks.relationshipUpdateMany, create: mocks.relationshipCreate },
+      careerEndingRecord: { create: mocks.endingCreate },
+      jobApplication: { update: mocks.jobApplicationUpdate, create: mocks.jobApplicationCreate },
     }));
   });
 
@@ -198,6 +212,23 @@ describe("choice event authority", () => {
       oldStatus: "RESOLVED",
       newStatus: "ACTIVE",
     });
+    expect(mocks.runUpdateMany).toHaveBeenCalledTimes(1);
+    expect(mocks.runUpdateMany).toHaveBeenCalledWith({
+      where: { id: "run-1", userId: "user-1", currentEventId: oldEvent.id },
+      data: { currentEventId: null },
+    });
+    expect(state.history.filter((eventId) => eventId === oldEvent.id)).toHaveLength(1);
+    expect(state.oldStatus).toBe("RESOLVED");
+    expect(state.newStatus).toBe("ACTIVE");
+    expect(state.currentEventId).toBe("new-event");
+    expect(state.flags).toEqual({ winnerChoiceApplied: true, newerEventCommitted: true });
+    expect(mocks.statsUpdate).not.toHaveBeenCalled();
+    expect(mocks.hiddenStateUpdate).not.toHaveBeenCalled();
+    expect(mocks.relationshipUpdateMany).not.toHaveBeenCalled();
+    expect(mocks.relationshipCreate).not.toHaveBeenCalled();
+    expect(mocks.jobApplicationUpdate).not.toHaveBeenCalled();
+    expect(mocks.jobApplicationCreate).not.toHaveBeenCalled();
+    expect(mocks.endingCreate).not.toHaveBeenCalled();
     expect(mocks.historyCreate).not.toHaveBeenCalled();
     expect(mocks.eventUpdate).not.toHaveBeenCalled();
     expect(mocks.runUpdate).not.toHaveBeenCalled();

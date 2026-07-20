@@ -7,6 +7,11 @@ const mocks = vi.hoisted(() => ({
   generateAiEvent: vi.fn(),
   generateAiEventStream: vi.fn(),
   isEventAllowedForLifeStage: vi.fn(),
+  runUpdateMany: vi.fn(),
+  eventCreate: vi.fn(),
+  eventUpdateMany: vi.fn(),
+  hiddenStateUpdate: vi.fn(),
+  transaction: vi.fn(),
 }));
 
 vi.mock("@/lib/server/session", () => ({
@@ -17,16 +22,16 @@ vi.mock("@/lib/server/prisma", () => ({
   prisma: {
     characterRun: {
       findFirst: mocks.characterFindFirst,
-      updateMany: vi.fn(),
+      updateMany: mocks.runUpdateMany,
     },
     event: {
       findFirst: mocks.eventFindFirst,
-      create: vi.fn(),
-      updateMany: vi.fn(),
+      create: mocks.eventCreate,
+      updateMany: mocks.eventUpdateMany,
     },
-    hiddenState: { update: vi.fn() },
+    hiddenState: { update: mocks.hiddenStateUpdate },
     eventHistory: { findMany: vi.fn() },
-    $transaction: vi.fn(),
+    $transaction: mocks.transaction,
   },
 }));
 
@@ -171,5 +176,37 @@ describe("next-event route committed recovery", () => {
     })}`);
     expect(mocks.generateAiEventStream).not.toHaveBeenCalled();
     expect(mocks.generateAiEvent).not.toHaveBeenCalled();
+  });
+
+  it.each(["AI", "STATIC", "FORCED"] as const)("streams an ineligible pre-existing %s pointer event unchanged", async (source) => {
+    const selected = arrangeCommittedCharacter(source);
+
+    const response = await nextStream(new Request("http://localhost/api/characters/run-1/events/next/stream", {
+      method: "POST",
+    }), { params: Promise.resolve({ id: "run-1" }) });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+    await expect(response.text()).resolves.toBe(
+      'event: status\ndata: {"message":"선택의 시간이 다가오고 있습니다..."}\n\n' +
+      `event: event\ndata: ${JSON.stringify({
+        event: {
+          id: selected.id,
+          title: selected.title,
+          body: selected.body,
+          choices,
+          source,
+          forced: source === "FORCED",
+        },
+      })}\n\n`,
+    );
+    expect(mocks.generateAiEventStream).not.toHaveBeenCalled();
+    expect(mocks.generateAiEvent).not.toHaveBeenCalled();
+    expect(mocks.eventCreate).not.toHaveBeenCalled();
+    expect(mocks.eventUpdateMany).not.toHaveBeenCalled();
+    expect(mocks.runUpdateMany).not.toHaveBeenCalled();
+    expect(mocks.hiddenStateUpdate).not.toHaveBeenCalled();
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.isEventAllowedForLifeStage).not.toHaveBeenCalled();
   });
 });
