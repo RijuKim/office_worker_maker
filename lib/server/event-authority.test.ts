@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   acquireAuthoritativeEvent,
+  acquireEventGenerationLease,
   createPrismaEventAuthorityStore,
   EventAuthorityLostError,
+  resolveEventGenerationRole,
   toPublicEvent,
   type EventAuthorityStore,
   type PersistedEvent,
@@ -89,7 +91,11 @@ describe("event authority", () => {
     await expect(store.claimIfEmpty("candidate-1")).resolves.toBe(false);
     expect(updateMany).toHaveBeenCalledWith({
       where: { id: "run-1", userId: "user-1", currentEventId: null },
-      data: { currentEventId: "candidate-1" },
+      data: {
+        currentEventId: "candidate-1",
+        eventGenerationToken: null,
+        eventGenerationStartedAt: null,
+      },
     });
     expect(discardMany).not.toHaveBeenCalled();
   });
@@ -149,5 +155,50 @@ describe("event authority", () => {
 
     await expect(acquireAuthoritativeEvent({ store, generate: async () => loser })).resolves.toEqual(winner);
     expect(store.discardCandidate).toHaveBeenCalledWith(loser.id);
+  });
+
+  it("elects one persisted generation leader and makes a mixed caller observe its winner", async () => {
+    let token: string | null = null;
+    let startedAt: Date | null = null;
+    let current: PersistedEvent | null = null;
+    const client = {
+      characterRun: {
+        updateMany: vi.fn(async ({ data }: { data: { eventGenerationToken: string; eventGenerationStartedAt: Date } }) => {
+          if (token) return { count: 0 };
+          token = data.eventGenerationToken;
+          startedAt = data.eventGenerationStartedAt;
+          return { count: 1 };
+        }),
+        findFirst: vi.fn(async () => ({ eventGenerationToken: token, eventGenerationStartedAt: startedAt })),
+      },
+    };
+    const store = { getCurrent: vi.fn(async () => current) } as unknown as EventAuthorityStore;
+    const leader = await resolveEventGenerationRole({
+      client: client as never, store, characterRunId: "run-1", userId: "user-1", leaseMs: 500,
+    });
+    setTimeout(() => { current = event("winner"); }, 10);
+    const follower = await resolveEventGenerationRole({
+      client: client as never, store, characterRunId: "run-1", userId: "user-1", leaseMs: 500,
+    });
+
+    expect(leader).toHaveProperty("token");
+    expect(follower).toEqual({ event: event("winner") });
+    expect(client.characterRun.updateMany).toHaveBeenCalledTimes(2);
+  });
+
+  it("takes over a stale persisted generation reservation", async () => {
+    const updateMany = vi.fn(async () => ({ count: 1 }));
+    const now = new Date("2026-07-21T00:01:00Z");
+    const result = await acquireEventGenerationLease({
+      client: { characterRun: { updateMany }, event: {}, $transaction: vi.fn() } as never,
+      characterRunId: "run-1", userId: "user-1", token: "new-owner", now, staleAfterMs: 30_000,
+    });
+
+    expect(result).toEqual({ role: "leader", lease: { token: "new-owner", startedAt: now } });
+    expect(updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        OR: expect.arrayContaining([{ eventGenerationStartedAt: { lt: new Date("2026-07-21T00:00:30Z") } }]),
+      }),
+    }));
   });
 });

@@ -3,9 +3,9 @@ import type { EventSource } from "@prisma/client";
 import { getStoryArc, isEventAllowedForLifeStage, selectNextEvent, type EventSelectionContext, type StaticEvent } from "@/lib/game/event-engine";
 import { evaluateCandidateEvent, findValidatedStaticFallback } from "@/lib/game/event-quality-policy";
 import { deriveLifeStageState } from "@/lib/game/life-stage";
-import { checkDailyAiLimit, generateAiEventStream, incrementAiUsage } from "@/lib/game/openrouter";
+import { checkDailyAiLimit, generateAiEventStream, getOpenRouterTimeoutMs, incrementAiUsage } from "@/lib/game/openrouter";
 import { recordEventQualityLog } from "@/lib/server/event-quality-log";
-import { acquireAuthoritativeEvent, createPrismaEventAuthorityStore, EventAuthorityLostError, toPublicEvent } from "@/lib/server/event-authority";
+import { acquireAuthoritativeEvent, createPrismaEventAuthorityStore, EventAuthorityLostError, releaseEventGenerationLease, resolveEventGenerationRole, toPublicEvent } from "@/lib/server/event-authority";
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
 import { logger } from "@/lib/server/logger";
@@ -52,12 +52,27 @@ export async function POST(request: Request, context: RouteContext) {
           return;
         }
 
-        const authorityStore = createPrismaEventAuthorityStore({ client: prisma, characterRunId: id, userId });
+        let authorityStore = createPrismaEventAuthorityStore({ client: prisma, characterRunId: id, userId });
         const committedEvent = await authorityStore.getCurrent();
         if (committedEvent) {
           send("event", { event: toPublicEvent(committedEvent) });
           return;
         }
+        const generationRole = await resolveEventGenerationRole({
+          client: prisma,
+          store: authorityStore,
+          characterRunId: id,
+          userId,
+          leaseMs: getOpenRouterTimeoutMs() + 5_000,
+        });
+        if (generationRole.event) {
+          send("event", { event: toPublicEvent(generationRole.event) });
+          return;
+        }
+        const generationToken = generationRole.token;
+        authorityStore = createPrismaEventAuthorityStore({
+          client: prisma, characterRunId: id, userId, generationToken,
+        });
 
         const currentFlags = (character.hiddenState.eventFlags as Record<string, unknown>) ?? {};
         const lifeStage = deriveLifeStageState({
@@ -154,6 +169,7 @@ export async function POST(request: Request, context: RouteContext) {
         let generationSlow = false;
         let providerId: string | null = null;
         let providerFailures: unknown[] = [];
+        let providerFirstBodyMs: number | null = null;
 
         if (character.stats && canUseAiForLifeStage(lifeStage.lifeStage, character.academicStatus)) {
           aiAttempted = true;
@@ -197,7 +213,9 @@ export async function POST(request: Request, context: RouteContext) {
           };
 
           const aiResult = await generateAiEventStream(aiState, (text) => {
-            send("body_delta", { text });
+            if (text && providerFirstBodyMs === null) {
+              providerFirstBodyMs = Date.now() - generationStartedAt;
+            }
           }, { skipPrimary: !limit.allowed });
           providerElapsedMs = aiResult.providerElapsedMs ?? 0;
           generationSlow = aiResult.slow ?? false;
@@ -262,6 +280,7 @@ export async function POST(request: Request, context: RouteContext) {
               preferredEvent: event, selectionContext, excludedEventTitles, qualityContext,
             });
             if (!fallback) {
+              await releaseEventGenerationLease({ client: prisma, characterRunId: id, userId, token: generationToken });
               log.error("검증된 대체 이벤트 없음", { userId, characterId: id, generationReason });
               send("error", { error: "다음 사건을 생성하지 못했습니다." });
               return;
@@ -327,14 +346,16 @@ export async function POST(request: Request, context: RouteContext) {
           providerElapsedMs,
           totalElapsedMs,
           slow: generationSlow || totalElapsedMs > 10_000,
+          providerFirstBodyMs,
+          timeToFirstBodyMs: totalElapsedMs,
+          timeToFinalEventMs: totalElapsedMs,
           lifeStage: lifeStage.lifeStage,
         });
 
+        // Only stream the committed winner. Provider deltas are intentionally
+        // buffered because they belong to an uncommitted candidate.
+        await streamTextFallback(newEvent.body, (text) => send("body_delta", { text }));
         send("event", { event: toPublicEvent(newEvent) });
-
-        if (newEvent.id === candidateId) {
-          await streamTextFallback(selectedEvent.body, (text) => send("body_delta", { text }));
-        }
       } catch (error) {
         if (error instanceof EventAuthorityLostError) {
           send("error", { error: "진행 중인 이벤트가 없습니다." });

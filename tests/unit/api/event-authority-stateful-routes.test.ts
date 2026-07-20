@@ -13,6 +13,8 @@ type StoredEvent = {
 
 const fixture = vi.hoisted(() => ({
   pointer: null as string | null,
+  generationToken: null as string | null,
+  generationStartedAt: null as Date | null,
   events: new Map<string, StoredEvent>(),
   createWaiters: [] as (() => void)[],
   generationBarrier: false,
@@ -56,9 +58,20 @@ function fullCharacter() {
 const prismaMock = vi.hoisted(() => ({
   characterRun: {
     findFirst: vi.fn(async (query: { select?: unknown }) => query.select
-      ? { currentEventId: fixture.pointer }
+      ? { currentEventId: fixture.pointer, eventGenerationToken: fixture.generationToken, eventGenerationStartedAt: fixture.generationStartedAt }
       : fullCharacter()),
-    updateMany: vi.fn(async ({ where, data }: { where: { currentEventId: null }; data: { currentEventId: string } }) => {
+    updateMany: vi.fn(async ({ where, data }: { where: { currentEventId?: null; eventGenerationToken?: string }; data: { currentEventId?: string; eventGenerationToken?: string | null; eventGenerationStartedAt?: Date | null } }) => {
+      if (data.currentEventId === undefined) {
+        if (where.eventGenerationToken && where.eventGenerationToken !== fixture.generationToken) return { count: 0 };
+        if (data.eventGenerationToken === null) {
+          fixture.generationToken = null;
+          fixture.generationStartedAt = null;
+        } else if (fixture.pointer === null && fixture.generationToken === null) {
+          fixture.generationToken = data.eventGenerationToken ?? null;
+          fixture.generationStartedAt = data.eventGenerationStartedAt ?? null;
+        } else return { count: 0 };
+        return { count: 1 };
+      }
       if (fixture.consumeWinnerOnCas) {
         fixture.consumeWinnerOnCas = false;
         const winner: StoredEvent = {
@@ -72,6 +85,8 @@ const prismaMock = vi.hoisted(() => ({
       }
       if (where.currentEventId === null && fixture.pointer === null) {
         fixture.pointer = data.currentEventId;
+        fixture.generationToken = null;
+        fixture.generationStartedAt = null;
         return { count: 1 };
       }
       return { count: 0 };
@@ -130,6 +145,7 @@ const prismaMock = vi.hoisted(() => ({
 
 const aiMocks = vi.hoisted(() => ({
   checkDailyAiLimit: vi.fn(), generateAiEvent: vi.fn(), generateAiEventStream: vi.fn(), incrementAiUsage: vi.fn(),
+  getOpenRouterTimeoutMs: vi.fn(() => 30_000),
 }));
 const engineMocks = vi.hoisted(() => ({ selectNextEvent: vi.fn() }));
 
@@ -232,6 +248,8 @@ describe("stateful JSON/SSE event authority", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     fixture.pointer = null;
+    fixture.generationToken = null;
+    fixture.generationStartedAt = null;
     fixture.events.clear();
     fixture.createWaiters = [];
     fixture.generationBarrier = false;
@@ -599,7 +617,6 @@ describe("stateful JSON/SSE event authority", () => {
   });
 
   it("overlaps fresh JSON and SSE generation and converges on one exact authoritative payload", async () => {
-    fixture.generationBarrier = true;
     const jsonPromise = nextJson(new Request("http://localhost/api/characters/run-1/events/next", { method: "POST" }), {
       params: Promise.resolve({ id: "run-1" }),
     });
@@ -610,7 +627,6 @@ describe("stateful JSON/SSE event authority", () => {
     const [jsonResponse, streamEvent] = await Promise.all([jsonPromise, streamPromise]);
     const jsonEvent = (await jsonResponse.json()).event;
     const active = [...fixture.events.values()].filter((event) => event.status === "ACTIVE");
-    const losers = [...fixture.events.values()].filter((event) => event.id !== fixture.pointer);
     const persistedWinner = fixture.events.get(fixture.pointer!);
     const winnerPayload = persistedWinner && {
       id: persistedWinner.id,
@@ -623,17 +639,10 @@ describe("stateful JSON/SSE event authority", () => {
 
     expect(jsonEvent).toEqual(streamEvent);
     expect(jsonEvent).toEqual(winnerPayload);
-    expect(fixture.generationCalls).toBe(2);
-    expect(losers[0]).not.toMatchObject({
-      title: persistedWinner?.title,
-      body: persistedWinner?.body,
-      choices: persistedWinner?.choices,
-      tags: persistedWinner?.tags,
-    });
+    expect(fixture.generationCalls).toBe(1);
     expect(active).toHaveLength(1);
     expect(active[0].id).toBe(fixture.pointer);
-    expect(losers).toHaveLength(1);
-    expect(losers.every((event) => event.status !== "ACTIVE")).toBe(true);
+    expect([...fixture.events.values()]).toHaveLength(1);
   });
 
   it("recovers a committed stream event through GET and JSON when the client ignores the final SSE", async () => {

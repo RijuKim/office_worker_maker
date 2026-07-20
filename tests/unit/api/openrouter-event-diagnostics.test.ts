@@ -120,6 +120,38 @@ describe("AI event diagnostics", () => {
     expect(fetchMock.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
   });
 
+  it("shares one total timeout budget across primary and secondary providers", async () => {
+    vi.useFakeTimers();
+    process.env.OLLAMA_API_KEY = "primary-key";
+    process.env.OPENROUTER_API_KEY = "secondary-key";
+    process.env.OPENROUTER_TIMEOUT_MS = "5000";
+    let call = 0;
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation((_url, init) => {
+      call += 1;
+      if (call === 1) {
+        return new Promise((resolve) => setTimeout(() => resolve(new Response("rate limited", { status: 429 })), 4_000));
+      }
+      return new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+      });
+    });
+
+    const pending = generateAiEvent({
+      name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4,
+      recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {},
+    });
+    await vi.advanceTimersByTimeAsync(4_000);
+    await vi.advanceTimersByTimeAsync(1_000);
+    const result = await pending;
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ success: false, reason: "timeout", totalElapsedMs: 5_000 });
+    expect(result.providerFailures).toEqual([
+      expect.objectContaining({ providerId: "ollama", reason: "rate_limited", providerElapsedMs: 4_000 }),
+      expect.objectContaining({ providerId: "openrouter", reason: "timeout", providerElapsedMs: 1_000 }),
+    ]);
+  });
+
   it("retains safe primary failure telemetry when the secondary provider succeeds", async () => {
     process.env.OLLAMA_API_KEY = "primary-secret";
     process.env.OPENROUTER_API_KEY = "secondary-secret";

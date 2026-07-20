@@ -348,7 +348,10 @@ export async function generateAiEvent(
   const providerFailures: AiProviderFailureTelemetry[] = [];
 
   for (const provider of aiProviders(options)) {
-    const result = await generateAiEventWithProvider(provider, state);
+    const providerStartedAt = Date.now();
+    const remainingMs = getOpenRouterTimeoutMs() - (providerStartedAt - totalStartedAt);
+    if (remainingMs <= 0) break;
+    const result = await generateAiEventWithProvider(provider, state, remainingMs, providerStartedAt);
     const totalElapsedMs = Date.now() - totalStartedAt;
     const measured = { ...result, totalElapsedMs, slow: totalElapsedMs > SLOW_AI_GENERATION_MS };
     if (measured.success) return { ...measured, retryUsed: providerFailures.length > 0, providerFailures };
@@ -363,12 +366,13 @@ export async function generateAiEvent(
 async function generateAiEventWithProvider(
   provider: AiProvider,
   state: AiEventPromptState,
+  timeoutMs: number,
+  startedAt: number,
 ): Promise<OpenRouterResult | OpenRouterFailure> {
   if (!provider.key) return { success: false, reason: "no_key", providerId: provider.id, providerLabel: provider.label, providerElapsedMs: 0 };
 
-  const startedAt = Date.now();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), getOpenRouterTimeoutMs());
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const failure = (reason: AiEventFailureReason, issues?: string[]): OpenRouterFailure => ({
     success: false,
     reason,
@@ -438,11 +442,14 @@ export async function generateAiEventStream(
   const providerFailures: AiProviderFailureTelemetry[] = [];
 
   for (const provider of aiProviders(options)) {
+    const providerStartedAt = Date.now();
+    const remainingMs = getOpenRouterTimeoutMs() - (providerStartedAt - totalStartedAt);
+    if (remainingMs <= 0) break;
     let providerSentBody = false;
     const result = await generateAiEventStreamWithProvider(provider, state, (delta) => {
       providerSentBody = true;
       onBodyDelta(delta);
-    });
+    }, remainingMs, providerStartedAt);
     const totalElapsedMs = Date.now() - totalStartedAt;
     const measured = { ...result, totalElapsedMs, slow: totalElapsedMs > SLOW_AI_GENERATION_MS };
     if (measured.success) return { ...measured, retryUsed: providerFailures.length > 0, providerFailures };
@@ -459,12 +466,13 @@ async function generateAiEventStreamWithProvider(
   provider: AiProvider,
   state: AiEventPromptState,
   onBodyDelta: (delta: string) => void,
+  timeoutMs: number,
+  startedAt: number,
 ): Promise<OpenRouterResult | OpenRouterFailure> {
   if (!provider.key) return { success: false, reason: "no_key", providerId: provider.id, providerLabel: provider.label, providerElapsedMs: 0 };
 
-  const startedAt = Date.now();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), getOpenRouterTimeoutMs());
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const failure = (reason: AiEventFailureReason, issues?: string[]): OpenRouterFailure => ({
     success: false, reason, providerId: provider.id, providerLabel: provider.label,
     providerElapsedMs: Date.now() - startedAt, issues,
@@ -558,7 +566,7 @@ function buildAiEventRequestBody(state: AiEventPromptState, provider: AiProvider
       { role: "user", content: buildUserPrompt(state) },
     ],
     response_format: { type: "json_object" },
-    max_tokens: 8000,
+    max_tokens: 2600,
     temperature: 0.85,
   };
 }
@@ -575,7 +583,7 @@ For streaming responsiveness, output the JSON object in this field order exactly
       },
       { role: "user", content: buildUserPrompt(state) },
     ],
-    max_tokens: 8000,
+    max_tokens: 2600,
     temperature: 0.85,
     stream: true,
   };

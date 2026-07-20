@@ -19,6 +19,14 @@ export interface EventAuthorityStore {
   discardCandidate(candidateId: string): Promise<void>;
 }
 
+export type EventGenerationLease = { token: string; startedAt: Date };
+export type GenerationLeaseResult =
+  | { role: "leader"; lease: EventGenerationLease }
+  | { role: "follower"; lease: EventGenerationLease };
+
+export const EVENT_GENERATION_LEASE_MS = 45_000;
+export const EVENT_GENERATION_POLL_MS = 100;
+
 export class EventAuthorityLostError extends Error {
   constructor() {
     super("The authoritative event was consumed while a concurrent candidate was being resolved.");
@@ -61,14 +69,124 @@ export async function acquireAuthoritativeEvent({
 
 type AuthorityPrisma = Pick<PrismaClient, "characterRun" | "event" | "$transaction">;
 
-export function createPrismaEventAuthorityStore({
+export async function acquireEventGenerationLease({
   client,
   characterRunId,
   userId,
+  now = new Date(),
+  token = crypto.randomUUID(),
+  staleAfterMs = EVENT_GENERATION_LEASE_MS,
 }: {
   client: AuthorityPrisma;
   characterRunId: string;
   userId: string;
+  now?: Date;
+  token?: string;
+  staleAfterMs?: number;
+}): Promise<GenerationLeaseResult> {
+  const staleBefore = new Date(now.getTime() - staleAfterMs);
+  const claimed = await client.characterRun.updateMany({
+    where: {
+      id: characterRunId,
+      userId,
+      currentEventId: null,
+      OR: [
+        { eventGenerationToken: null },
+        { eventGenerationStartedAt: null },
+        { eventGenerationStartedAt: { lt: staleBefore } },
+      ],
+    },
+    data: { eventGenerationToken: token, eventGenerationStartedAt: now },
+  });
+  if (claimed.count === 1) return { role: "leader", lease: { token, startedAt: now } };
+
+  const current = await client.characterRun.findFirst({
+    where: { id: characterRunId, userId },
+    select: { eventGenerationToken: true, eventGenerationStartedAt: true },
+  });
+  return {
+    role: "follower",
+    lease: {
+      token: current?.eventGenerationToken ?? "",
+      startedAt: current?.eventGenerationStartedAt ?? now,
+    },
+  };
+}
+
+export async function waitForAuthoritativeEvent({
+  store,
+  timeoutMs,
+  pollMs = EVENT_GENERATION_POLL_MS,
+}: {
+  store: EventAuthorityStore;
+  timeoutMs: number;
+  pollMs?: number;
+}): Promise<PersistedEvent | null> {
+  const deadline = Date.now() + timeoutMs;
+  do {
+    const current = await store.getCurrent();
+    if (current) return current;
+    await new Promise((resolve) => setTimeout(resolve, pollMs));
+  } while (Date.now() < deadline);
+  return store.getCurrent();
+}
+
+export async function resolveEventGenerationRole({
+  client,
+  store,
+  characterRunId,
+  userId,
+  leaseMs,
+}: {
+  client: AuthorityPrisma;
+  store: EventAuthorityStore;
+  characterRunId: string;
+  userId: string;
+  leaseMs: number;
+}): Promise<{ event: PersistedEvent; token?: never } | { event?: never; token: string }> {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const result = await acquireEventGenerationLease({
+      client, characterRunId, userId, staleAfterMs: leaseMs,
+    });
+    if (result.role === "leader") return { token: result.lease.token };
+
+    const elapsed = Date.now() - result.lease.startedAt.getTime();
+    const winner = await waitForAuthoritativeEvent({
+      store,
+      timeoutMs: Math.max(EVENT_GENERATION_POLL_MS, leaseMs - elapsed),
+    });
+    if (winner) return { event: winner };
+  }
+  throw new Error("Event generation reservation could not be acquired after stale recovery.");
+}
+
+export async function releaseEventGenerationLease({
+  client,
+  characterRunId,
+  userId,
+  token,
+}: {
+  client: AuthorityPrisma;
+  characterRunId: string;
+  userId: string;
+  token: string;
+}) {
+  await client.characterRun.updateMany({
+    where: { id: characterRunId, userId, currentEventId: null, eventGenerationToken: token },
+    data: { eventGenerationToken: null, eventGenerationStartedAt: null },
+  });
+}
+
+export function createPrismaEventAuthorityStore({
+  client,
+  characterRunId,
+  userId,
+  generationToken,
+}: {
+  client: AuthorityPrisma;
+  characterRunId: string;
+  userId: string;
+  generationToken?: string;
 }): EventAuthorityStore {
   return {
     async getCurrent() {
@@ -108,8 +226,17 @@ export function createPrismaEventAuthorityStore({
     async claimIfEmpty(candidateId, onClaim) {
       return client.$transaction(async (tx) => {
         const claimed = await tx.characterRun.updateMany({
-          where: { id: characterRunId, userId, currentEventId: null },
-          data: { currentEventId: candidateId },
+          where: {
+            id: characterRunId,
+            userId,
+            currentEventId: null,
+            ...(generationToken ? { eventGenerationToken: generationToken } : {}),
+          },
+          data: {
+            currentEventId: candidateId,
+            eventGenerationToken: null,
+            eventGenerationStartedAt: null,
+          },
         });
         if (claimed.count === 1) {
           const promoted = await tx.event.updateMany({
