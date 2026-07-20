@@ -5,7 +5,7 @@ import { evaluateCandidateEvent, findValidatedStaticFallback } from "@/lib/game/
 import { deriveLifeStageState } from "@/lib/game/life-stage";
 import { checkDailyAiLimit, generateAiEventStream, getOpenRouterTimeoutMs, incrementAiUsage } from "@/lib/game/openrouter";
 import { recordEventQualityLog } from "@/lib/server/event-quality-log";
-import { acquireAuthoritativeEvent, createPrismaEventAuthorityStore, EventAuthorityLostError, releaseEventGenerationLease, resolveEventGenerationRole, toPublicEvent } from "@/lib/server/event-authority";
+import { acquireAuthoritativeEvent, createPrismaEventAuthorityStore, EventAuthorityLostError, resolveEventGenerationRole, startEventGenerationHeartbeat, toPublicEvent, type EventGenerationHeartbeat } from "@/lib/server/event-authority";
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
 import { logger } from "@/lib/server/logger";
@@ -25,8 +25,15 @@ export async function POST(request: Request, context: RouteContext) {
 
   return new Response(new ReadableStream({
     async start(controller) {
+      let generationLease: EventGenerationHeartbeat | null = null;
+      const generationStartedAt = Date.now();
+      let timeToFirstVisibleBodyMs: number | null = null;
+      let timeToFinalEventMs: number | null = null;
       const send = (event: string, data: unknown) => {
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+        const elapsed = Date.now() - generationStartedAt;
+        if (event === "body_delta" && timeToFirstVisibleBodyMs === null) timeToFirstVisibleBodyMs = elapsed;
+        if (event === "event") timeToFinalEventMs = elapsed;
       };
       try {
         send("status", { message: "선택의 시간이 다가오고 있습니다..." });
@@ -65,11 +72,19 @@ export async function POST(request: Request, context: RouteContext) {
           userId,
           leaseMs: getOpenRouterTimeoutMs() + 5_000,
         });
+        if (generationRole.missing) {
+          send("error", { error: "캐릭터를 찾을 수 없습니다." });
+          return;
+        }
         if (generationRole.event) {
           send("event", { event: toPublicEvent(generationRole.event) });
           return;
         }
         const generationToken = generationRole.token;
+        generationLease = startEventGenerationHeartbeat({
+          client: prisma, characterRunId: id, userId, token: generationToken,
+          leaseMs: getOpenRouterTimeoutMs() + 5_000,
+        });
         authorityStore = createPrismaEventAuthorityStore({
           client: prisma, characterRunId: id, userId, generationToken,
         });
@@ -162,7 +177,6 @@ export async function POST(request: Request, context: RouteContext) {
         let aiFailed = false;
         let retryUsed = false;
         let fallbackUsed = false;
-        const generationStartedAt = Date.now();
         let providerElapsedMs = 0;
         let generationReason: string | null = null;
         let generationStage: "provider" | "parse" | "quality" | null = null;
@@ -280,7 +294,6 @@ export async function POST(request: Request, context: RouteContext) {
               preferredEvent: event, selectionContext, excludedEventTitles, qualityContext,
             });
             if (!fallback) {
-              await releaseEventGenerationLease({ client: prisma, characterRunId: id, userId, token: generationToken });
               log.error("검증된 대체 이벤트 없음", { userId, characterId: id, generationReason });
               send("error", { error: "다음 사건을 생성하지 못했습니다." });
               return;
@@ -303,6 +316,7 @@ export async function POST(request: Request, context: RouteContext) {
         }
 
         const candidateId = crypto.randomUUID();
+        generationLease.assertOwned();
         const newEvent = await acquireAuthoritativeEvent({
           store: authorityStore,
           generate: async () => ({
@@ -329,6 +343,10 @@ export async function POST(request: Request, context: RouteContext) {
             });
           },
         });
+        // Only stream the committed winner. Provider deltas are intentionally
+        // buffered because they belong to an uncommitted candidate.
+        await streamTextFallback(newEvent.body, (text) => send("body_delta", { text }));
+        send("event", { event: toPublicEvent(newEvent) });
         const totalElapsedMs = Date.now() - generationStartedAt;
         log.info("스트림 이벤트 생성 완료", {
           userId,
@@ -347,15 +365,11 @@ export async function POST(request: Request, context: RouteContext) {
           totalElapsedMs,
           slow: generationSlow || totalElapsedMs > 10_000,
           providerFirstBodyMs,
-          timeToFirstBodyMs: totalElapsedMs,
-          timeToFinalEventMs: totalElapsedMs,
+          timeToFirstVisibleBodyMs,
+          timeToFinalEventMs,
           lifeStage: lifeStage.lifeStage,
         });
 
-        // Only stream the committed winner. Provider deltas are intentionally
-        // buffered because they belong to an uncommitted candidate.
-        await streamTextFallback(newEvent.body, (text) => send("body_delta", { text }));
-        send("event", { event: toPublicEvent(newEvent) });
       } catch (error) {
         if (error instanceof EventAuthorityLostError) {
           send("error", { error: "진행 중인 이벤트가 없습니다." });
@@ -365,6 +379,7 @@ export async function POST(request: Request, context: RouteContext) {
         log.error("스트림 이벤트 생성 중 예외", { userId, characterId: id, error: String(error) });
         send("error", { error: "다음 사건을 생성하지 못했습니다." });
       } finally {
+        await generationLease?.stop();
         controller.close();
       }
     },

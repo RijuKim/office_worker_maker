@@ -6,6 +6,7 @@ import {
   createPrismaEventAuthorityStore,
   EventAuthorityLostError,
   resolveEventGenerationRole,
+  startEventGenerationHeartbeat,
   toPublicEvent,
   type EventAuthorityStore,
   type PersistedEvent,
@@ -24,6 +25,55 @@ function event(id: string): PersistedEvent {
 }
 
 describe("event authority", () => {
+  it("renews a live lease beyond its original expiry and releases it on stop", async () => {
+    vi.useFakeTimers();
+    let token: string | null = "owner";
+    let startedAt = new Date(0);
+    const updateMany = vi.fn(async ({ where, data }: {
+      where: { eventGenerationToken?: string };
+      data: { eventGenerationStartedAt?: Date | null; eventGenerationToken?: null };
+    }) => {
+      if (where.eventGenerationToken !== token) return { count: 0 };
+      if (data.eventGenerationToken === null) token = null;
+      if (data.eventGenerationStartedAt instanceof Date) startedAt = data.eventGenerationStartedAt;
+      return { count: 1 };
+    });
+    const client = { characterRun: { updateMany, findFirst: vi.fn() }, event: {}, $transaction: vi.fn() };
+    const heartbeat = startEventGenerationHeartbeat({
+      client: client as never, characterRunId: "run-1", userId: "user-1", token: "owner",
+      leaseMs: 300, intervalMs: 100,
+    });
+
+    await vi.advanceTimersByTimeAsync(750);
+    heartbeat.assertOwned();
+    expect(startedAt.getTime()).toBeGreaterThanOrEqual(700);
+    expect(updateMany).toHaveBeenCalledTimes(7);
+
+    await heartbeat.stop();
+    expect(token).toBeNull();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(updateMany).toHaveBeenCalledTimes(8);
+    vi.useRealTimers();
+  });
+
+  it("fences commit after a heartbeat renewal loses ownership", async () => {
+    vi.useFakeTimers();
+    const client = {
+      characterRun: {
+        updateMany: vi.fn(async () => ({ count: 0 })),
+        findFirst: vi.fn(),
+      },
+      event: {}, $transaction: vi.fn(),
+    };
+    const heartbeat = startEventGenerationHeartbeat({
+      client: client as never, characterRunId: "run-1", userId: "user-1", token: "old-owner",
+      leaseMs: 300, intervalMs: 100,
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(() => heartbeat.assertOwned()).toThrow(EventAuthorityLostError);
+    await heartbeat.stop();
+    vi.useRealTimers();
+  });
   it("returns the exact committed event for JSON or stream recovery without generating", async () => {
     const committed = event("committed");
     const generate = vi.fn(async () => event("replacement"));
@@ -200,5 +250,25 @@ describe("event authority", () => {
         OR: expect.arrayContaining([{ eventGenerationStartedAt: { lt: new Date("2026-07-21T00:00:30Z") } }]),
       }),
     }));
+  });
+
+  it("terminates distinctly when the run disappears before lease acquisition", async () => {
+    const client = {
+      characterRun: {
+        updateMany: vi.fn(async () => ({ count: 0 })),
+        findFirst: vi.fn(async () => null),
+      },
+    };
+    const store = { getCurrent: vi.fn(async () => null) } as unknown as EventAuthorityStore;
+
+    await expect(resolveEventGenerationRole({
+      client: client as never,
+      store,
+      characterRunId: "deleted-run",
+      userId: "user-1",
+      leaseMs: 500,
+    })).resolves.toEqual({ missing: true });
+    expect(client.characterRun.updateMany).toHaveBeenCalledTimes(1);
+    expect(store.getCurrent).not.toHaveBeenCalled();
   });
 });

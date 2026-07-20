@@ -6,7 +6,7 @@ import { evaluateCandidateEvent, findValidatedStaticFallback } from "@/lib/game/
 import { deriveLifeStageState } from "@/lib/game/life-stage";
 import { checkDailyAiLimit, generateAiEvent, getOpenRouterTimeoutMs, incrementAiUsage } from "@/lib/game/openrouter";
 import { recordEventQualityLog } from "@/lib/server/event-quality-log";
-import { acquireAuthoritativeEvent, createPrismaEventAuthorityStore, EventAuthorityLostError, releaseEventGenerationLease, resolveEventGenerationRole, toPublicEvent } from "@/lib/server/event-authority";
+import { acquireAuthoritativeEvent, createPrismaEventAuthorityStore, EventAuthorityLostError, resolveEventGenerationRole, startEventGenerationHeartbeat, toPublicEvent } from "@/lib/server/event-authority";
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
 import { logger } from "@/lib/server/logger";
@@ -68,14 +68,22 @@ export async function POST(request: Request, context: RouteContext) {
     userId,
     leaseMs: getOpenRouterTimeoutMs() + 5_000,
   });
+  if (generationRole.missing) {
+    return NextResponse.json({ error: "캐릭터를 찾을 수 없습니다." }, { status: 404 });
+  }
   if (generationRole.event) {
     return NextResponse.json({ event: toPublicEvent(generationRole.event) });
   }
   const generationToken = generationRole.token;
+  const generationLease = startEventGenerationHeartbeat({
+    client: prisma, characterRunId: id, userId, token: generationToken,
+    leaseMs: getOpenRouterTimeoutMs() + 5_000,
+  });
   authorityStore = createPrismaEventAuthorityStore({
     client: prisma, characterRunId: id, userId, generationToken,
   });
 
+  try {
   const currentFlags = (character.hiddenState.eventFlags as Record<string, unknown>) ?? {};
   const lifeStage = deriveLifeStageState({
     eventFlags: currentFlags,
@@ -287,7 +295,6 @@ export async function POST(request: Request, context: RouteContext) {
         qualityContext,
       });
       if (!fallback) {
-        await releaseEventGenerationLease({ client: prisma, characterRunId: id, userId, token: generationToken });
         log.error("검증된 대체 이벤트 없음", { userId, characterId: id, generationReason });
         return NextResponse.json({ error: "다음 사건을 생성하지 못했습니다." }, { status: 500 });
       }
@@ -310,6 +317,7 @@ export async function POST(request: Request, context: RouteContext) {
 
   let newEvent;
   try {
+    generationLease.assertOwned();
     newEvent = await acquireAuthoritativeEvent({
       store: authorityStore,
       generate: async () => ({
@@ -364,6 +372,9 @@ export async function POST(request: Request, context: RouteContext) {
   });
 
   return NextResponse.json({ event: toPublicEvent(newEvent) });
+  } finally {
+    await generationLease.stop();
+  }
 }
 
 function canUseAiForLifeStage(lifeStage: string, academicStatus: string) {

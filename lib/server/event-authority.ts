@@ -22,10 +22,16 @@ export interface EventAuthorityStore {
 export type EventGenerationLease = { token: string; startedAt: Date };
 export type GenerationLeaseResult =
   | { role: "leader"; lease: EventGenerationLease }
-  | { role: "follower"; lease: EventGenerationLease };
+  | { role: "follower"; lease: EventGenerationLease }
+  | { role: "missing" };
 
 export const EVENT_GENERATION_LEASE_MS = 45_000;
 export const EVENT_GENERATION_POLL_MS = 100;
+
+export type EventGenerationHeartbeat = {
+  assertOwned(): void;
+  stop(): Promise<void>;
+};
 
 export class EventAuthorityLostError extends Error {
   constructor() {
@@ -104,11 +110,12 @@ export async function acquireEventGenerationLease({
     where: { id: characterRunId, userId },
     select: { eventGenerationToken: true, eventGenerationStartedAt: true },
   });
+  if (!current) return { role: "missing" };
   return {
     role: "follower",
     lease: {
-      token: current?.eventGenerationToken ?? "",
-      startedAt: current?.eventGenerationStartedAt ?? now,
+      token: current.eventGenerationToken ?? "",
+      startedAt: current.eventGenerationStartedAt ?? now,
     },
   };
 }
@@ -143,12 +150,17 @@ export async function resolveEventGenerationRole({
   characterRunId: string;
   userId: string;
   leaseMs: number;
-}): Promise<{ event: PersistedEvent; token?: never } | { event?: never; token: string }> {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+}): Promise<
+  | { event: PersistedEvent; token?: never; missing?: never }
+  | { event?: never; token: string; missing?: never }
+  | { event?: never; token?: never; missing: true }
+> {
+  while (true) {
     const result = await acquireEventGenerationLease({
       client, characterRunId, userId, staleAfterMs: leaseMs,
     });
     if (result.role === "leader") return { token: result.lease.token };
+    if (result.role === "missing") return { missing: true };
 
     const elapsed = Date.now() - result.lease.startedAt.getTime();
     const winner = await waitForAuthoritativeEvent({
@@ -157,7 +169,6 @@ export async function resolveEventGenerationRole({
     });
     if (winner) return { event: winner };
   }
-  throw new Error("Event generation reservation could not be acquired after stale recovery.");
 }
 
 export async function releaseEventGenerationLease({
@@ -175,6 +186,67 @@ export async function releaseEventGenerationLease({
     where: { id: characterRunId, userId, currentEventId: null, eventGenerationToken: token },
     data: { eventGenerationToken: null, eventGenerationStartedAt: null },
   });
+}
+
+/**
+ * Keeps a generation lease fresh without holding a database transaction open.
+ * Every renewal and the eventual commit are fenced by the same opaque token.
+ */
+export function startEventGenerationHeartbeat({
+  client,
+  characterRunId,
+  userId,
+  token,
+  leaseMs,
+  intervalMs = Math.max(50, Math.floor(leaseMs / 3)),
+}: {
+  client: AuthorityPrisma;
+  characterRunId: string;
+  userId: string;
+  token: string;
+  leaseMs: number;
+  intervalMs?: number;
+}): EventGenerationHeartbeat {
+  let stopped = false;
+  let lost = false;
+  let renewal: Promise<void> | null = null;
+
+  const renew = () => {
+    if (stopped || renewal) return;
+    renewal = client.characterRun.updateMany({
+      where: {
+        id: characterRunId,
+        userId,
+        currentEventId: null,
+        eventGenerationToken: token,
+      },
+      data: { eventGenerationStartedAt: new Date() },
+    }).then(({ count }) => {
+      if (count !== 1) lost = true;
+    }).catch(() => {
+      // A failed renewal is treated as loss of authority. This prevents a
+      // request from committing after the database could no longer fence it.
+      lost = true;
+    }).finally(() => {
+      renewal = null;
+    });
+  };
+
+  const timer = setInterval(renew, Math.min(intervalMs, Math.max(50, leaseMs - 1)));
+  timer.unref?.();
+
+  return {
+    assertOwned() {
+      if (lost) throw new EventAuthorityLostError();
+    },
+    async stop() {
+      if (stopped) return;
+      stopped = true;
+      clearInterval(timer);
+      await renewal;
+      await releaseEventGenerationLease({ client, characterRunId, userId, token });
+    },
+  };
 }
 
 export function createPrismaEventAuthorityStore({

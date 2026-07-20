@@ -152,6 +152,50 @@ describe("AI event diagnostics", () => {
     ]);
   });
 
+  it("does not call the secondary provider when the primary exhausts the total budget", async () => {
+    vi.useFakeTimers();
+    process.env.OLLAMA_API_KEY = "primary-key";
+    process.env.OPENROUTER_API_KEY = "secondary-key";
+    process.env.OPENROUTER_TIMEOUT_MS = "5000";
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation((_url, init) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+    }));
+
+    const pending = generateAiEvent({
+      name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4,
+      recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {},
+    });
+    await vi.advanceTimersByTimeAsync(5_000);
+    const result = await pending;
+
+    expect(result).toMatchObject({ success: false, reason: "timeout", providerId: "ollama", totalElapsedMs: 5_000 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses one bounded structured request for narrative and all choices", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      choices: [{ message: { content: JSON.stringify(validEvent) } }],
+    }), { status: 200 }));
+
+    await generateAiEvent({
+      name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4,
+      recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {},
+    }, { skipPrimary: true });
+    const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(request.max_tokens).toBeLessThanOrEqual(2600);
+    expect(request.response_format).toEqual({ type: "json_object" });
+    const instructions = request.messages.map((message: { content: string }) => message.content).join("\n");
+    for (const required of ["title", "body", "tags", "choices", "id", "label", "summary", "statDelta", "relationshipDelta"]) {
+      expect(instructions).toContain(`\"${required}\"`);
+    }
+    expect(instructions).toContain("2-4 complete objects");
+    expect(instructions).toContain("single JSON object");
+    expect(JSON.stringify(request)).not.toContain("choice-only");
+  });
+
   it("retains safe primary failure telemetry when the secondary provider succeeds", async () => {
     process.env.OLLAMA_API_KEY = "primary-secret";
     process.env.OPENROUTER_API_KEY = "secondary-secret";
@@ -193,6 +237,24 @@ describe("AI event diagnostics", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(payload), { status: 200 }));
     const result = await generateAiEvent({ name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4, recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {} }, { skipPrimary: true });
     expect(result).toMatchObject({ success: false, reason });
+  });
+
+  it.each([
+    ["choice_count", { ...validEvent, choices: [validEvent.choices[0]] }],
+    ["choice_field", { ...validEvent, choices: [{ ...validEvent.choices[0], label: 42 }, validEvent.choices[1]] }],
+    ["choice_schema", { ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: "bad" }, validEvent.choices[1]] }],
+    ["choice_stat_range", { ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: { mental: 16 } }, validEvent.choices[1]] }],
+  ] as const)("classifies real provider choice output as %s with one bounded call", async (reason, candidate) => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      choices: [{ message: { content: JSON.stringify(candidate) } }],
+    }), { status: 200 }));
+    const result = await generateAiEvent({
+      name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4,
+      recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {},
+    }, { skipPrimary: true });
+    expect(result).toMatchObject({ success: false, reason, providerFailures: [expect.objectContaining({ reason, stage: "parse" })] });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it.each([false, true])("classifies HTTP-200 SSE in-band errors (EOF=%s)", async (atEof) => {
