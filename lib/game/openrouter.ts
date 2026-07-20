@@ -272,6 +272,7 @@ export interface OpenRouterResult {
   providerElapsedMs: number;
   totalElapsedMs: number;
   slow: boolean;
+  retryUsed: boolean;
   providerFailures: AiProviderFailureTelemetry[];
 }
 
@@ -305,6 +306,7 @@ export interface OpenRouterFailure {
   providerElapsedMs?: number;
   totalElapsedMs?: number;
   slow?: boolean;
+  retryUsed?: boolean;
   issues?: string[];
   providerFailures?: AiProviderFailureTelemetry[];
 }
@@ -349,13 +351,13 @@ export async function generateAiEvent(
     const result = await generateAiEventWithProvider(provider, state);
     const totalElapsedMs = Date.now() - totalStartedAt;
     const measured = { ...result, totalElapsedMs, slow: totalElapsedMs > SLOW_AI_GENERATION_MS };
-    if (measured.success) return { ...measured, providerFailures };
+    if (measured.success) return { ...measured, retryUsed: providerFailures.length > 0, providerFailures };
     lastFailure = measured;
     providerFailures.push(toProviderFailureTelemetry(provider, measured));
     console.warn("AI event provider failed", { provider: provider.label, reason: measured.reason });
   }
 
-  return { ...lastFailure, providerFailures };
+  return { ...lastFailure, retryUsed: providerFailures.length > 1, providerFailures };
 }
 
 async function generateAiEventWithProvider(
@@ -415,7 +417,7 @@ async function generateAiEventWithProvider(
       return failure(parsed.reason, parsed.issues);
     }
 
-    return { success: true, event: parsed.event, providerId: provider.id, providerLabel: provider.label, providerElapsedMs: Date.now() - startedAt, totalElapsedMs: 0, slow: false, providerFailures: [] };
+    return { success: true, event: parsed.event, providerId: provider.id, providerLabel: provider.label, providerElapsedMs: Date.now() - startedAt, totalElapsedMs: 0, slow: false, retryUsed: false, providerFailures: [] };
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return failure("timeout");
@@ -443,14 +445,14 @@ export async function generateAiEventStream(
     });
     const totalElapsedMs = Date.now() - totalStartedAt;
     const measured = { ...result, totalElapsedMs, slow: totalElapsedMs > SLOW_AI_GENERATION_MS };
-    if (measured.success) return { ...measured, providerFailures };
+    if (measured.success) return { ...measured, retryUsed: providerFailures.length > 0, providerFailures };
     lastFailure = measured;
     providerFailures.push(toProviderFailureTelemetry(provider, measured));
     console.warn("AI event stream provider failed", { provider: provider.label, reason: measured.reason });
     if (providerSentBody) break;
   }
 
-  return { ...lastFailure, providerFailures };
+  return { ...lastFailure, retryUsed: providerFailures.length > 1, providerFailures };
 }
 
 async function generateAiEventStreamWithProvider(
@@ -537,7 +539,7 @@ async function generateAiEventStreamWithProvider(
 
     const parsed = parseAiEventContentDetailed(content);
     if (!parsed.success) return failure(parsed.reason, parsed.issues);
-    return { success: true, event: parsed.event, providerId: provider.id, providerLabel: provider.label, providerElapsedMs: Date.now() - startedAt, totalElapsedMs: 0, slow: false, providerFailures: [] };
+    return { success: true, event: parsed.event, providerId: provider.id, providerLabel: provider.label, providerElapsedMs: Date.now() - startedAt, totalElapsedMs: 0, slow: false, retryUsed: false, providerFailures: [] };
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return failure("timeout");

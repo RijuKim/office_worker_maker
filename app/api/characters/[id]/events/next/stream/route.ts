@@ -145,7 +145,7 @@ export async function POST(request: Request, context: RouteContext) {
         let source: EventSource = "FALLBACK";
         let aiAttempted = false;
         let aiFailed = false;
-        const retryUsed = false;
+        let retryUsed = false;
         let fallbackUsed = false;
         const generationStartedAt = Date.now();
         let providerElapsedMs = 0;
@@ -200,6 +200,7 @@ export async function POST(request: Request, context: RouteContext) {
           }, { skipPrimary: !limit.allowed });
           providerElapsedMs = aiResult.providerElapsedMs ?? 0;
           generationSlow = aiResult.slow ?? false;
+          retryUsed = aiResult.retryUsed ?? false;
           providerId = aiResult.providerId ?? null;
           providerFailures = aiResult.providerFailures ?? [];
 
@@ -228,7 +229,7 @@ export async function POST(request: Request, context: RouteContext) {
               reasons: initialEvaluation.verdict.reasons,
               diversityScore: initialEvaluation.verdict.diversityScore,
               continuityExemptions: initialEvaluation.verdict.continuityExemptions,
-              retryUsed: false,
+              retryUsed,
               fallbackUsed: false,
               selectedFallbackTitle: null,
               durationMs: initialEvaluation.durationMs,
@@ -308,6 +309,7 @@ export async function POST(request: Request, context: RouteContext) {
             });
           },
         });
+        const totalElapsedMs = Date.now() - generationStartedAt;
         log.info("스트림 이벤트 생성 완료", {
           userId,
           characterId: id,
@@ -322,8 +324,8 @@ export async function POST(request: Request, context: RouteContext) {
           providerId,
           providerFailures,
           providerElapsedMs,
-          totalElapsedMs: Date.now() - generationStartedAt,
-          slow: generationSlow,
+          totalElapsedMs,
+          slow: generationSlow || totalElapsedMs > 10_000,
           lifeStage: lifeStage.lifeStage,
         });
 

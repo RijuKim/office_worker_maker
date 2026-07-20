@@ -20,6 +20,7 @@ const fixture = vi.hoisted(() => ({
   generationCalls: 0,
   consumeWinnerOnCas: false,
   aiEnabled: false,
+  commitDelayMs: 0,
 }));
 
 const routeEvent = vi.hoisted(() => ({
@@ -79,6 +80,9 @@ const prismaMock = vi.hoisted(() => ({
       return event?.status === where.status ? event : null;
     }),
     create: vi.fn(async ({ data }: { data: StoredEvent }) => {
+      if (fixture.commitDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, fixture.commitDelayMs));
+      }
       fixture.generationCalls += 1;
       const candidateNumber = fixture.generationCalls;
       const stored = {
@@ -169,6 +173,7 @@ describe("stateful JSON/SSE event authority", () => {
     fixture.generationCalls = 0;
     fixture.consumeWinnerOnCas = false;
     fixture.aiEnabled = false;
+    fixture.commitDelayMs = 0;
     aiMocks.checkDailyAiLimit.mockResolvedValue({ allowed: true });
     engineMocks.selectNextEvent.mockReturnValue({ type: "static", event: routeEvent });
   });
@@ -250,6 +255,114 @@ describe("stateful JSON/SSE event authority", () => {
     expect(logged).not.toContain("API_KEY");
     expect(logged).not.toContain("prompt");
     expect(logged).not.toContain("raw");
+  });
+
+  it("logs a secondary-provider success as a slow retry and commits its AI event", async () => {
+    vi.useFakeTimers();
+    fixture.aiEnabled = true;
+    const secret = "SECONDARY_API_SECRET_SENTINEL";
+    const prompt = "FULL_PROMPT_SENTINEL";
+    const raw = "RAW_RESPONSE_SENTINEL";
+    const aiEvent = {
+      title: "두 번째 공급자의 제안",
+      body: "당신은 늦은 오후 도서관 창가에서 지원서를 펼쳤다. 빗소리 사이로 새로운 제안이 도착했고, 담당자는 오늘 안에 답을 달라고 했다. 조건은 매력적이지만 준비하던 계획과 충돌했다. 당신은 비용과 가능성을 차분히 비교했다. 어떤 답이든 다음 일정과 관계가 달라질 순간이었다.",
+      tags: ["진로"],
+      choices: routeEvent.choices,
+    };
+    aiMocks.generateAiEvent.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 12_000));
+      return {
+        success: true, event: aiEvent, providerId: "openrouter", providerLabel: "OpenRouter",
+        providerElapsedMs: 7_000, totalElapsedMs: 12_000, slow: true, retryUsed: true,
+        providerFailures: [{ providerId: "ollama", providerLabel: "Ollama DeepSeek", providerElapsedMs: 5_000, stage: "provider", reason: "rate_limited" }],
+      };
+    });
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const pending = nextJson(new Request("http://localhost/api/characters/run-1/events/next", { method: "POST" }), { params: Promise.resolve({ id: "run-1" }) });
+    await vi.advanceTimersByTimeAsync(12_000);
+    const response = await pending;
+    const serializedResponse = JSON.stringify(await response.json());
+    const serializedLogs = JSON.stringify(info.mock.calls);
+
+    expect(response.status).toBe(200);
+    expect(serializedResponse).toContain('"source":"AI"');
+    expect(aiMocks.generateAiEvent).toHaveBeenCalledTimes(1);
+    expect(info).toHaveBeenCalledWith(expect.stringContaining("이벤트 생성 완료"), expect.objectContaining({
+      eventId: fixture.pointer, providerId: "openrouter", providerElapsedMs: 7_000,
+      totalElapsedMs: 12_000, retryUsed: true, fallbackUsed: false, slow: true,
+      providerFailures: [expect.objectContaining({ providerId: "ollama", stage: "provider", reason: "rate_limited", providerElapsedMs: 5_000 })],
+    }));
+    for (const sentinel of [secret, prompt, raw]) {
+      expect(serializedResponse).not.toContain(sentinel);
+      expect(serializedLogs).not.toContain(sentinel);
+    }
+    vi.useRealTimers();
+  });
+
+  it("marks fallback validation and commit overhead over ten seconds as slow without failing", async () => {
+    vi.useFakeTimers();
+    fixture.aiEnabled = true;
+    fixture.commitDelayMs = 11_000;
+    aiMocks.generateAiEvent.mockResolvedValue({
+      success: false, reason: "timeout", providerId: "openrouter", providerLabel: "OpenRouter",
+      providerElapsedMs: 5_000, totalElapsedMs: 5_000, slow: false, retryUsed: false,
+      providerFailures: [{ providerId: "openrouter", providerLabel: "OpenRouter", providerElapsedMs: 5_000, stage: "provider", reason: "timeout" }],
+    });
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const pending = nextJson(new Request("http://localhost/api/characters/run-1/events/next", { method: "POST" }), { params: Promise.resolve({ id: "run-1" }) });
+    await vi.advanceTimersByTimeAsync(11_000);
+    const response = await pending;
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.event).toMatchObject({ id: fixture.pointer, source: "FALLBACK" });
+    expect(info).toHaveBeenCalledWith(expect.stringContaining("이벤트 생성 완료"), expect.objectContaining({
+      eventId: fixture.pointer, totalElapsedMs: 11_000, slow: true, retryUsed: false, fallbackUsed: true,
+    }));
+    vi.useRealTimers();
+  });
+
+  it("honors the configured provider timeout at route level and commits a validated fallback", async () => {
+    vi.useFakeTimers();
+    fixture.aiEnabled = true;
+    aiMocks.checkDailyAiLimit.mockResolvedValue({ allowed: false });
+    process.env.OPENROUTER_API_KEY = "ROUTE_TIMEOUT_SECRET_SENTINEL";
+    process.env.OPENROUTER_TIMEOUT_MS = "5000";
+    const rawSentinel = "ROUTE_RAW_RESPONSE_SENTINEL";
+    const actual = await vi.importActual<typeof import("@/lib/game/openrouter")>("@/lib/game/openrouter");
+    aiMocks.generateAiEvent.mockImplementation(actual.generateAiEvent);
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation((_url, init) => new Promise((_resolve, reject) => {
+      void rawSentinel;
+      init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+    }));
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const pending = nextJson(new Request("http://localhost/api/characters/run-1/events/next", { method: "POST" }), { params: Promise.resolve({ id: "run-1" }) });
+    await vi.advanceTimersByTimeAsync(5_000);
+    const response = await pending;
+    const responseText = await response.text();
+    const serializedLogs = JSON.stringify(info.mock.calls);
+
+    expect(response.status).toBe(200);
+    expect(JSON.parse(responseText).event).toMatchObject({ id: fixture.pointer, source: "FALLBACK" });
+    expect(responseText).not.toContain("error");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
+    expect(info).toHaveBeenCalledWith(expect.stringContaining("이벤트 생성 완료"), expect.objectContaining({
+      eventId: fixture.pointer, source: "FALLBACK", providerId: "openrouter",
+      providerElapsedMs: 5_000, totalElapsedMs: 5_000, generationStage: "provider",
+      generationReason: "timeout", retryUsed: false, fallbackUsed: true, slow: false,
+      providerFailures: [expect.objectContaining({ providerId: "openrouter", reason: "timeout", providerElapsedMs: 5_000 })],
+    }));
+    for (const sentinel of [process.env.OPENROUTER_API_KEY!, "FULL_PROMPT_SENTINEL", rawSentinel]) {
+      expect(responseText).not.toContain(sentinel);
+      expect(serializedLogs).not.toContain(sentinel);
+    }
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENROUTER_TIMEOUT_MS;
+    vi.useRealTimers();
   });
 
   it("overlaps fresh JSON and SSE generation and converges on one exact authoritative payload", async () => {

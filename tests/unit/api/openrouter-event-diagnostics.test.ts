@@ -55,7 +55,11 @@ describe("AI event diagnostics", () => {
     [{ ...validEvent, choices: [validEvent.choices[0]] }, "choice_count"],
     [{ ...validEvent, choices: [...validEvent.choices, validEvent.choices[0], validEvent.choices[1], validEvent.choices[0]] }, "choice_count"],
     [{ ...validEvent, choices: [{ ...validEvent.choices[0], id: undefined }, validEvent.choices[1]] }, "choice_field"],
+    [{ ...validEvent, choices: [{ ...validEvent.choices[0], id: 42 }, validEvent.choices[1]] }, "choice_field"],
+    [{ ...validEvent, choices: [{ ...validEvent.choices[0], label: undefined }, validEvent.choices[1]] }, "choice_field"],
+    [{ ...validEvent, choices: [{ ...validEvent.choices[0], label: 42 }, validEvent.choices[1]] }, "choice_field"],
     [{ ...validEvent, choices: [{ ...validEvent.choices[0], summary: undefined }, validEvent.choices[1]] }, "choice_field"],
+    [{ ...validEvent, choices: [{ ...validEvent.choices[0], summary: 42 }, validEvent.choices[1]] }, "choice_field"],
     [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: undefined }, validEvent.choices[1]] }, "choice_schema"],
     [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: "bad" }, validEvent.choices[1]] }, "choice_schema"],
     [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: { mental: "bad" } }, validEvent.choices[1]] }, "choice_schema"],
@@ -128,7 +132,7 @@ describe("AI event diagnostics", () => {
       recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {},
     });
 
-    expect(result).toMatchObject({ success: true, providerId: "openrouter", providerFailures: [{ providerId: "ollama", stage: "provider", reason: "rate_limited" }] });
+    expect(result).toMatchObject({ success: true, providerId: "openrouter", retryUsed: true, providerFailures: [{ providerId: "ollama", stage: "provider", reason: "rate_limited" }] });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(JSON.stringify(result)).not.toContain("primary-secret");
     expect(JSON.stringify(result)).not.toContain("secondary-secret");
