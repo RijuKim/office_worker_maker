@@ -12,7 +12,7 @@ describe("synthesizeFallbackCareerPath", () => {
     expect(result.destinationName).toBeNull();
     expect(result.jobRole).toBeNull();
     expect(result.salaryBand).toBeNull();
-    expect(result.careerPath).toContain("전문직");
+    expect(result.careerPath).toBe("전문직 시험 준비생");
   });
 
   it("returns a career path based on high charm and mental", () => {

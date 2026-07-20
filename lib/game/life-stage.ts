@@ -358,7 +358,7 @@ export function applyLifeStageTransition(input: LifeStageTransitionInput): LifeS
   };
   const reasons: LifeStageTransitionReason[] = [];
 
-  if (shouldRequireExtraSemester(next, input.stats, input.eventFlags)) {
+  if (next.stageEventCount >= CORE_EVENTS_PER_SEMESTER && shouldRequireExtraSemester(next, input.stats, input.eventFlags)) {
     next = {
       ...next,
       graduation: "extra_semester",
