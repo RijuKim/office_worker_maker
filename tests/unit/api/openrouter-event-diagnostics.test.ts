@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   generateAiEvent,
+  generateAiEventStream,
   getOpenRouterTimeoutMs,
   parseAiEventContentDetailed,
 } from "@/lib/game/openrouter";
@@ -21,6 +22,9 @@ describe("AI event diagnostics", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     delete process.env.OPENROUTER_API_KEY;
+    delete process.env.OLLAMA_API_KEY;
+    delete process.env.OPENROUTER_TIMEOUT_MS;
+    vi.useRealTimers();
   });
 
   it.each([
@@ -44,12 +48,28 @@ describe("AI event diagnostics", () => {
   });
 
   it.each([
+    [{ ...validEvent, title: undefined }, "narrative_schema"],
+    [{ ...validEvent, tags: undefined }, "narrative_schema"],
+    [{ ...validEvent, choices: [] }, "choice_count"],
     [{ ...validEvent, body: "짧다" }, "narrative_schema"],
     [{ ...validEvent, choices: [validEvent.choices[0]] }, "choice_count"],
+    [{ ...validEvent, choices: [...validEvent.choices, validEvent.choices[0], validEvent.choices[1], validEvent.choices[0]] }, "choice_count"],
+    [{ ...validEvent, choices: [{ ...validEvent.choices[0], id: undefined }, validEvent.choices[1]] }, "choice_field"],
+    [{ ...validEvent, choices: [{ ...validEvent.choices[0], summary: undefined }, validEvent.choices[1]] }, "choice_field"],
+    [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: undefined }, validEvent.choices[1]] }, "choice_schema"],
+    [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: "bad" }, validEvent.choices[1]] }, "choice_schema"],
+    [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: { mental: "bad" } }, validEvent.choices[1]] }, "choice_schema"],
+    [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: { secretStat: -1 } }, validEvent.choices[1]] }, "choice_schema"],
     [{ ...validEvent, choices: [{ ...validEvent.choices[0], label: "x".repeat(201) }, validEvent.choices[1]] }, "choice_field"],
+    [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: { mental: -15, health: -1 } }, validEvent.choices[1]] }, null],
+    [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: { mental: 15, health: 15 } }, validEvent.choices[1]] }, null],
     [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: { mental: -16 } }, validEvent.choices[1]] }, "choice_stat_range"],
+    [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: { mental: 16 } }, validEvent.choices[1]] }, "choice_stat_range"],
+    [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: { health: -2 } }, validEvent.choices[1]] }, "choice_stat_range"],
   ])("returns the diagnostic reason %s", (candidate, reason) => {
-    expect(parseAiEventContentDetailed(JSON.stringify(candidate))).toMatchObject({ success: false, reason });
+    const result = parseAiEventContentDetailed(JSON.stringify(candidate));
+    if (reason === null) expect(result).toMatchObject({ success: true });
+    else expect(result).toMatchObject({ success: false, reason });
   });
 
   it("accepts a slow successful provider response without fallback or a second call", async () => {
@@ -68,7 +88,82 @@ describe("AI event diagnostics", () => {
       recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {},
     }, { skipPrimary: true });
 
-    expect(result).toMatchObject({ success: true, slow: true, totalElapsedMs: 12_001 });
+    expect(result).toMatchObject({ success: true, slow: true, totalElapsedMs: 12_001, providerElapsedMs: 12_001, providerFailures: [] });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("aborts at the configured timeout and returns bounded timeout telemetry", async () => {
+    vi.useFakeTimers();
+    process.env.OPENROUTER_API_KEY = "test-key";
+    process.env.OPENROUTER_TIMEOUT_MS = "5000";
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation((_url, init) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+    }));
+
+    const pending = generateAiEvent({
+      name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4,
+      recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {},
+    }, { skipPrimary: true });
+    await vi.advanceTimersByTimeAsync(5_000);
+    const result = await pending;
+
+    expect(result).toMatchObject({
+      success: false, reason: "timeout", providerId: "openrouter",
+      providerElapsedMs: 5_000, totalElapsedMs: 5_000, slow: false,
+      providerFailures: [{ providerId: "openrouter", stage: "provider", reason: "timeout", providerElapsedMs: 5_000 }],
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
+  });
+
+  it("retains safe primary failure telemetry when the secondary provider succeeds", async () => {
+    process.env.OLLAMA_API_KEY = "primary-secret";
+    process.env.OPENROUTER_API_KEY = "secondary-secret";
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response("limited", { status: 429 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(validEvent) } }] }), { status: 200 }));
+
+    const result = await generateAiEvent({
+      name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4,
+      recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {},
+    });
+
+    expect(result).toMatchObject({ success: true, providerId: "openrouter", providerFailures: [{ providerId: "ollama", stage: "provider", reason: "rate_limited" }] });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(result)).not.toContain("primary-secret");
+    expect(JSON.stringify(result)).not.toContain("secondary-secret");
+    expect(JSON.stringify(result)).not.toContain("주인공:");
+  });
+
+  it("classifies a missing provider key without making a request", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    const result = await generateAiEvent({ name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4, recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {} }, { skipPrimary: true });
+    expect(result).toMatchObject({ success: false, reason: "no_key", providerId: "openrouter", providerElapsedMs: 0 });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([[429, "rate_limited"], [500, "api_error"]] as const)("classifies HTTP %i as %s", async (status, reason) => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("upstream failure", { status }));
+    const result = await generateAiEvent({ name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4, recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {} }, { skipPrimary: true });
+    expect(result).toMatchObject({ success: false, reason, providerId: "openrouter" });
+  });
+
+  it.each([
+    ["empty content", { choices: [{ message: { content: "" } }] }, "empty_content"],
+    ["malformed JSON", { choices: [{ message: { content: "{broken" } }] }, "malformed_json"],
+  ])("classifies %s responses", async (_label, payload, reason) => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(payload), { status: 200 }));
+    const result = await generateAiEvent({ name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4, recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {} }, { skipPrimary: true });
+    expect(result).toMatchObject({ success: false, reason });
+  });
+
+  it.each([false, true])("classifies HTTP-200 SSE in-band errors (EOF=%s)", async (atEof) => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    const suffix = atEof ? "" : "\n\n";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(`data: {"error":{"message":"upstream failed"}}${suffix}`, { status: 200 }));
+    const result = await generateAiEventStream({ name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4, recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {} }, () => {}, { skipPrimary: true });
+    expect(result).toMatchObject({ success: false, reason: "api_error" });
   });
 });

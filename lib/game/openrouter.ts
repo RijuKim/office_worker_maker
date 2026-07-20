@@ -66,7 +66,7 @@ const aiEventSchema = z.object({
           wealth: z.number().int().min(-15).max(15).optional(),
           reputation: z.number().int().min(-15).max(15).optional(),
           charm: z.number().int().min(-15).max(15).optional(),
-        }),
+        }).strict(),
         relationshipDelta: z.array(z.object({
           name: z.string().min(1).max(60),
           trust: z.number().int().min(-30).max(30),
@@ -272,7 +272,17 @@ export interface OpenRouterResult {
   providerElapsedMs: number;
   totalElapsedMs: number;
   slow: boolean;
+  providerFailures: AiProviderFailureTelemetry[];
 }
+
+export type AiProviderFailureTelemetry = {
+  providerId: AiProvider["id"];
+  providerLabel: string;
+  providerElapsedMs: number;
+  reason: AiEventFailureReason | "invalid_response";
+  stage: "provider" | "parse";
+  issues?: string[];
+};
 
 export type AiEventFailureReason =
   | "no_key"
@@ -296,6 +306,7 @@ export interface OpenRouterFailure {
   totalElapsedMs?: number;
   slow?: boolean;
   issues?: string[];
+  providerFailures?: AiProviderFailureTelemetry[];
 }
 
 export interface OpenRouterEndingResult {
@@ -305,30 +316,53 @@ export interface OpenRouterEndingResult {
   providerLabel?: string;
 }
 
+function toProviderFailureTelemetry(
+  provider: AiProvider,
+  failure: OpenRouterFailure,
+): AiProviderFailureTelemetry {
+  return {
+    providerId: failure.providerId ?? provider.id,
+    providerLabel: failure.providerLabel ?? provider.label,
+    providerElapsedMs: failure.providerElapsedMs ?? 0,
+    reason: failure.reason,
+    stage: isParseFailure(failure.reason) ? "parse" : "provider",
+    ...(failure.issues ? { issues: failure.issues } : {}),
+  };
+}
+
+function isParseFailure(reason: OpenRouterFailure["reason"]) {
+  return reason === "malformed_json" || reason === "narrative_schema" ||
+    reason === "choice_count" || reason === "choice_field" ||
+    reason === "choice_stat_range" || reason === "choice_schema" ||
+    reason === "invalid_response";
+}
+
 export async function generateAiEvent(
   state: AiEventPromptState,
   options: AiProviderOptions = {},
 ): Promise<OpenRouterResult | OpenRouterFailure> {
   const totalStartedAt = Date.now();
   let lastFailure: OpenRouterFailure = { success: false, reason: "no_key" };
+  const providerFailures: AiProviderFailureTelemetry[] = [];
 
   for (const provider of aiProviders(options)) {
     const result = await generateAiEventWithProvider(provider, state);
     const totalElapsedMs = Date.now() - totalStartedAt;
     const measured = { ...result, totalElapsedMs, slow: totalElapsedMs > SLOW_AI_GENERATION_MS };
-    if (measured.success) return measured;
+    if (measured.success) return { ...measured, providerFailures };
     lastFailure = measured;
+    providerFailures.push(toProviderFailureTelemetry(provider, measured));
     console.warn("AI event provider failed", { provider: provider.label, reason: measured.reason });
   }
 
-  return lastFailure;
+  return { ...lastFailure, providerFailures };
 }
 
 async function generateAiEventWithProvider(
   provider: AiProvider,
   state: AiEventPromptState,
 ): Promise<OpenRouterResult | OpenRouterFailure> {
-  if (!provider.key) return { success: false, reason: "no_key" };
+  if (!provider.key) return { success: false, reason: "no_key", providerId: provider.id, providerLabel: provider.label, providerElapsedMs: 0 };
 
   const startedAt = Date.now();
   const controller = new AbortController();
@@ -381,7 +415,7 @@ async function generateAiEventWithProvider(
       return failure(parsed.reason, parsed.issues);
     }
 
-    return { success: true, event: parsed.event, providerId: provider.id, providerLabel: provider.label, providerElapsedMs: Date.now() - startedAt, totalElapsedMs: 0, slow: false };
+    return { success: true, event: parsed.event, providerId: provider.id, providerLabel: provider.label, providerElapsedMs: Date.now() - startedAt, totalElapsedMs: 0, slow: false, providerFailures: [] };
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return failure("timeout");
@@ -399,6 +433,7 @@ export async function generateAiEventStream(
 ): Promise<OpenRouterResult | OpenRouterFailure> {
   const totalStartedAt = Date.now();
   let lastFailure: OpenRouterFailure = { success: false, reason: "no_key" };
+  const providerFailures: AiProviderFailureTelemetry[] = [];
 
   for (const provider of aiProviders(options)) {
     let providerSentBody = false;
@@ -408,13 +443,14 @@ export async function generateAiEventStream(
     });
     const totalElapsedMs = Date.now() - totalStartedAt;
     const measured = { ...result, totalElapsedMs, slow: totalElapsedMs > SLOW_AI_GENERATION_MS };
-    if (measured.success) return measured;
+    if (measured.success) return { ...measured, providerFailures };
     lastFailure = measured;
+    providerFailures.push(toProviderFailureTelemetry(provider, measured));
     console.warn("AI event stream provider failed", { provider: provider.label, reason: measured.reason });
     if (providerSentBody) break;
   }
 
-  return lastFailure;
+  return { ...lastFailure, providerFailures };
 }
 
 async function generateAiEventStreamWithProvider(
@@ -422,7 +458,7 @@ async function generateAiEventStreamWithProvider(
   state: AiEventPromptState,
   onBodyDelta: (delta: string) => void,
 ): Promise<OpenRouterResult | OpenRouterFailure> {
-  if (!provider.key) return { success: false, reason: "no_key" };
+  if (!provider.key) return { success: false, reason: "no_key", providerId: provider.id, providerLabel: provider.label, providerElapsedMs: 0 };
 
   const startedAt = Date.now();
   const controller = new AbortController();
@@ -489,7 +525,10 @@ async function generateAiEventStreamWithProvider(
     }
 
     if (buffer.trim()) {
-      const parsed = safeJson(buffer.trim());
+      const trailing = buffer.trim();
+      const payload = trailing.startsWith("data:") ? trailing.slice(5).trim() : trailing;
+      const parsed = safeJson(payload);
+      if (readRecord(parsed)?.error) return failure("api_error");
       const token = extractChatToken(parsed);
       if (typeof token === "string") {
         content += token;
@@ -498,7 +537,7 @@ async function generateAiEventStreamWithProvider(
 
     const parsed = parseAiEventContentDetailed(content);
     if (!parsed.success) return failure(parsed.reason, parsed.issues);
-    return { success: true, event: parsed.event, providerId: provider.id, providerLabel: provider.label, providerElapsedMs: Date.now() - startedAt, totalElapsedMs: 0, slow: false };
+    return { success: true, event: parsed.event, providerId: provider.id, providerLabel: provider.label, providerElapsedMs: Date.now() - startedAt, totalElapsedMs: 0, slow: false, providerFailures: [] };
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return failure("timeout");
@@ -888,58 +927,42 @@ function normalizeAiEvent(raw: unknown) {
     Array.isArray(event.options) ? event.options :
     Array.isArray(event.actions) ? event.actions :
     [];
-  const tags = Array.isArray(event.tags)
-    ? event.tags.filter((tag) => typeof tag === "string").slice(0, 5)
-    : [];
-
   return {
-    title: typeof event.title === "string" ? event.title : "이름 없는 하루",
+    title: event.title,
     body: typeof event.body === "string" ? event.body :
       typeof event.description === "string" ? event.description :
-      typeof event.narrative === "string" ? event.narrative :
-      "",
-    tags: tags.length > 0 ? tags : ["AI"],
-    choices: rawChoices.map((choice, index) => normalizeChoice(choice, index)),
+      event.narrative,
+    tags: event.tags,
+    choices: rawChoices.map((choice) => normalizeChoice(choice)),
   };
 }
 
-function normalizeChoice(raw: unknown, index: number) {
-  const choice = typeof raw === "object" && raw !== null ? raw as Record<string, unknown> : {};
-  const rawDelta = readRecord(choice.statDelta) ?? readRecord(choice.statChanges) ?? readRecord(choice.effects) ?? {};
-  const statDelta = Object.fromEntries(
-    Object.entries(rawDelta)
-      .map(([key, value]) => [key, Number(value)] as const)
-      .filter(([key, value]) => allowedStats.includes(key as typeof allowedStats[number]) && Number.isFinite(value))
-      .map(([key, value]) => {
-        return [key, Math.round(value)];
-      }),
-  );
-  const adjustedStatDelta = ensureChoiceCost(statDelta, index);
+function normalizeChoice(raw: unknown) {
+  const choice = readRecord(raw);
+  if (!choice) return raw;
+  const rawDelta = readRecord(choice.statDelta) ?? readRecord(choice.statChanges) ?? readRecord(choice.effects);
+  const statDelta = rawDelta ? Object.fromEntries(
+    Object.entries(rawDelta).map(([key, value]) => {
+      if (allowedStats.includes(key as typeof allowedStats[number]) && typeof value === "string") {
+        const numeric = Number(value);
+        if (Number.isFinite(numeric)) return [key, Math.round(numeric)];
+      }
+      return [key, value];
+    }),
+  ) : choice.statDelta;
   const summarySource = typeof choice.summary === "string" ? choice.summary :
-    typeof choice.nextEvent === "string" ? choice.nextEvent :
-    "선택의 결과가 다음 장면으로 이어졌다.";
-  const summary = summarySource.startsWith("당신은") ? summarySource : `당신은 ${summarySource}`;
+    choice.nextEvent;
+  const summary = typeof summarySource === "string" && !summarySource.startsWith("당신은")
+    ? `당신은 ${summarySource}`
+    : summarySource;
 
   return {
-    id: typeof choice.id === "string" ? choice.id : `choice_${index + 1}`,
+    id: choice.id,
     label: typeof choice.label === "string" ? choice.label :
-      typeof choice.text === "string" ? choice.text :
-      `${index + 1}번째 선택을 한다.`,
+      choice.text,
     summary,
-    statDelta: adjustedStatDelta,
+    statDelta,
     relationshipDelta: normalizeRelationshipDelta(choice.relationshipDelta ?? choice.relationshipChanges),
-  };
-}
-
-function ensureChoiceCost(statDelta: Record<string, number>, index: number) {
-  if (Object.values(statDelta).some((value) => value < 0)) {
-    return statDelta;
-  }
-  const costByIndex = ["mental", "health", "wealth", "reputation"] as const;
-  const key = costByIndex[index % costByIndex.length];
-  return {
-    ...statDelta,
-    [key]: key === "health" ? -1 : Math.min(-1, statDelta[key] ?? (index === 0 ? -2 : -3)),
   };
 }
 

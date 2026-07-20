@@ -19,6 +19,7 @@ const fixture = vi.hoisted(() => ({
   hiddenFlags: {} as Record<string, unknown>,
   generationCalls: 0,
   consumeWinnerOnCas: false,
+  aiEnabled: false,
 }));
 
 const routeEvent = vi.hoisted(() => ({
@@ -38,7 +39,10 @@ function fullCharacter() {
     currentGradeYear: 2, major: "사회학과", academicStatus: "ENROLLED", lifeStatus: [],
     majorEventCount: 1, coreEventCount: 2, currentEventId: fixture.pointer,
     createdAt: new Date("2026-07-20T00:00:00Z"), updatedAt: new Date("2026-07-20T00:00:00Z"),
-    stats: null,
+    stats: fixture.aiEnabled ? {
+      academic: 50, practical: 50, communication: 50, creativity: 50, health: 8,
+      mental: 50, network: 50, wealth: 50, reputation: 50, charm: 50,
+    } : null,
     hiddenState: { burnoutRisk: 10, eventFlags: fixture.hiddenFlags, familyState: {} },
     relationships: [], specs: [], jobApplications: [], careerPaths: [], eventHistory: [], records: [],
     events: [...fixture.events.values()].filter((event) => event.status === "ACTIVE"),
@@ -117,15 +121,21 @@ const prismaMock = vi.hoisted(() => ({
   $transaction: vi.fn(async (operation: (tx: typeof prismaMock) => Promise<unknown>) => operation(prismaMock)),
 }));
 
+const aiMocks = vi.hoisted(() => ({
+  checkDailyAiLimit: vi.fn(), generateAiEvent: vi.fn(), generateAiEventStream: vi.fn(), incrementAiUsage: vi.fn(),
+}));
+const engineMocks = vi.hoisted(() => ({ selectNextEvent: vi.fn() }));
+
 vi.mock("@/lib/server/prisma", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/server/session", () => ({ requireCurrentUserId: vi.fn(async () => "user-1") }));
 vi.mock("@/lib/game/openrouter", () => ({
-  checkDailyAiLimit: vi.fn(), generateAiEvent: vi.fn(), generateAiEventStream: vi.fn(), incrementAiUsage: vi.fn(),
+  ...aiMocks,
 }));
-vi.mock("@/lib/game/event-engine", () => ({
+vi.mock("@/lib/game/event-engine", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/game/event-engine")>(),
   getStoryArc: vi.fn(() => ({ phase: "growth" })),
   isEventAllowedForLifeStage: vi.fn(() => true),
-  selectNextEvent: vi.fn(() => ({ type: "static", event: routeEvent })),
+  selectNextEvent: engineMocks.selectNextEvent,
 }));
 vi.mock("@/lib/game/life-stage", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/game/life-stage")>();
@@ -158,6 +168,88 @@ describe("stateful JSON/SSE event authority", () => {
     fixture.hiddenFlags = {};
     fixture.generationCalls = 0;
     fixture.consumeWinnerOnCas = false;
+    fixture.aiEnabled = false;
+    aiMocks.checkDailyAiLimit.mockResolvedValue({ allowed: true });
+    engineMocks.selectNextEvent.mockReturnValue({ type: "static", event: routeEvent });
+  });
+
+  it("does not mark a FORCED event as fallback after AI failure", async () => {
+    fixture.aiEnabled = true;
+    engineMocks.selectNextEvent.mockReturnValue({ type: "forced", event: routeEvent });
+    aiMocks.generateAiEvent.mockResolvedValue({
+      success: false, reason: "api_error", providerId: "openrouter", providerElapsedMs: 10,
+      totalElapsedMs: 10, slow: false, providerFailures: [],
+    });
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const response = await nextJson(new Request("http://localhost/api/characters/run-1/events/next", { method: "POST" }), { params: Promise.resolve({ id: "run-1" }) });
+    const payload = await response.json();
+
+    expect(payload.event).toMatchObject({ source: "FORCED", forced: true });
+    expect(info).toHaveBeenCalledWith(expect.stringContaining("이벤트 생성 완료"), expect.objectContaining({ source: "FORCED", fallbackUsed: false }));
+    expect(fixture.hiddenFlags).not.toHaveProperty("lastAiFallbackReason");
+  });
+
+  it.each([
+    ["JSON", "timeout"], ["SSE", "timeout"],
+    ["JSON", "malformed_json"], ["SSE", "malformed_json"],
+    ["JSON", "quality"], ["SSE", "quality"],
+  ] as const)("commits a validated FALLBACK after a %s %s failure without exposing the internal error", async (kind, failureKind) => {
+    fixture.aiEnabled = true;
+    const failure = failureKind === "quality" ? {
+      success: true as const,
+      event: {
+        title: "품질 거절 후보", body: "짧다", tags: ["진로"],
+        choices: [
+          { id: "a", label: "합격한다", summary: "당신은 갔다.", statDelta: { mental: -1 } },
+          { id: "b", label: "남는다", summary: "당신은 남았다.", statDelta: { wealth: -1 } },
+        ],
+      },
+      providerId: "openrouter", providerLabel: "OpenRouter", providerElapsedMs: 25,
+      totalElapsedMs: 25, slow: false, providerFailures: [],
+    } : {
+      success: false as const,
+      reason: failureKind,
+      providerId: "openrouter",
+      providerLabel: "OpenRouter",
+      providerElapsedMs: 5_000,
+      totalElapsedMs: 5_000,
+      slow: false,
+      providerFailures: [{ providerId: "openrouter", providerLabel: "OpenRouter", providerElapsedMs: 5_000, reason: failureKind, stage: failureKind === "malformed_json" ? "parse" : "provider" }],
+    };
+    aiMocks.generateAiEvent.mockResolvedValue(failure);
+    aiMocks.generateAiEventStream.mockResolvedValue(failure);
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const response = kind === "JSON"
+      ? await nextJson(new Request("http://localhost/api/characters/run-1/events/next", { method: "POST" }), { params: Promise.resolve({ id: "run-1" }) })
+      : await nextStream(new Request("http://localhost/api/characters/run-1/events/next/stream", { method: "POST" }), { params: Promise.resolve({ id: "run-1" }) });
+    const text = await response.text();
+    const event = kind === "JSON" ? JSON.parse(text).event : eventFromSse(text);
+
+    expect(response.status).toBe(200);
+    expect(event).toMatchObject({ id: fixture.pointer, source: "FALLBACK", forced: false });
+    expect(text).not.toContain(failureKind);
+    expect(text).not.toContain("error");
+    expect([...fixture.events.values()].filter((item) => item.status === "ACTIVE")).toHaveLength(1);
+    expect(info).toHaveBeenCalledWith(expect.stringContaining(kind === "JSON" ? "이벤트 생성 완료" : "스트림 이벤트 생성 완료"), expect.objectContaining({
+      eventId: fixture.pointer,
+      source: "FALLBACK",
+      providerId: "openrouter",
+      providerElapsedMs: failureKind === "quality" ? 25 : 5_000,
+      totalElapsedMs: expect.any(Number),
+      slow: false,
+      generationReason: failureKind === "quality" ? "post_parse_quality_failure" : failureKind,
+      generationStage: failureKind === "quality" ? "quality" : failureKind === "malformed_json" ? "parse" : "provider",
+      retryUsed: false,
+      fallbackUsed: true,
+      providerFailures: failureKind === "quality" ? [] : [expect.objectContaining({ providerId: "openrouter", reason: failureKind, providerElapsedMs: 5_000 })],
+    }));
+    expect(kind === "JSON" ? aiMocks.generateAiEvent : aiMocks.generateAiEventStream).toHaveBeenCalledTimes(1);
+    const logged = JSON.stringify(info.mock.calls);
+    expect(logged).not.toContain("API_KEY");
+    expect(logged).not.toContain("prompt");
+    expect(logged).not.toContain("raw");
   });
 
   it("overlaps fresh JSON and SSE generation and converges on one exact authoritative payload", async () => {

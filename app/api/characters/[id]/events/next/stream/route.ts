@@ -150,8 +150,10 @@ export async function POST(request: Request, context: RouteContext) {
         const generationStartedAt = Date.now();
         let providerElapsedMs = 0;
         let generationReason: string | null = null;
+        let generationStage: "provider" | "parse" | "quality" | null = null;
         let generationSlow = false;
         let providerId: string | null = null;
+        let providerFailures: unknown[] = [];
 
         if (character.stats && canUseAiForLifeStage(lifeStage.lifeStage, character.academicStatus)) {
           aiAttempted = true;
@@ -199,6 +201,7 @@ export async function POST(request: Request, context: RouteContext) {
           providerElapsedMs = aiResult.providerElapsedMs ?? 0;
           generationSlow = aiResult.slow ?? false;
           providerId = aiResult.providerId ?? null;
+          providerFailures = aiResult.providerFailures ?? [];
 
           if (aiResult.success) {
             if (aiResult.providerId === "ollama") {
@@ -238,6 +241,7 @@ export async function POST(request: Request, context: RouteContext) {
             } else if (initialEvaluation.verdict.hardFailure) {
               aiFailed = true;
               generationReason = "post_parse_quality_failure";
+              generationStage = "quality";
             } else {
               selectedEvent = aiEvent;
               source = "AI";
@@ -245,6 +249,7 @@ export async function POST(request: Request, context: RouteContext) {
           } else {
             aiFailed = true;
             generationReason = aiResult.reason;
+            generationStage = aiResult.providerFailures?.at(-1)?.stage ?? "provider";
           }
         }
 
@@ -273,7 +278,7 @@ export async function POST(request: Request, context: RouteContext) {
             selectedEvent = event;
             source = type === "forced" ? "FORCED" : event.source;
           }
-          fallbackUsed = aiAttempted;
+          fallbackUsed = source === "FALLBACK";
         }
 
         const candidateId = crypto.randomUUID();
@@ -313,7 +318,9 @@ export async function POST(request: Request, context: RouteContext) {
           retryUsed,
           fallbackUsed,
           generationReason,
+          generationStage,
           providerId,
+          providerFailures,
           providerElapsedMs,
           totalElapsedMs: Date.now() - generationStartedAt,
           slow: generationSlow,
