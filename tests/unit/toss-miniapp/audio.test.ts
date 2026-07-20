@@ -1,14 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-type FailurePoint = "constructor" | "resume" | "oscillator" | "gain" | "start";
+type FailurePoint = "constructor" | "resume-sync" | "resume-async" | "oscillator" | "gain" | "start";
 
 function installAudioContext(failure: FailurePoint) {
   class TestAudioContext {
-    state = failure === "resume" ? "suspended" : "running";
+    state = failure.startsWith("resume") ? "suspended" : "running";
     currentTime = 0;
     destination = {};
     constructor() { if (failure === "constructor") throw new Error("no audio context"); }
-    resume() { return failure === "resume" ? Promise.reject(new Error("resume denied")) : Promise.resolve(); }
+    resume() {
+      if (failure === "resume-sync") throw new Error("resume denied");
+      return failure === "resume-async" ? Promise.reject(new Error("resume denied")) : Promise.resolve();
+    }
     createOscillator() {
       if (failure === "oscillator") throw new Error("oscillator unavailable");
       return {
@@ -27,7 +30,14 @@ function installAudioContext(failure: FailurePoint) {
 describe("optional Toss audio and haptics", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it.each<FailurePoint>(["constructor", "resume", "oscillator", "gain", "start"])("keeps playCue non-throwing when %s fails", async (failure) => {
+  it("keeps playCue non-throwing when AudioContext is absent", async () => {
+    vi.resetModules();
+    vi.stubGlobal("AudioContext", undefined);
+    const { playCue } = await import("../../../apps/toss-miniapp/src/audio");
+    expect(() => playCue("tap", true)).not.toThrow();
+  });
+
+  it.each<FailurePoint>(["constructor", "resume-sync", "resume-async", "oscillator", "gain", "start"])("keeps playCue non-throwing when %s fails", async (failure) => {
     vi.resetModules();
     installAudioContext(failure);
     const { playCue } = await import("../../../apps/toss-miniapp/src/audio");

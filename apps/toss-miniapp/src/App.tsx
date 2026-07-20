@@ -283,7 +283,7 @@ export function App() {
           <button className="menu-button" type="button" aria-label="메뉴" aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}>메뉴</button>
           {menuOpen && (
             <nav className="menu-popover" aria-label="메뉴">
-              {currentCharacter && <button type="button" onClick={() => { cue(); setScreen("home"); setMenuOpen(false); }}>진행</button>}
+              {currentCharacter && <button type="button" onClick={() => { cue(); setScreen("play"); setMenuOpen(false); }}>진행</button>}
               <button type="button" onClick={startNewSimulation}>새 시뮬레이션</button>
               <button type="button" onClick={() => { setMenuOpen(false); void loadRecords(); }}>기록</button>
               <div className="menu-divider" />
