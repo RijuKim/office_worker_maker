@@ -163,6 +163,50 @@ function eventFromSse(text: string) {
   return JSON.parse(line.slice(6)).event;
 }
 
+function serializeForLeakCheck(value: unknown) {
+  const seen = new WeakSet<object>();
+
+  function normalize(current: unknown): unknown {
+    if (typeof current === "bigint") return `${current}n`;
+    if (typeof current === "symbol" || typeof current === "function") return String(current);
+    if (current === null || typeof current !== "object") return current;
+    if (seen.has(current)) return "[Circular]";
+    seen.add(current);
+
+    if (current instanceof Error) {
+      const serialized: Record<string, unknown> = {
+        name: current.name,
+        message: current.message,
+        stack: current.stack ?? null,
+        cause: current.cause === undefined ? null : normalize(current.cause),
+      };
+      for (const key of Object.keys(current)) {
+        if (key in serialized) continue;
+        try {
+          serialized[key] = normalize((current as unknown as Record<string, unknown>)[key]);
+        } catch (error) {
+          serialized[key] = `[Unreadable: ${error instanceof Error ? error.message : String(error)}]`;
+        }
+      }
+      return serialized;
+    }
+
+    if (Array.isArray(current)) return current.map(normalize);
+
+    const serialized: Record<string, unknown> = {};
+    for (const key of Object.keys(current)) {
+      try {
+        serialized[key] = normalize((current as Record<string, unknown>)[key]);
+      } catch (error) {
+        serialized[key] = `[Unreadable: ${error instanceof Error ? error.message : String(error)}]`;
+      }
+    }
+    return serialized;
+  }
+
+  return JSON.stringify(normalize(value));
+}
+
 function spyOnSerializedLoggerOutput() {
   const spies = [
     vi.spyOn(console, "info").mockImplementation(() => {}),
@@ -170,7 +214,7 @@ function spyOnSerializedLoggerOutput() {
     vi.spyOn(console, "error").mockImplementation(() => {}),
   ];
   return {
-    serialized: () => JSON.stringify(spies.flatMap((spy) => spy.mock.calls)),
+    serialized: () => serializeForLeakCheck(spies.flatMap((spy) => spy.mock.calls)),
   };
 }
 
@@ -197,6 +241,24 @@ describe("stateful JSON/SSE event authority", () => {
     fixture.characterName = "한서윤";
     aiMocks.checkDailyAiLimit.mockResolvedValue({ allowed: true });
     engineMocks.selectNextEvent.mockReturnValue({ type: "static", event: routeEvent });
+  });
+
+  it("preserves nested and cyclic Error logger arguments for leakage detection", () => {
+    const logger = spyOnSerializedLoggerOutput();
+    const sentinel = "PROVIDER_ERROR_SENTINEL";
+    const cause = new Error(`${sentinel}_CAUSE`);
+    const providerError = new Error(`${sentinel}_MESSAGE`, { cause });
+    providerError.stack = `${providerError.name}: ${providerError.message}\n${sentinel}_STACK`;
+    const cyclic: { error: Error; nested?: unknown } = { error: providerError };
+    cyclic.nested = [cyclic, { cause }];
+
+    console.error("provider failure", cyclic);
+
+    const serializedLogs = logger.serialized();
+    expect(serializedLogs).toContain(`${sentinel}_MESSAGE`);
+    expect(serializedLogs).toContain(`${sentinel}_CAUSE`);
+    expect(serializedLogs).toContain(`${sentinel}_STACK`);
+    expect(serializedLogs).toContain("[Circular]");
   });
 
   it("does not mark a FORCED event as fallback after AI failure", async () => {
@@ -245,7 +307,8 @@ describe("stateful JSON/SSE event authority", () => {
     };
     aiMocks.generateAiEvent.mockResolvedValue(failure);
     aiMocks.generateAiEventStream.mockResolvedValue(failure);
-    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const logger = spyOnSerializedLoggerOutput();
+    const info = vi.mocked(console.info);
 
     const response = kind === "JSON"
       ? await nextJson(new Request("http://localhost/api/characters/run-1/events/next", { method: "POST" }), { params: Promise.resolve({ id: "run-1" }) })
@@ -272,7 +335,7 @@ describe("stateful JSON/SSE event authority", () => {
       providerFailures: failureKind === "quality" ? [] : [expect.objectContaining({ providerId: "openrouter", reason: failureKind, providerElapsedMs: 5_000 })],
     }));
     expect(kind === "JSON" ? aiMocks.generateAiEvent : aiMocks.generateAiEventStream).toHaveBeenCalledTimes(1);
-    const logged = JSON.stringify(info.mock.calls);
+    const logged = logger.serialized();
     expect(logged).not.toContain("API_KEY");
     expect(logged).not.toContain("prompt");
     expect(logged).not.toContain("raw");
@@ -452,13 +515,14 @@ describe("stateful JSON/SSE event authority", () => {
       void rawSentinel;
       init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
     }));
-    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const logger = spyOnSerializedLoggerOutput();
+    const info = vi.mocked(console.info);
 
     const pending = nextJson(new Request("http://localhost/api/characters/run-1/events/next", { method: "POST" }), { params: Promise.resolve({ id: "run-1" }) });
     await vi.advanceTimersByTimeAsync(5_000);
     const response = await pending;
     const responseText = await response.text();
-    const serializedLogs = JSON.stringify(info.mock.calls);
+    const serializedLogs = logger.serialized();
 
     expect(response.status).toBe(200);
     expect(JSON.parse(responseText).event).toMatchObject({ id: fixture.pointer, source: "FALLBACK" });
