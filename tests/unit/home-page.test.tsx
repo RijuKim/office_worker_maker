@@ -66,6 +66,9 @@ function findButton(container: HTMLElement, label: RegExp | string) {
 }
 
 beforeEach(() => {
+  window.localStorage.clear();
+  vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+  vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);
   vi.stubGlobal("fetch", vi.fn(async () => ({
     ok: true,
     json: async () => ({ characters: [] }),
@@ -75,6 +78,7 @@ beforeEach(() => {
 afterEach(() => {
   mockedSessionStatus = "unauthenticated";
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
   document.body.innerHTML = "";
 });
 
@@ -89,10 +93,28 @@ describe("Home page scaffold", () => {
     });
 
     expect(container.querySelector(".app-title")?.textContent).toBe("일어나보니대한민국 취준생");
+    expect(container.querySelectorAll(".app-title > span")).toHaveLength(2);
+    expect(container.querySelector(".app-title > span:first-child")?.textContent).toBe("일어나보니");
+    expect(container.querySelector(".app-title > span:last-child")?.textContent).toBe("대한민국 취준생");
+    expect(container.textContent).toContain("낯선 아침이 시작됩니다.");
     expect(container.textContent).toContain("눈을 뜨니 오전 6시 07분입니다.");
     expect(container.textContent).toContain("이 이야기는 실제 진로 예측이 아닌 재미를 위한 허구의 시뮬레이션입니다.");
     expect(container.textContent).not.toContain("취준 생활 시뮬레이션");
     expect(container.textContent).not.toContain("새 이야기");
+    const intro = container.querySelector("[data-testid='onboarding-intro']")?.textContent;
+    expect(intro).toContain("눈을 뜨니 오전 6시 07분입니다. 휴대폰에는 읽지 않은 카톡 알림이 수북하게 쌓여 있습니다.");
+    expect(intro).toContain("학과 단체방 공지, 새로 올라온 동아리 모집 글, 아르바이트 연락, 그리고 아직 열어보지 않은 메시지 하나가 화면 위에 겹쳐 있습니다. 마지막 메시지에는 짧은 문장만 남아 있습니다. “이번에는 어떤 사람이 될 수 있을까요?”");
+    expect(intro).toContain("오늘은 평범한 학기의 첫날일 수도, 오래 미뤄둔 변화를 시작하는 날일 수도 있습니다. 지금 고르는 작은 선택들은 수업과 관계, 생활과 진로를 조금씩 다른 방향으로 이끌게 될 것입니다.");
+    expect(intro).toContain("이 이야기는 실제 진로 예측이 아닌 재미를 위한 허구의 시뮬레이션입니다.");
+    expect(intro).not.toContain("인터뷰");
+    const art = container.querySelector("[data-testid='pixel-scene-intro']");
+    expect(art?.getAttribute("data-palette")).toBe("blue-lilac-apricot-cream");
+    expect(art?.getAttribute("data-art-structure")).toBe("dawn-room-window-phone-computer");
+    expect(art?.querySelector("svg")).toBeTruthy();
+    expect(art?.querySelector("[data-part='window-cream']")?.getAttribute("fill")).toBe("#f5d7a0");
+    expect(art?.querySelector("[data-part='computer']")).toBeTruthy();
+    expect(art?.querySelector("[data-part*='cross']")).toBeNull();
+    expect(art?.textContent).not.toMatch(/[😀-🙏]/u);
 
     act(() => (container.querySelector("button[aria-label='메뉴']") as HTMLButtonElement).click());
     expect(container.textContent).toContain("로그인/저장");
@@ -125,8 +147,7 @@ describe("Home page scaffold", () => {
     act(() => findButton(container, "다음").click());
     const age = container.querySelector("select[aria-label='당신의 나이는 몇 살인가요?']") as HTMLSelectElement;
     expect(age.options).toHaveLength(63);
-    expect(age.options[0].value).toBe("18");
-    expect(age.options[62].value).toBe("80");
+    expect(Array.from(age.options, (option) => Number(option.value))).toEqual(Array.from({ length: 63 }, (_, index) => index + 18));
     act(() => {
       age.value = "80";
       age.dispatchEvent(new Event("change", { bubbles: true }));
@@ -139,6 +160,106 @@ describe("Home page scaffold", () => {
 
     act(() => root.unmount());
     container.remove();
+  });
+
+  it("submits the retained onboarding choices exactly and opens the created run", async () => {
+    let postedBody: unknown;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input), "http://localhost").pathname;
+      if (url === "/api/characters" && init?.method === "POST") {
+        postedBody = JSON.parse(String(init.body));
+        return Response.json({
+          character: {
+            ...character,
+            age: 80,
+            events: [{
+              id: "event-created",
+              title: "첫 아침의 선택",
+              body: "새로운 하루가 시작됩니다.",
+              choices: [{ id: "begin", label: "하루를 시작한다", statDelta: {} }],
+              source: "STATIC",
+            }],
+          },
+        }, { status: 201 });
+      }
+      return Response.json({ characters: [] });
+    }));
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => root.render(<Home />));
+
+    act(() => findButton(container, "시작하기").click());
+    expect(findButton(container, "다음").hasAttribute("disabled")).toBe(true);
+    const name = container.querySelector("input[aria-label='당신의 이름은 무엇인가요?']") as HTMLInputElement;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(name, "한서윤");
+      name.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    act(() => findButton(container, "다음").click());
+    const age = container.querySelector("select") as HTMLSelectElement;
+    act(() => {
+      age.value = "80";
+      age.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    act(() => findButton(container, "다음").click());
+    act(() => findButton(container, /^기숙사/).click());
+    act(() => findButton(container, "이전").click());
+    expect((container.querySelector("select") as HTMLSelectElement).value).toBe("80");
+    act(() => findButton(container, "다음").click());
+    expect(findButton(container, /^기숙사/).getAttribute("aria-pressed")).toBe("true");
+    act(() => findButton(container, "다음").click());
+    expect(container.textContent).toContain("(2/2)");
+
+    await waitForAssertion(() => expect(findButton(container, "눈을 뜬다").hasAttribute("disabled")).toBe(false));
+    const submit = findButton(container, "눈을 뜬다");
+    act(() => submit.click());
+    await waitForAssertion(() => expect(postedBody).toBeDefined());
+    expect(postedBody).toEqual({
+      name: "한서윤",
+      age: 80,
+      residence: "dorm",
+      preferredStats: ["academic", "mental"],
+    });
+    await waitForAssertion(() => expect(container.textContent).toContain("첫 아침의 선택"));
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it("persists every menu setting under the existing key and recovers invalid stored shapes", async () => {
+    window.localStorage.setItem("sano-audio-settings", JSON.stringify({ music: false, sfx: false, haptics: false }));
+    const mount = () => {
+      const container = document.createElement("div");
+      document.body.appendChild(container);
+      const root = createRoot(container);
+      act(() => root.render(<Home />));
+      act(() => (container.querySelector("button[aria-label='메뉴']") as HTMLButtonElement).click());
+      return { container, root };
+    };
+    let mounted = mount();
+    await act(async () => Promise.resolve());
+    const toggles = Array.from(mounted.container.querySelectorAll(".audio-toggle input")) as HTMLInputElement[];
+    expect(toggles.map((toggle) => toggle.checked)).toEqual([false, false, false]);
+    for (const toggle of toggles) act(() => toggle.click());
+    await waitForAssertion(() => expect(JSON.parse(window.localStorage.getItem("sano-audio-settings")!)).toEqual({ music: true, sfx: true, haptics: true }));
+    act(() => mounted.root.unmount());
+    mounted.container.remove();
+
+    mounted = mount();
+    await act(async () => Promise.resolve());
+    expect(Array.from(mounted.container.querySelectorAll(".audio-toggle input"), (node) => (node as HTMLInputElement).checked)).toEqual([true, true, true]);
+    act(() => mounted.root.unmount());
+    mounted.container.remove();
+
+    for (const invalid of ["{broken", JSON.stringify({ music: "yes", sfx: true, haptics: true })]) {
+      window.localStorage.setItem("sano-audio-settings", invalid);
+      mounted = mount();
+      await act(async () => Promise.resolve());
+      expect(JSON.parse(window.localStorage.getItem("sano-audio-settings")!)).toEqual({ music: false, sfx: true, haptics: true });
+      act(() => mounted.root.unmount());
+      mounted.container.remove();
+    }
   });
 
   it("uses life-stage progress on play and character detail surfaces", async () => {

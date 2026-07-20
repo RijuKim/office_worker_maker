@@ -60,6 +60,22 @@ type CreateStep = "intro" | "name" | "age" | "residence" | "abilities";
 
 type BrowserAudioContext = typeof AudioContext;
 
+function safelyPlay(audio: HTMLAudioElement) {
+  try {
+    void Promise.resolve(audio.play()).catch(() => undefined);
+  } catch {
+    // Unsupported or permission-blocked audio is a non-blocking no-op.
+  }
+}
+
+function safelyPause(audio: HTMLAudioElement) {
+  try {
+    audio.pause();
+  } catch {
+    // Unsupported media controls are a non-blocking no-op.
+  }
+}
+
 const statLabels: Record<string, string> = {
   academic: "학업",
   practical: "실무",
@@ -262,6 +278,36 @@ function ChoiceResultArt({ tone }: { tone: string }) {
 }
 
 function PixelScene({ scene, label }: { scene: string; label?: string }) {
+  if (scene === "intro") {
+    return (
+      <div
+        className="pixel-scene scene-intro"
+        aria-label={label ?? "오전 6시 07분의 밝은 새벽 방 픽셀아트"}
+        data-art-structure="dawn-room-window-phone-computer"
+        data-palette="blue-lilac-apricot-cream"
+        data-testid="pixel-scene-intro"
+      >
+        <svg aria-hidden="true" data-testid="intro-scene-svg" shapeRendering="crispEdges" viewBox="0 0 320 180">
+          <rect data-part="room-blue" width="320" height="180" fill="#536f9b" />
+          <rect data-part="lilac-wall" y="55" width="320" height="60" fill="#d98f83" />
+          <rect data-part="apricot-dawn" y="82" width="320" height="33" fill="#f3b477" />
+          <rect data-part="room-shadow" y="115" width="320" height="65" fill="#51404a" />
+          <rect data-part="window-cream" x="16" y="17" width="136" height="100" fill="#f5d7a0" />
+          <rect data-part="window-blue" x="23" y="24" width="122" height="86" fill="#718fbb" />
+          <rect data-part="window-apricot" x="23" y="70" width="122" height="40" fill="#f0a06f" />
+          <rect data-part="window-cream-light" x="23" y="91" width="122" height="19" fill="#ffd58f" />
+          <rect data-part="computer-desk" x="197" y="106" width="94" height="13" fill="#352b31" />
+          <rect data-part="computer" x="207" y="70" width="62" height="37" fill="#2f3542" />
+          <rect data-part="computer-screen" x="214" y="77" width="48" height="24" fill="#bdeee6" />
+          <rect data-part="computer-line-primary" x="222" y="82" width="31" height="4" fill="#ffffff" />
+          <rect data-part="computer-line-secondary" x="222" y="90" width="24" height="3" fill="#6fa3aa" />
+          <rect data-part="bed" x="164" y="120" width="132" height="45" fill="#72566b" />
+          <rect data-part="phone" x="176" y="111" width="72" height="20" fill="#96788d" />
+          <rect data-part="floor" y="154" width="320" height="26" fill="#302931" />
+        </svg>
+      </div>
+    );
+  }
   return (
     <div className={`pixel-scene scene-${scene}`} aria-label={label ?? "장면 삽화"}>
       <div className="scene-sky" />
@@ -359,7 +405,7 @@ export default function AppPage() {
       musicTimerRef.current = null;
     }
     if (bgmAudioRef.current) {
-      bgmAudioRef.current.pause();
+      safelyPause(bgmAudioRef.current);
       bgmAudioRef.current.currentTime = 0;
     }
   }, []);
@@ -455,14 +501,14 @@ export default function AppPage() {
       bgmAudioRef.current.currentTime = 0;
       bgmAudioRef.current.volume = 0.36;
       bgmAudioRef.current.loop = true;
-      bgmAudioRef.current.play().catch(() => undefined);
+      safelyPlay(bgmAudioRef.current);
       return;
     }
     const audio = new Audio("/bgm.mp3");
     audio.volume = 0.36;
     audio.loop = true;
     bgmAudioRef.current = audio;
-    audio.play().catch(() => undefined);
+    safelyPlay(audio);
   }, [audioSettings.music]);
 
   const updateAudioSetting = useCallback((key: keyof AudioSettings, value: boolean) => {
@@ -1042,9 +1088,10 @@ export default function AppPage() {
           <div className="pixel-panel create-panel p-6">
             {createStep === "intro" && <section className="create-step" data-testid="onboarding-intro">
             <div className="create-hero-art overflow-hidden border-4 border-[#2a2018]" data-testid="intro-dawn-art">
-              <PixelScene scene="intro" label="취준 시뮬레이션 인트로" />
+              <PixelScene scene="intro" label="오전 6시 07분의 밝은 새벽 방 픽셀아트" />
             </div>
             <div className="space-y-3 pt-5 text-[15px] leading-7 text-[#3a332d]">
+              <h2 className="create-question">낯선 아침이 시작됩니다.</h2>
               <p>눈을 뜨니 오전 6시 07분입니다. 휴대폰에는 읽지 않은 카톡 알림이 수북하게 쌓여 있습니다.</p>
               <p>학과 단체방 공지, 새로 올라온 동아리 모집 글, 아르바이트 연락, 그리고 아직 열어보지 않은 메시지 하나가 화면 위에 겹쳐 있습니다. 마지막 메시지에는 짧은 문장만 남아 있습니다. “이번에는 어떤 사람이 될 수 있을까요?”</p>
               <p>오늘은 평범한 학기의 첫날일 수도, 오래 미뤄둔 변화를 시작하는 날일 수도 있습니다. 지금 고르는 작은 선택들은 수업과 관계, 생활과 진로를 조금씩 다른 방향으로 이끌게 될 것입니다.</p>

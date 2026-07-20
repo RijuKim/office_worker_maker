@@ -250,6 +250,58 @@ describe("account and character API foundation", () => {
     expect(body.character.currentEventId).toBe("event-1");
   });
 
+  it.each([
+    { age: 18, residence: "family_home" as const },
+    { age: 80, residence: "dorm" as const },
+  ])("accepts and persists boundary age $age with residence $residence", async ({ age, residence }) => {
+    sessionMock.requireCurrentUserId.mockResolvedValueOnce("user-1");
+    const created = characterRecord({ age, hiddenState: { familyState: { residence } } });
+    let persistedData: Record<string, unknown> | undefined;
+
+    prismaMock.$transaction.mockImplementationOnce(async (callback) => callback({
+      characterRun: {
+        create: vi.fn(async ({ data }) => {
+          persistedData = data;
+          return { id: "char-1" };
+        }),
+        update: vi.fn(async () => created),
+      },
+      event: { create: vi.fn(async () => ({ id: "event-1" })) },
+    }));
+
+    const response = await createCharacter(jsonRequest({
+      name: "한서윤",
+      age,
+      residence,
+      preferredStats: ["academic", "mental"],
+      startGradeYear: 2,
+      major: "사회학과",
+    }));
+
+    expect(response.status).toBe(201);
+    expect(persistedData).toMatchObject({
+      age,
+      hiddenState: { create: { familyState: { support: "보통", pressure: "낮음", residence } } },
+    });
+  });
+
+  it.each([17, 81])("semantically rejects out-of-range age %i without persistence", async (age) => {
+    sessionMock.requireCurrentUserId.mockResolvedValueOnce("user-1");
+
+    const response = await createCharacter(jsonRequest({
+      name: "한서윤",
+      age,
+      residence: "studio",
+      preferredStats: ["academic", "mental"],
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("캐릭터 정보를 확인해 주세요.");
+    expect(body.issues.age).toHaveLength(1);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
   it("lists only the authenticated user's characters", async () => {
     sessionMock.requireCurrentUserId.mockResolvedValueOnce("user-1");
     prismaMock.characterRun.findMany.mockResolvedValueOnce([characterRecord()]);

@@ -22,6 +22,7 @@ const fixture = vi.hoisted(() => ({
   aiEnabled: false,
   commitDelayMs: 0,
   characterName: "한서윤",
+  age: 21,
 }));
 
 const routeEvent = vi.hoisted(() => ({
@@ -37,7 +38,7 @@ const routeEvent = vi.hoisted(() => ({
 
 function fullCharacter() {
   return {
-    id: "run-1", userId: "user-1", name: fixture.characterName, age: 21, startGradeYear: 2,
+    id: "run-1", userId: "user-1", name: fixture.characterName, age: fixture.age, startGradeYear: 2,
     currentGradeYear: 2, major: "사회학과", academicStatus: "ENROLLED", lifeStatus: [],
     majorEventCount: 1, coreEventCount: 2, currentEventId: fixture.pointer,
     createdAt: new Date("2026-07-20T00:00:00Z"), updatedAt: new Date("2026-07-20T00:00:00Z"),
@@ -239,8 +240,36 @@ describe("stateful JSON/SSE event authority", () => {
     fixture.aiEnabled = false;
     fixture.commitDelayMs = 0;
     fixture.characterName = "한서윤";
+    fixture.age = 21;
     aiMocks.checkDailyAiLimit.mockResolvedValue({ allowed: true });
     engineMocks.selectNextEvent.mockReturnValue({ type: "static", event: routeEvent });
+  });
+
+  it.each([
+    { kind: "JSON", age: 18 }, { kind: "JSON", age: 40 }, { kind: "JSON", age: 80 },
+    { kind: "SSE", age: 18 }, { kind: "SSE", age: 40 }, { kind: "SSE", age: 80 },
+  ] as const)("passes persisted age $age through the $kind generation context", async ({ kind, age }) => {
+    fixture.age = age;
+    fixture.aiEnabled = true;
+    const success = {
+      success: true as const,
+      event: routeEvent,
+      providerId: "ollama",
+      providerElapsedMs: 5,
+      totalElapsedMs: 5,
+      slow: false,
+      providerFailures: [],
+    };
+    aiMocks.generateAiEvent.mockResolvedValue(success);
+    aiMocks.generateAiEventStream.mockResolvedValue(success);
+
+    const response = kind === "JSON"
+      ? await nextJson(new Request("http://localhost/api/characters/run-1/events/next", { method: "POST" }), { params: Promise.resolve({ id: "run-1" }) })
+      : await nextStream(new Request("http://localhost/api/characters/run-1/events/next/stream", { method: "POST" }), { params: Promise.resolve({ id: "run-1" }) });
+    await response.text();
+
+    expect(kind === "JSON" ? aiMocks.generateAiEvent : aiMocks.generateAiEventStream)
+      .toHaveBeenCalledWith(expect.objectContaining({ age }), expect.anything(), ...(kind === "SSE" ? [expect.anything()] : []));
   });
 
   it("preserves nested and cyclic Error logger arguments for leakage detection", () => {
