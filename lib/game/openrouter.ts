@@ -410,6 +410,12 @@ async function generateAiEventWithProvider(
     }
 
     if (!response.ok) {
+      const responseBody = await response.text().catch(() => "(failed to read body)");
+      console.warn("AI event provider returned non-ok response", {
+        provider: provider.label,
+        status: response.status,
+        body: responseBody.slice(0, 500),
+      });
       logAiAttempt({
         kind: "json",
         providerId: provider.id,
@@ -419,14 +425,20 @@ async function generateAiEventWithProvider(
         httpStatus: response.status,
         providerElapsedMs: Date.now() - startedAt,
       });
-      console.warn("AI event provider returned non-ok response", {
-        provider: provider.label,
-        status: response.status,
-      });
       return failure("api_error");
     }
 
-    const data = await response.json();
+    const responseText = await response.text();
+    let data: unknown;
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      console.warn("AI event provider returned non-JSON response", {
+        provider: provider.label,
+        body: responseText.slice(0, 500),
+      });
+      return failure("api_error");
+    }
     const content = data?.choices?.[0]?.message?.content;
 
     if (!content) {
