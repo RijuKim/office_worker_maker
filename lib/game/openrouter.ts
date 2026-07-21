@@ -429,9 +429,9 @@ async function generateAiEventWithProvider(
     }
 
     const responseText = await response.text();
-    let data: unknown;
+    let parsedData: unknown;
     try {
-      data = JSON.parse(responseText);
+      parsedData = JSON.parse(responseText);
     } catch {
       console.warn("AI event provider returned non-JSON response", {
         provider: provider.label,
@@ -439,7 +439,11 @@ async function generateAiEventWithProvider(
       });
       return failure("api_error");
     }
-    const content = data?.choices?.[0]?.message?.content;
+    const data = parsedData as Record<string, unknown> | null;
+    const choices = data?.choices;
+    const firstChoice = Array.isArray(choices) ? choices[0] : null;
+    const message = firstChoice && typeof firstChoice === "object" ? (firstChoice as Record<string, unknown>).message : null;
+    const content: string | undefined = message && typeof message === "object" ? (message as Record<string, unknown>).content as string | undefined : undefined;
 
     if (!content) {
       logAiAttempt({
