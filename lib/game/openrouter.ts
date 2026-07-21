@@ -17,10 +17,10 @@ type AiProviderOptions = {
 
 const primaryProvider = (): AiProvider => ({
   id: "ollama",
-  label: "Ollama Qwen",
+  label: "Ollama Gemma",
   baseUrl: "https://ollama.com/v1",
   key: process.env.OLLAMA_API_KEY ?? null,
-  model: "qwen3.5:397b",
+  model: "gemma4:31b",
 });
 
 const fallbackProvider = (): AiProvider => ({
