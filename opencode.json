@@ -1,0 +1,26 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "tenet": {
+      "type": "local",
+      "command": [
+        "tenet",
+        "serve"
+      ]
+    },
+    "playwright": {
+      "type": "local",
+      "command": [
+        "npx",
+        "@playwright/mcp@latest"
+      ],
+      "enabled": true
+    }
+  },
+  "permission": {
+    "mcp": {
+      "playwright": "allow",
+      "tenet": "allow"
+    }
+  }
+}

@@ -17,3 +17,8 @@ prisma/dev.db
 .tenet/.state/tenet.db-shm
 .vercel
 .env*.local
+
+.granite
+
+# Tenet live SQLite runtime state. Do not track this in Git.
+.tenet/.state/

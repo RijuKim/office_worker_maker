@@ -315,13 +315,33 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   if (!selectedEvent) {
-    // TEMP: fallback 제거 - AI 실패 원인을 보기 위해 에러를 그대로 반환
-    return NextResponse.json({
-      error: "AI 이벤트 생성 실패",
-      generationReason,
-      generationStage,
-      providerFailures,
-    }, { status: 500 });
+    const { type, event } = selectNextEvent(selectionContext, excludedEventTitles);
+    if (aiAttempted && type !== "forced") {
+      const fallback = findValidatedStaticFallback({
+        preferredEvent: event,
+        selectionContext,
+        excludedEventTitles,
+        qualityContext,
+      });
+      if (!fallback) {
+        log.error("검증된 대체 이벤트 없음", { userId, characterId: id, generationReason });
+        return NextResponse.json({ error: "다음 사건을 생성하지 못했습니다." }, { status: 500 });
+      }
+      selectedEvent = fallback.event;
+      source = "FALLBACK";
+      recordEventQualityLog({
+        characterRunId: id, eventId: null, phase: "static_fallback", source,
+        verdict: fallback.evaluation.verdict, reasons: fallback.evaluation.verdict.reasons,
+        diversityScore: fallback.evaluation.verdict.diversityScore,
+        continuityExemptions: fallback.evaluation.verdict.continuityExemptions,
+        retryUsed, fallbackUsed: true, selectedFallbackTitle: fallback.event.title,
+        durationMs: fallback.evaluation.durationMs, createdAt: new Date().toISOString(),
+      });
+    } else {
+      selectedEvent = event;
+      source = type === "forced" ? "FORCED" : event.source;
+    }
+    fallbackUsed = source === "FALLBACK";
   }
 
   let newEvent;

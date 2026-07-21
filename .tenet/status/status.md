@@ -1,14 +1,14 @@
 # Tenet Status
 
-Updated: 2026-07-09T00:27:43.102Z
+Updated: 2026-07-21T04:52:07.792Z
 
 | Metric | Count |
 |--------|-------|
-| Completed | 29 / 62 |
+| Completed | 179 / 213 |
 | Running | 0 |
-| Pending | 3 |
+| Pending | 2 |
 | Failed | 9 |
-| Blocked | 0 |
+| Blocked | 1 |
 
 ## Failed
 

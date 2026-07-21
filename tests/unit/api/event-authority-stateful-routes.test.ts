@@ -244,7 +244,7 @@ const prismaMock = vi.hoisted(() => ({
 
 const aiMocks = vi.hoisted(() => ({
   checkDailyAiLimit: vi.fn(), generateAiEvent: vi.fn(), generateAiEventStream: vi.fn(), incrementAiUsage: vi.fn(),
-  getOpenRouterTimeoutMs: vi.fn(() => 30_000),
+  getOpenRouterTimeoutMs: vi.fn(() => 60_000),
 }));
 const engineMocks = vi.hoisted(() => ({ selectNextEvent: vi.fn() }));
 
@@ -638,7 +638,7 @@ describe("stateful JSON/SSE event authority", () => {
 
   it.each(["JSON", "SSE"] as const)("takes over an expired persisted lease through %s, commits, and cleans up", async (kind) => {
     fixture.generationToken = "crashed-owner";
-    fixture.generationStartedAt = new Date(Date.now() - 60_000);
+    fixture.generationStartedAt = new Date(Date.now() - 70_000);
 
     const response = kind === "JSON"
       ? await nextJson(new Request("http://localhost/api/characters/run-1/events/next", { method: "POST" }), { params: Promise.resolve({ id: "run-1" }) })

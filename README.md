@@ -48,6 +48,8 @@ NEXTAUTH_SECRET="generate-a-long-random-secret"
 NEXTAUTH_URL="https://your-vercel-domain.vercel.app"
 OPENROUTER_API_KEY="..."
 OPENROUTER_MODEL="openrouter/model-name"
+OPENROUTER_TIMEOUT_MS="60000"
+OPENROUTER_MAX_TOKENS="1800"
 ```
 
 For local development, put these values in `.env.local`. Do not commit `.env.local`.

@@ -12,7 +12,10 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'npm run dev',
+    // Acceptance tests exercise the configured development database. Apply the
+    // repository's committed migrations before Next.js can serve a request so
+    // the generated Prisma client and runtime schema cannot silently drift.
+    command: 'npx prisma migrate deploy && npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

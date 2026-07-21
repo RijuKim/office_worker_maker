@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   generateAiEvent,
   generateAiEventStream,
+  getOpenRouterMaxTokens,
   getOpenRouterTimeoutMs,
   parseAiEventContentDetailed,
 } from "@/lib/game/openrouter";
@@ -28,15 +29,27 @@ describe("AI event diagnostics", () => {
   });
 
   it.each([
-    [undefined, 30_000],
-    ["abc", 30_000],
-    ["4999", 30_000],
-    ["120001", 30_000],
-    ["45000", 45_000],
+    [undefined, 60_000],
+    ["abc", 60_000],
+    ["4999", 60_000],
+    ["120001", 60_000],
+    ["60000", 60_000],
     ["5000", 5_000],
     ["120000", 120_000],
   ])("parses timeout %s as %i ms", (raw, expected) => {
     expect(getOpenRouterTimeoutMs(raw)).toBe(expected);
+  });
+
+  it.each([
+    [undefined, 1_800],
+    ["abc", 1_800],
+    ["399", 1_800],
+    ["400", 400],
+    ["1800", 1_800],
+    ["4000", 4_000],
+    ["4001", 1_800],
+  ])("parses max tokens %s as %i", (raw, expected) => {
+    expect(getOpenRouterMaxTokens(raw)).toBe(expected);
   });
 
   it("classifies malformed JSON separately", () => {
@@ -185,7 +198,7 @@ describe("AI event diagnostics", () => {
     const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(request.max_tokens).toBeLessThanOrEqual(2600);
+    expect(request.max_tokens).toBeLessThanOrEqual(1_800);
     expect(request.response_format).toEqual({ type: "json_object" });
     const instructions = request.messages.map((message: { content: string }) => message.content).join("\n");
     for (const required of ["title", "body", "tags", "choices", "id", "label", "summary", "statDelta", "relationshipDelta"]) {

@@ -1,7 +1,8 @@
 # Job Queue
 
-Updated: 2026-07-09T00:27:43.102Z
+Updated: 2026-07-21T04:52:07.792Z
 
+- [x] AI timeout, choice diagnostics, and latency (ai-generation-diagnostics) — 3m 42s
 - [!] Integration: Auth And Character Foundation (e2e-1) — 4s !! Reading additional input from stdin...
 OpenAI Codex v0.142.5
 --------
@@ -722,6 +723,10 @@ ERROR: You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/
 - [-] Integration: Spec system E2E (e2e-1-spec-integration) !! cancelled by user
 - [-] Integration: Rules, AI, And Career Data (e2e-2) !! cancelled by user
 - [-] Final Acceptance Sweep (e2e-3) !! cancelled by user
+- [x] Authoritative event lifecycle and concurrency (event-authority) — 3m 33s
+- [F] Integration: event selection stability (integration-event-stability) — 1262m 54s
+- [x] Integration: production verification (integration-postdeploy) — 4m 13s
+- [-] Integration: predeployment UI and age gates (integration-predeploy) — 3m 3s !! cancelled by user
 - [x] Scaffold And Tooling (job-1) — 5m 17s
 - [x] Life-stage core model and transitions (job-1-life-stage-core) — 4m 32s
 - [-] Prisma schema migration for spec system (job-1-spec-db-migration) !! cancelled by user
@@ -739,7 +744,9 @@ ERROR: You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/
 - [-] Literary Game UI (job-6) !! cancelled by user
 - [-] Spec system UI panels (job-6-spec-ui) !! cancelled by user
 - [-] Career And Ending Records Collection (job-7) !! cancelled by user
-- [ ] Integration: slice 1 event quality (slice-1-e2e)
+- [x] Main app onboarding and combined menu (main-onboarding-and-menu) — 3m 46s
+- [x] Production deployment (production-deploy) — 4m 57s
+- [x] Integration: slice 1 event quality (slice-1-e2e) — 32s
 - [x] Next-event route integration and quality logs (slice-1-route-integration) — 5m 45s
 - [x] Event thread lifecycle core (slice-1-thread-lifecycle-core) — 3m 11s
 - [x] Event validator and diversity scorecard (slice-1-validator-scorecard) — 5m 28s
@@ -1498,6 +1505,7 @@ Slice 1 implemented the life-stage state machine with career gate events. Slice 
 ERROR: You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at 5:25 PM.
 ERROR: You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at 5:25 PM.
 
+- [x] Toss onboarding and menu parity (toss-onboarding-and-menu) — 3m 17s
 - [!] eval-mr8vp15c — 109ms !! Reading additional input from stdin...
 Not inside a trusted directory and --skip-git-repo-check was not specified.
 
@@ -3994,3 +4002,146 @@ ERROR: You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/
 
 - [ ] test_critic for fd686716
 - [ ] interaction_e2e for fd686716
+- [x] eval-mrske0fb — 18s
+- [x] eval-mrskhxu0 — 13s
+- [x] eval-mrslrtfs — 20s
+- [x] blocking finding follow-up for Integration: slice 1 event quality — 1m 48s
+- [x] code_critic for 649da40c — 1m 27s
+- [x] test_critic for 649da40c — 1m 17s
+- [x] interaction_e2e for 649da40c — 2m 34s
+- [x] code_critic for 649da40c — 1m 20s
+- [x] test_critic for 649da40c — 1m 7s
+- [x] interaction_e2e for 649da40c — 2m 4s
+- [x] code_critic for 649da40c — 1m 12s
+- [x] test_critic for 649da40c — 1m 29s
+- [x] interaction_e2e for 649da40c — 4m 39s
+- [x] code_critic for 649da40c — 58s
+- [x] test_critic for 649da40c — 53s
+- [x] interaction_e2e for 649da40c — 4m 58s
+- [x] code_critic for 649da40c — 54s
+- [x] test_critic for 649da40c — 38s
+- [x] interaction_e2e for 649da40c — 1m 25s
+- [x] code_critic for 138c316a — 1m 5s
+- [x] test_critic for 138c316a — 52s
+- [x] interaction_e2e for 138c316a — 2m 41s
+- [x] code_critic for 138c316a — 1m 24s
+- [x] test_critic for 138c316a — 1m 21s
+- [x] interaction_e2e for 138c316a — 2m 44s
+- [x] code_critic for 138c316a — 1m 41s
+- [x] test_critic for 138c316a — 43s
+- [x] interaction_e2e for 138c316a — 1m 42s
+- [x] code_critic for 138c316a — 1m 5s
+- [x] test_critic for 138c316a — 45s
+- [x] interaction_e2e for 138c316a — 2m 17s
+- [x] code_critic for 138c316a — 1m 36s
+- [x] test_critic for 138c316a — 1m 9s
+- [x] interaction_e2e for 138c316a — 1m 7s
+- [x] code_critic for 138c316a — 1m 39s
+- [x] test_critic for 138c316a — 58s
+- [x] interaction_e2e for 138c316a — 1m 9s
+- [x] blocking finding follow-up for Integration: event selection stability — 3m 35s
+- [x] code_critic for cdd46389 — 1m 22s
+- [x] test_critic for cdd46389 — 32s
+- [x] interaction_e2e for cdd46389 — 1m 21s
+- [x] code_critic for 60faeba4 — 1m 20s
+- [x] test_critic for 60faeba4 — 50s
+- [x] interaction_e2e for 60faeba4 — 2m 38s
+- [x] code_critic for 60faeba4 — 1m 8s
+- [x] test_critic for 60faeba4 — 1m 19s
+- [x] interaction_e2e for 60faeba4 — 1m 23s
+- [x] code_critic for 60faeba4 — 1m 44s
+- [x] test_critic for 60faeba4 — 1m 2s
+- [x] interaction_e2e for 60faeba4 — 2m 36s
+- [x] code_critic for 60faeba4 — 1m 24s
+- [x] test_critic for 60faeba4 — 1m 18s
+- [x] interaction_e2e for 60faeba4 — 1m 47s
+- [x] code_critic for 60faeba4 — 1m 28s
+- [x] test_critic for 60faeba4 — 51s
+- [x] interaction_e2e for 60faeba4 — 2m 33s
+- [x] code_critic for 60faeba4 — 1m 20s
+- [x] test_critic for 60faeba4 — 1m 19s
+- [x] interaction_e2e for 60faeba4 — 1m 59s
+- [x] eval-mrt5yjo8 — 12s
+- [x] eval-mrt60y1k — 11s
+- [x] eval-mrt627y6 — 13s
+- [x] eval-mrt72clt — 16s
+- [x] eval-mrt73p6r — 17s
+- [x] eval-mrt760mg — 18s
+- [x] eval-mrt76yei — 20s
+- [x] code_critic for d5a2be21 — 1m 54s
+- [x] test_critic for d5a2be21 — 1m 24s
+- [x] interaction_e2e for d5a2be21 — 4m 58s
+- [x] code_critic for d5a2be21 — 1m 36s
+- [x] test_critic for d5a2be21 — 1m 15s
+- [x] interaction_e2e for d5a2be21 — 3m 35s
+- [x] code_critic for d5a2be21 — 1m 13s
+- [x] test_critic for d5a2be21 — 46s
+- [x] interaction_e2e for d5a2be21 — 1m 59s
+- [x] code_critic for d5a2be21 — 1m 35s
+- [x] test_critic for d5a2be21 — 36s
+- [x] interaction_e2e for d5a2be21 — 1m 20s
+- [x] code_critic for eeae113e — 1m 24s
+- [x] test_critic for eeae113e — 40s
+- [x] interaction_e2e for eeae113e — 2m 40s
+- [x] code_critic for 60faeba4 — 1m 22s
+- [x] test_critic for 60faeba4 — 1m 7s
+- [x] interaction_e2e for 60faeba4 — 2m 17s
+- [x] code_critic for eeae113e — 56s
+- [x] test_critic for eeae113e — 1m 3s
+- [x] interaction_e2e for eeae113e — 1m 43s
+- [x] authoritative-fast-event-generation — 71m 51s !! cancelled by user
+- [x] code_critic for ec4e61e6 — 1m 42s
+- [x] test_critic for ec4e61e6 — 42s
+- [x] interaction_e2e for ec4e61e6 — 1m 51s
+- [x] code_critic for eeae113e — 1m 7s
+- [x] test_critic for eeae113e — 1m 0s
+- [x] interaction_e2e for eeae113e — 2m 54s
+- [x] code_critic for eeae113e — 1m 36s
+- [x] test_critic for eeae113e — 56s
+- [x] interaction_e2e for eeae113e — 2m 35s
+- [x] code_critic for ec4e61e6 — 1m 5s
+- [x] test_critic for ec4e61e6 — 50s
+- [x] interaction_e2e for ec4e61e6 — 1m 7s
+- [x] code_critic for ec4e61e6 — 1m 21s
+- [x] test_critic for ec4e61e6 — 1m 12s
+- [x] interaction_e2e for ec4e61e6 — 1m 18s
+- [x] code_critic for eeae113e — 52s
+- [x] test_critic for eeae113e — 56s
+- [x] interaction_e2e for eeae113e — 3m 12s
+- [x] code_critic for ec4e61e6 — 57s
+- [x] test_critic for ec4e61e6 — 44s
+- [x] interaction_e2e for ec4e61e6 — 1m 35s
+- [x] code_critic for eeae113e — 1m 8s
+- [x] test_critic for eeae113e — 1m 3s
+- [x] interaction_e2e for eeae113e — 1m 46s
+- [x] code_critic for eeae113e — 1m 21s
+- [x] test_critic for eeae113e — 46s
+- [x] interaction_e2e for eeae113e — 1m 43s
+- [x] authoritative-fast-event-generation-final — 2m 8s
+- [x] blocking finding follow-up for Integration: predeployment UI and age gates — 3m 50s
+- [x] restore-existing-toss-visual-ui — 5m 54s
+- [x] code_critic for 397154ac — 1m 3s
+- [x] test_critic for 397154ac — 1m 9s
+- [x] interaction_e2e for 397154ac — 1m 8s
+- [x] code_critic for 397154ac — 1m 10s
+- [x] test_critic for 397154ac — 1m 5s
+- [x] interaction_e2e for 397154ac — 1m 19s
+- [x] code_critic for 397154ac — 1m 41s
+- [x] test_critic for 397154ac — 1m 4s
+- [x] interaction_e2e for 397154ac — 1m 43s
+- [x] code_critic for 397154ac — 48s
+- [x] test_critic for 397154ac — 39s
+- [x] interaction_e2e for 397154ac — 1m 9s
+- [x] code_critic for 397154ac — 2m 4s
+- [x] test_critic for 397154ac — 1m 12s
+- [x] interaction_e2e for 397154ac — 1m 46s
+- [x] code_critic for eb07c32f — 1m 8s
+- [x] test_critic for eb07c32f — 49s
+- [x] interaction_e2e for eb07c32f — 3m 52s
+- [x] final-predeploy-remediation-and-verification — 3m 48s
+- [x] stabilize-toss-restoration-playwright-gate — 3m 31s
+- [x] code_critic for 8cc3b3cb — 49s
+- [x] test_critic for 8cc3b3cb — 34s
+- [x] interaction_e2e for 8cc3b3cb — 38s
+- [x] replacement-predeployment-checkpoint — 3m 40s
+- [x] Fix production source completeness — 4m 38s
