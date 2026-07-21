@@ -1092,16 +1092,16 @@ function extractChatToken(payload: unknown) {
   const choice = readRecord(choices[0]);
   const delta = readRecord(choice?.delta);
   const deltaContent = delta?.content;
-  if (typeof deltaContent === "string") return deltaContent;
+  if (typeof deltaContent === "string" && deltaContent.length > 0) return deltaContent;
   // deepseek-v4-flash:cloud thinking mode puts tokens in delta.reasoning
   const deltaReasoning = delta?.reasoning;
-  if (typeof deltaReasoning === "string") return deltaReasoning;
+  if (typeof deltaReasoning === "string" && deltaReasoning.length > 0) return deltaReasoning;
   const message = readRecord(choice?.message);
   const messageContent = message?.content;
-  if (typeof messageContent === "string") return messageContent;
+  if (typeof messageContent === "string" && messageContent.length > 0) return messageContent;
   // deepseek-v4-flash:cloud thinking mode puts tokens in message.reasoning
   const messageReasoning = message?.reasoning;
-  return typeof messageReasoning === "string" ? messageReasoning : null;
+  return typeof messageReasoning === "string" && messageReasoning.length > 0 ? messageReasoning : null;
 }
 
 function normalizeAiEvent(raw: unknown) {
