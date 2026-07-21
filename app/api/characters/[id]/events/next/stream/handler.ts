@@ -256,6 +256,7 @@ export function createNextEventStreamPost({
         let generationReason: string | null = null;
         let generationStage: "provider" | "parse" | "quality" | null = null;
         let generationSlow = false;
+        let qualityElapsedMs = 0;
         let providerId: string | null = null;
         let providerFailures: unknown[] = [];
         let providerFirstBodyMs: number | null = null;
@@ -375,6 +376,7 @@ export function createNextEventStreamPost({
               durationMs: initialEvaluation.durationMs,
               createdAt: new Date().toISOString(),
             });
+            qualityElapsedMs = initialEvaluation.durationMs;
 
             if (initialEvaluation.verdict.status === "pass" && isEventAllowedForLifeStage({ title: aiEvent.title, tags: aiEvent.tags }, selectionContext)) {
               selectedEvent = aiEvent;
@@ -395,31 +397,14 @@ export function createNextEventStreamPost({
         }
 
         if (!selectedEvent) {
-          const { type, event } = selectNextEvent(selectionContext, excludedEventTitles);
-          if (aiAttempted && type !== "forced") {
-            const fallback = findValidatedStaticFallback({
-              preferredEvent: event, selectionContext, excludedEventTitles, qualityContext,
-            });
-            if (!fallback) {
-              log.error("검증된 대체 이벤트 없음", { userId, characterId: id, generationReason });
-              send("error", { error: "다음 사건을 생성하지 못했습니다." });
-              return;
-            }
-            selectedEvent = fallback.event;
-            source = "FALLBACK";
-            recordEventQualityLog({
-              characterRunId: id, eventId: null, phase: "static_fallback", source,
-              verdict: fallback.evaluation.verdict, reasons: fallback.evaluation.verdict.reasons,
-              diversityScore: fallback.evaluation.verdict.diversityScore,
-              continuityExemptions: fallback.evaluation.verdict.continuityExemptions,
-              retryUsed, fallbackUsed: true, selectedFallbackTitle: fallback.event.title,
-              durationMs: fallback.evaluation.durationMs, createdAt: new Date().toISOString(),
-            });
-          } else {
-            selectedEvent = event;
-            source = type === "forced" ? "FORCED" : event.source;
-          }
-          fallbackUsed = source === "FALLBACK";
+          // TEMP: fallback 제거 - AI 실패 원인을 보기 위해 에러를 그대로 반환
+          send("error", {
+            error: "AI 이벤트 생성 실패",
+            generationReason,
+            generationStage,
+            providerFailures,
+          });
+          return;
         }
 
         const candidateId = crypto.randomUUID();
@@ -476,6 +461,7 @@ export function createNextEventStreamPost({
           fallbackUsed,
           generationReason,
           generationStage,
+          qualityElapsedMs,
           providerId,
           providerFailures,
           providerElapsedMs,
