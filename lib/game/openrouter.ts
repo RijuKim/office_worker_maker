@@ -1090,10 +1090,18 @@ function extractChatToken(payload: unknown) {
   const choices = readRecord(payload)?.choices;
   if (!Array.isArray(choices)) return null;
   const choice = readRecord(choices[0]);
-  const deltaContent = readRecord(choice?.delta)?.content;
+  const delta = readRecord(choice?.delta);
+  const deltaContent = delta?.content;
   if (typeof deltaContent === "string") return deltaContent;
-  const messageContent = readRecord(choice?.message)?.content;
-  return typeof messageContent === "string" ? messageContent : null;
+  // deepseek-v4-flash:cloud thinking mode puts tokens in delta.reasoning
+  const deltaReasoning = delta?.reasoning;
+  if (typeof deltaReasoning === "string") return deltaReasoning;
+  const message = readRecord(choice?.message);
+  const messageContent = message?.content;
+  if (typeof messageContent === "string") return messageContent;
+  // deepseek-v4-flash:cloud thinking mode puts tokens in message.reasoning
+  const messageReasoning = message?.reasoning;
+  return typeof messageReasoning === "string" ? messageReasoning : null;
 }
 
 function normalizeAiEvent(raw: unknown) {
