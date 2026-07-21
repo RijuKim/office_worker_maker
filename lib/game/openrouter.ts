@@ -44,7 +44,7 @@ const MIN_AI_TIMEOUT_MS = 5_000;
 const MAX_AI_TIMEOUT_MS = 120_000;
 export const SLOW_AI_GENERATION_MS = 10_000;
 
-const DEFAULT_AI_MAX_TOKENS = 1_800;
+const DEFAULT_AI_MAX_TOKENS = 4_000;
 const MIN_AI_MAX_TOKENS = 400;
 const MAX_AI_MAX_TOKENS = 4_000;
 
@@ -1144,6 +1144,7 @@ function normalizeChoice(raw: unknown) {
 
   return {
     id: typeof choice.id === "string" ? choice.id :
+      typeof choice.id === "number" ? String(choice.id) :
       (typeof choice.label === "string" ? choice.label : String(choice.text ?? "choice_0")).replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 40),
     label: typeof choice.label === "string" ? choice.label :
       choice.text,
