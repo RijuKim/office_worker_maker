@@ -16,14 +16,6 @@ type AiProviderOptions = {
 };
 
 const primaryProvider = (): AiProvider => ({
-  id: "ollama",
-  label: "Ollama DeepSeek",
-  baseUrl: "https://ollama.com/v1",
-  key: process.env.OLLAMA_API_KEY ?? null,
-  model: "deepseek-v4-flash:cloud",
-});
-
-const fallbackProvider = (): AiProvider => ({
   id: "openrouter",
   label: "OpenRouter",
   baseUrl: "https://openrouter.ai/api/v1",
@@ -33,6 +25,14 @@ const fallbackProvider = (): AiProvider => ({
     "HTTP-Referer": process.env.NEXTAUTH_URL ?? "https://sano-officeworker.vercel.app",
     "X-Title": "Sano Officeworker",
   },
+});
+
+const fallbackProvider = (): AiProvider => ({
+  id: "ollama",
+  label: "Ollama DeepSeek",
+  baseUrl: "https://ollama.com/v1",
+  key: process.env.OLLAMA_API_KEY ?? null,
+  model: "deepseek-v4-flash:cloud",
 });
 
 const aiProviders = (options: AiProviderOptions = {}) =>
