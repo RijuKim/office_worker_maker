@@ -3,7 +3,7 @@ import type { EventSource } from "@prisma/client";
 import { getStoryArc, isEventAllowedForLifeStage, selectNextEvent, type EventSelectionContext, type StaticEvent } from "@/lib/game/event-engine";
 import { evaluateCandidateEvent, findValidatedStaticFallback } from "@/lib/game/event-quality-policy";
 import { deriveLifeStageState } from "@/lib/game/life-stage";
-import { checkDailyAiLimit, generateAiEventStream, getOpenRouterTimeoutMs, incrementAiUsage } from "@/lib/game/openrouter";
+import { checkDailyAiLimit, generateAiEvent, generateAiEventStream, getOpenRouterTimeoutMs, incrementAiUsage } from "@/lib/game/openrouter";
 import { recordEventQualityLog } from "@/lib/server/event-quality-log";
 import { acquireAuthoritativeEvent, createPrismaEventAuthorityStore, EventAuthorityLostError, resolveEventGenerationRole, startEventGenerationHeartbeat, toPublicEvent, type EventGenerationHeartbeat } from "@/lib/server/event-authority";
 import { prisma } from "@/lib/server/prisma";
@@ -343,6 +343,35 @@ export function createNextEventStreamPost({
           providerId = aiResult.providerId ?? null;
           providerFailures = aiResult.providerFailures ?? [];
 
+          if (!aiResult.success) {
+            // Streaming failed (Ollama thinking mode puts everything in reasoning),
+            // fall back to non-streaming generateAiEvent which handles reasoning field.
+            const nonStreamStartedAt = now();
+            try {
+              const nonStreamResult = await generateAiEvent(aiState, { skipPrimary: !limit.allowed });
+              if (nonStreamResult.success) {
+                providerElapsedMs += (nonStreamResult.providerElapsedMs ?? 0);
+                providerId = nonStreamResult.providerId ?? null;
+                retryUsed = true;
+                if (nonStreamResult.providerFailures) {
+                  providerFailures = [...(providerFailures as unknown[]), ...nonStreamResult.providerFailures];
+                }
+                aiResult = nonStreamResult;
+                aiFailed = false;
+                generationReason = null;
+                generationStage = null;
+              } else {
+                aiFailed = true;
+                generationReason = nonStreamResult.reason;
+                generationStage = nonStreamResult.providerFailures?.at(-1)?.stage ?? "provider";
+              }
+            } catch (nonStreamErr) {
+              aiFailed = true;
+              generationReason = "api_error";
+              generationStage = "provider";
+            }
+          }
+
           if (aiResult.success) {
             if (aiResult.providerId === "ollama") {
               assertConnected();
@@ -397,7 +426,6 @@ export function createNextEventStreamPost({
         }
 
         if (!selectedEvent) {
-          // TEMP: fallback 제거 - AI 실패 원인을 보기 위해 에러를 그대로 반환
           send("error", {
             error: "AI 이벤트 생성 실패",
             detail: {
@@ -409,6 +437,13 @@ export function createNextEventStreamPost({
               providerId,
               retryUsed,
             },
+          });
+          return;
+        }
+
+        if (!selectedEvent) {
+          send("error", {
+            error: "다음 사건을 생성하지 못했습니다.",
           });
           return;
         }
