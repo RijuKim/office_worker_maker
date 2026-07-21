@@ -86,6 +86,59 @@ function candidate(id: string): PersistedEvent {
 }
 
 describe("PostgreSQL-faithful event authority interleavings", () => {
+  it.each(["renewal-first", "takeover-first"] as const)(
+    "atomically elects one predicate when renewal and takeover race (%s)",
+    async (order) => {
+      const harness = transactionalHarness();
+      const original = new Date("2026-07-21T00:00:00.000Z");
+      const renewalAt = new Date("2026-07-21T00:00:01.000Z");
+      // The takeover boundary is just beyond the original lease, while a
+      // successful renewal makes the exact same predicate non-stale.
+      const takeoverAt = new Date("2026-07-21T00:00:01.001Z");
+      harness.run.token = "owner";
+      harness.run.startedAt = original;
+
+      let openBarrier!: () => void;
+      const barrier = new Promise<void>((resolve) => { openBarrier = resolve; });
+      const renew = async () => {
+        await barrier;
+        return harness.client.characterRun.updateMany({
+          where: { id: "run-1", userId: "user-1", currentEventId: null, eventGenerationToken: "owner" },
+          data: { eventGenerationStartedAt: renewalAt },
+        } as never);
+      };
+      const takeover = async () => {
+        await barrier;
+        return acquireEventGenerationLease({
+          client: harness.client as never,
+          characterRunId: "run-1",
+          userId: "user-1",
+          token: "challenger",
+          now: takeoverAt,
+          staleAfterMs: 1_000,
+        });
+      };
+
+      const operations = order === "renewal-first"
+        ? [renew(), takeover()] as const
+        : [takeover(), renew()] as const;
+      openBarrier();
+      const [first, second] = await Promise.all(operations);
+      const renewal = order === "renewal-first" ? first : second;
+      const acquisition = order === "renewal-first" ? second : first;
+
+      const predicateWins = (renewal as { count: number }).count +
+        ((acquisition as { role: string }).role === "leader" ? 1 : 0);
+      expect(predicateWins).toBe(1);
+      if ((renewal as { count: number }).count === 1) {
+        expect((acquisition as { role: string }).role).toBe("follower");
+        expect(harness.run.token).toBe("owner");
+      } else {
+        expect((acquisition as { role: string }).role).toBe("leader");
+        expect(harness.run.token).toBe("challenger");
+      }
+    },
+  );
   it("serializes simultaneous acquisition and permits takeover only after staleness", async () => {
     const harness = transactionalHarness();
     const now = new Date("2026-07-21T00:00:00Z");

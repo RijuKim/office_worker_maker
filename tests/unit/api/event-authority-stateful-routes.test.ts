@@ -11,6 +11,63 @@ type StoredEvent = {
   tags: string[];
 };
 
+const ALLOWED_EVENT_STAT_KEYS = new Set([
+  "academic", "practical", "health", "mental", "wealth", "reputation", "charm",
+]);
+
+function expectPlainObject(value: unknown): asserts value is Record<string, unknown> {
+  expect(value).not.toBeNull();
+  expect(typeof value).toBe("object");
+  expect(Array.isArray(value)).toBe(false);
+  expect(Object.getPrototypeOf(value)).toBe(Object.prototype);
+}
+
+function expectJsonValue(value: unknown): void {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return;
+  if (typeof value === "number") {
+    expect(Number.isFinite(value)).toBe(true);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach(expectJsonValue);
+    return;
+  }
+  expectPlainObject(value);
+  Object.values(value).forEach(expectJsonValue);
+}
+
+function expectValidFallbackEvent(event: StoredEvent): void {
+  expect(event.title.trim().length).toBeGreaterThan(0);
+  expect(event.body.trim().length).toBeGreaterThan(0);
+  expect(event.tags.length).toBeGreaterThan(0);
+  event.tags.forEach((tag) => {
+    expect(typeof tag).toBe("string");
+    expect(tag.trim().length).toBeGreaterThan(0);
+  });
+  expect(event.choices.length).toBeGreaterThanOrEqual(2);
+  expect(event.choices.length).toBeLessThanOrEqual(4);
+
+  for (const rawChoice of event.choices) {
+    expectPlainObject(rawChoice);
+    for (const field of ["id", "label", "summary"] as const) {
+      expect(typeof rawChoice[field]).toBe("string");
+      expect((rawChoice[field] as string).trim().length).toBeGreaterThan(0);
+    }
+
+    expectPlainObject(rawChoice.statDelta);
+    for (const [key, value] of Object.entries(rawChoice.statDelta)) {
+      expect(ALLOWED_EVENT_STAT_KEYS.has(key)).toBe(true);
+      expect(Number.isInteger(value)).toBe(true);
+      const minimum = key === "health" ? -1 : -15;
+      expect(value).toBeGreaterThanOrEqual(minimum);
+      expect(value).toBeLessThanOrEqual(15);
+    }
+
+    expectPlainObject(rawChoice.flagDelta);
+    Object.values(rawChoice.flagDelta).forEach(expectJsonValue);
+  }
+}
+
 const fixture = vi.hoisted(() => ({
   pointer: null as string | null,
   generationToken: null as string | null,
@@ -27,6 +84,9 @@ const fixture = vi.hoisted(() => ({
   age: 21,
   residence: "studio",
   disappearBeforeLease: false,
+  characterLookupBarrier: null as Promise<void> | null,
+  leaseAcquisitionBarrier: null as Promise<void> | null,
+  injectedFailure: null as "candidate_create" | "usage_update" | "transaction_commit" | "ownership_loss" | "provider_reject" | null,
 }));
 
 const routeEvent = vi.hoisted(() => ({
@@ -58,13 +118,16 @@ function fullCharacter() {
 
 const prismaMock = vi.hoisted(() => ({
   characterRun: {
-    findFirst: vi.fn(async (query: { select?: unknown }) => query.select
-      ? (fixture.disappearBeforeLease ? null : { currentEventId: fixture.pointer, eventGenerationToken: fixture.generationToken, eventGenerationStartedAt: fixture.generationStartedAt })
-      : fullCharacter()),
+    findFirst: vi.fn(async (query: { select?: unknown }) => {
+      if (!query.select && fixture.characterLookupBarrier) await fixture.characterLookupBarrier;
+      return query.select
+        ? (fixture.disappearBeforeLease ? null : { currentEventId: fixture.pointer, eventGenerationToken: fixture.generationToken, eventGenerationStartedAt: fixture.generationStartedAt })
+        : fullCharacter();
+    }),
     updateMany: vi.fn(async ({ where, data }: { where: { currentEventId?: null; eventGenerationToken?: string; OR?: Array<{ eventGenerationStartedAt?: { lt: Date } }> }; data: { currentEventId?: string; eventGenerationToken?: string | null; eventGenerationStartedAt?: Date | null } }) => {
+      if (where.eventGenerationToken && where.eventGenerationToken !== fixture.generationToken) return { count: 0 };
       if (data.currentEventId === undefined) {
         if (fixture.disappearBeforeLease) return { count: 0 };
-        if (where.eventGenerationToken && where.eventGenerationToken !== fixture.generationToken) return { count: 0 };
         if (data.eventGenerationStartedAt instanceof Date && data.eventGenerationToken === undefined) {
           if (fixture.pointer !== null || fixture.generationToken === null) return { count: 0 };
           fixture.generationStartedAt = data.eventGenerationStartedAt;
@@ -80,6 +143,7 @@ const prismaMock = vi.hoisted(() => ({
         )) {
           fixture.generationToken = data.eventGenerationToken ?? null;
           fixture.generationStartedAt = data.eventGenerationStartedAt ?? null;
+          if (fixture.leaseAcquisitionBarrier) await fixture.leaseAcquisitionBarrier;
         } else return { count: 0 };
         return { count: 1 };
       }
@@ -109,6 +173,7 @@ const prismaMock = vi.hoisted(() => ({
       return event?.status === where.status ? event : null;
     }),
     create: vi.fn(async ({ data }: { data: StoredEvent }) => {
+      if (fixture.injectedFailure === "candidate_create") throw new Error("injected candidate create failure");
       if (fixture.commitDelayMs > 0) {
         await new Promise((resolve) => setTimeout(resolve, fixture.commitDelayMs));
       }
@@ -127,6 +192,10 @@ const prismaMock = vi.hoisted(() => ({
         status: "DISCARDED",
       };
       fixture.events.set(stored.id, stored);
+      if (fixture.injectedFailure === "ownership_loss") {
+        fixture.generationToken = "replacement-owner";
+        fixture.generationStartedAt = new Date();
+      }
       if (fixture.generationBarrier) {
         await new Promise<void>((resolve) => {
           fixture.createWaiters.push(resolve);
@@ -146,12 +215,31 @@ const prismaMock = vi.hoisted(() => ({
   },
   hiddenState: {
     update: vi.fn(async ({ data }: { data: { eventFlags: Record<string, unknown> } }) => {
+      if (fixture.injectedFailure === "transaction_commit") throw new Error("injected transactional hidden-state failure");
       fixture.hiddenFlags = data.eventFlags;
       return {};
     }),
   },
   eventHistory: { findMany: vi.fn(async () => []) },
-  $transaction: vi.fn(async (operation: (tx: typeof prismaMock) => Promise<unknown>) => operation(prismaMock)),
+  $transaction: vi.fn(async (operation: (tx: typeof prismaMock) => Promise<unknown>) => {
+    const snapshot = {
+      pointer: fixture.pointer,
+      generationToken: fixture.generationToken,
+      generationStartedAt: fixture.generationStartedAt,
+      hiddenFlags: fixture.hiddenFlags,
+      events: new Map([...fixture.events].map(([id, event]) => [id, { ...event }])),
+    };
+    try {
+      return await operation(prismaMock);
+    } catch (error) {
+      fixture.pointer = snapshot.pointer;
+      fixture.generationToken = snapshot.generationToken;
+      fixture.generationStartedAt = snapshot.generationStartedAt;
+      fixture.hiddenFlags = snapshot.hiddenFlags;
+      fixture.events = snapshot.events;
+      throw error;
+    }
+  }),
 }));
 
 const aiMocks = vi.hoisted(() => ({
@@ -185,6 +273,7 @@ vi.mock("@/lib/game/life-stage", async (importOriginal) => {
 import { GET as getCharacter } from "@/app/api/characters/[id]/route";
 import { POST as nextJson } from "@/app/api/characters/[id]/events/next/route";
 import { POST as nextStream } from "@/app/api/characters/[id]/events/next/stream/route";
+import { createNextEventStreamPost } from "@/app/api/characters/[id]/events/next/stream/handler";
 
 function eventFromSse(text: string) {
   const line = text.split("\n").find((entry) => entry.startsWith("data: {\"event\""));
@@ -273,6 +362,9 @@ describe("stateful JSON/SSE event authority", () => {
     fixture.age = 21;
     fixture.residence = "studio";
     fixture.disappearBeforeLease = false;
+    fixture.characterLookupBarrier = null;
+    fixture.leaseAcquisitionBarrier = null;
+    fixture.injectedFailure = null;
     aiMocks.checkDailyAiLimit.mockResolvedValue({ allowed: true });
     engineMocks.selectNextEvent.mockReturnValue({ type: "static", event: routeEvent });
   });
@@ -306,6 +398,223 @@ describe("stateful JSON/SSE event authority", () => {
     const event = kind === "JSON" ? JSON.parse(text).event : eventFromSse(text);
     expect(event.title).toContain(`${age}세 ${residence}`);
     expect(event.body).toContain(`${age}세 주인공이 ${residence}`);
+  });
+
+  it("cancels while provider generation is held, stops the owned lease, and fences the late candidate", async () => {
+    fixture.aiEnabled = true;
+    let finishProvider!: (value: unknown) => void;
+    const heldProvider = new Promise((resolve) => { finishProvider = resolve; });
+    aiMocks.generateAiEventStream.mockReturnValue(heldProvider);
+
+    const response = await nextStream(
+      new Request("http://localhost/api/characters/run-1/events/next/stream", { method: "POST" }),
+      { params: Promise.resolve({ id: "run-1" }) },
+    );
+    const reader = response.body!.getReader();
+    expect(new TextDecoder().decode((await reader.read()).value)).toContain("event: status");
+    await vi.waitFor(() => expect(aiMocks.generateAiEventStream).toHaveBeenCalledOnce());
+    const ownedToken = fixture.generationToken;
+    expect(ownedToken).toEqual(expect.any(String));
+
+    await reader.cancel("client disconnected");
+
+    expect(fixture.generationToken).toBeNull();
+    expect(fixture.generationStartedAt).toBeNull();
+    finishProvider({
+      success: true, event: routeEvent, providerId: "ollama", providerElapsedMs: 100,
+      totalElapsedMs: 100, slow: false, retryUsed: false, providerFailures: [],
+    });
+    await vi.waitFor(() => expect(aiMocks.incrementAiUsage).not.toHaveBeenCalled());
+    expect(prismaMock.event.create).not.toHaveBeenCalled();
+
+    expect(fixture.pointer).toBeNull();
+    expect(fixture.generationToken).not.toBe(ownedToken);
+    expect([...fixture.events.values()].filter((event) => event.status === "ACTIVE")).toHaveLength(0);
+  });
+
+  it("cancels before lease acquisition and fences every later SSE side effect", async () => {
+    fixture.aiEnabled = true;
+    let releaseLookup!: () => void;
+    fixture.characterLookupBarrier = new Promise<void>((resolve) => { releaseLookup = resolve; });
+    aiMocks.generateAiEventStream.mockResolvedValue({
+      success: true, event: routeEvent, providerId: "ollama", providerElapsedMs: 1,
+      totalElapsedMs: 1, slow: false, retryUsed: false, providerFailures: [],
+    });
+
+    const response = await nextStream(
+      new Request("http://localhost/api/characters/run-1/events/next/stream", { method: "POST" }),
+      { params: Promise.resolve({ id: "run-1" }) },
+    );
+    const reader = response.body!.getReader();
+    expect(new TextDecoder().decode((await reader.read()).value)).toContain("event: status");
+
+    const closed = reader.closed;
+    await reader.cancel("disconnect before character lookup finishes");
+    releaseLookup();
+    await expect(closed).resolves.toBeUndefined();
+    await vi.waitFor(() => expect(prismaMock.characterRun.findFirst).toHaveBeenCalledOnce());
+
+    expect(aiMocks.generateAiEventStream).not.toHaveBeenCalled();
+    expect(aiMocks.incrementAiUsage).not.toHaveBeenCalled();
+    expect(prismaMock.event.create).not.toHaveBeenCalled();
+    expect(prismaMock.hiddenState.update).not.toHaveBeenCalled();
+    expect(fixture.pointer).toBeNull();
+    expect(fixture.generationToken).toBeNull();
+    expect([...fixture.events.values()].filter((event) => event.status === "ACTIVE")).toHaveLength(0);
+  });
+
+  it("does not release a replacement owner when cancellation lands inside role resolution", async () => {
+    fixture.aiEnabled = true;
+    let releaseLeaseResolution!: () => void;
+    fixture.leaseAcquisitionBarrier = new Promise<void>((resolve) => { releaseLeaseResolution = resolve; });
+    aiMocks.generateAiEventStream.mockResolvedValue({
+      success: true, event: routeEvent, providerId: "ollama", providerElapsedMs: 1,
+      totalElapsedMs: 1, slow: false, retryUsed: false, providerFailures: [],
+    });
+
+    const response = await nextStream(
+      new Request("http://localhost/api/characters/run-1/events/next/stream", { method: "POST" }),
+      { params: Promise.resolve({ id: "run-1" }) },
+    );
+    const reader = response.body!.getReader();
+    expect(new TextDecoder().decode((await reader.read()).value)).toContain("event: status");
+    await vi.waitFor(() => expect(fixture.generationToken).toEqual(expect.any(String)));
+    const ownedToken = fixture.generationToken;
+
+    const closed = reader.closed;
+    await reader.cancel("disconnect while generation role is resolving");
+    expect(fixture.generationToken).toBe(ownedToken);
+    const replacementStartedAt = new Date("2026-07-21T03:04:05.678Z");
+    fixture.generationToken = "replacement-owner-during-role-resolution";
+    fixture.generationStartedAt = replacementStartedAt;
+    releaseLeaseResolution();
+    await expect(closed).resolves.toBeUndefined();
+    await vi.waitFor(() => expect(fixture.generationToken).toBe("replacement-owner-during-role-resolution"));
+
+    expect(aiMocks.generateAiEventStream).not.toHaveBeenCalled();
+    expect(aiMocks.incrementAiUsage).not.toHaveBeenCalled();
+    expect(prismaMock.event.create).not.toHaveBeenCalled();
+    expect(prismaMock.hiddenState.update).not.toHaveBeenCalled();
+    expect(fixture.pointer).toBeNull();
+    expect(fixture.generationStartedAt).toBe(replacementStartedAt);
+    expect([...fixture.events.values()].filter((event) => event.status === "ACTIVE")).toHaveLength(0);
+    expect(prismaMock.characterRun.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ eventGenerationToken: ownedToken }),
+      data: { eventGenerationToken: null, eventGenerationStartedAt: null },
+    }));
+  });
+
+  it.each([
+    { kind: "JSON", failure: "candidate_create" },
+    { kind: "SSE", failure: "candidate_create" },
+    { kind: "JSON", failure: "provider_reject" },
+    { kind: "SSE", failure: "provider_reject" },
+    { kind: "JSON", failure: "usage_update" },
+    { kind: "SSE", failure: "usage_update" },
+    { kind: "JSON", failure: "transaction_commit" },
+    { kind: "SSE", failure: "transaction_commit" },
+    { kind: "JSON", failure: "ownership_loss" },
+    { kind: "SSE", failure: "ownership_loss" },
+  ] as const)("fences $kind route state after injected $failure failure", async ({ kind, failure }) => {
+    fixture.injectedFailure = failure;
+    if (failure === "provider_reject") vi.useFakeTimers();
+    if (failure === "usage_update" || failure === "provider_reject") {
+      fixture.aiEnabled = true;
+      const result = {
+        success: true as const, event: routeEvent, providerId: "ollama",
+        providerElapsedMs: 2, totalElapsedMs: 2, slow: false, retryUsed: false, providerFailures: [],
+      };
+      aiMocks.generateAiEvent.mockResolvedValue(result);
+      aiMocks.generateAiEventStream.mockResolvedValue(result);
+      if (failure === "usage_update") {
+        aiMocks.incrementAiUsage.mockRejectedValue(new Error("injected AI usage failure"));
+      } else {
+        aiMocks.generateAiEvent.mockRejectedValue(new Error("injected provider rejection"));
+        aiMocks.generateAiEventStream.mockRejectedValue(new Error("injected provider rejection"));
+      }
+    }
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const response = kind === "JSON"
+      ? await nextJson(new Request("http://localhost/api/characters/run-1/events/next", { method: "POST" }), { params: Promise.resolve({ id: "run-1" }) })
+      : await nextStream(new Request("http://localhost/api/characters/run-1/events/next/stream", { method: "POST" }), { params: Promise.resolve({ id: "run-1" }) });
+    if (kind === "SSE" && failure === "provider_reject") await vi.advanceTimersByTimeAsync(100);
+    const text = await response.text();
+    const ownershipLost = failure === "ownership_loss";
+    const providerRejected = failure === "provider_reject";
+
+    if (providerRejected) {
+      const event = kind === "JSON" ? JSON.parse(text).event : eventFromSse(text);
+      const active = [...fixture.events.values()].filter((item) => item.status === "ACTIVE");
+      const persisted = active[0];
+      const expectedPublicEvent = {
+        id: persisted.id,
+        title: persisted.title,
+        body: persisted.body,
+        choices: persisted.choices,
+        source: persisted.source,
+        forced: false,
+      };
+      expect(response.status).toBe(200);
+      expect(active).toHaveLength(1);
+      expect(persisted).toMatchObject({ id: fixture.pointer, source: "FALLBACK", status: "ACTIVE" });
+      expectValidFallbackEvent(persisted);
+      expect(event).toEqual(expectedPublicEvent);
+      expect(text).not.toContain("event: error");
+      expect(text).not.toContain("다음 사건을 생성하지 못했습니다.");
+      expect(kind === "JSON" ? JSON.parse(text).error : undefined).toBeUndefined();
+
+      const renewalCallsAtCompletion = prismaMock.characterRun.updateMany.mock.calls.filter(([argument]) => {
+        const data = (argument as { data?: { eventGenerationStartedAt?: Date; eventGenerationToken?: unknown } }).data;
+        return data?.eventGenerationStartedAt instanceof Date && data.eventGenerationToken === undefined;
+      }).length;
+      await vi.advanceTimersByTimeAsync(120_000);
+      const renewalCallsAfterMultipleIntervals = prismaMock.characterRun.updateMany.mock.calls.filter(([argument]) => {
+        const data = (argument as { data?: { eventGenerationStartedAt?: Date; eventGenerationToken?: unknown } }).data;
+        return data?.eventGenerationStartedAt instanceof Date && data.eventGenerationToken === undefined;
+      }).length;
+      expect(renewalCallsAfterMultipleIntervals - renewalCallsAtCompletion).toBe(0);
+    } else if (kind === "JSON") {
+      expect(response.status).toBe(ownershipLost ? 400 : 500);
+      expect(JSON.parse(text)).toEqual({
+        error: ownershipLost ? "진행 중인 이벤트가 없습니다." : "다음 사건을 생성하지 못했습니다.",
+      });
+    } else {
+      expect(response.status).toBe(200);
+      expect(text).toContain("event: status");
+      expect(text).toContain("event: error");
+      expect(text).toContain(ownershipLost ? "진행 중인 이벤트가 없습니다." : "다음 사건을 생성하지 못했습니다.");
+      expect(text).not.toContain("event: event");
+    }
+
+    if (providerRejected) expect(fixture.pointer).toEqual(expect.any(String));
+    else expect(fixture.pointer).toBeNull();
+    expect([...fixture.events.values()].filter((event) => event.status === "ACTIVE")).toHaveLength(providerRejected ? 1 : 0);
+    expect(prismaMock.characterRun.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ eventGenerationToken: expect.any(String) }),
+      data: { eventGenerationToken: null, eventGenerationStartedAt: null },
+    }));
+    if (providerRejected) {
+      expect(fixture.events.get(fixture.pointer!)).toMatchObject({ status: "ACTIVE", source: "FALLBACK" });
+      expect(fixture.generationToken).toBeNull();
+      expect(fixture.generationStartedAt).toBeNull();
+      const completionMessage = kind === "JSON" ? "이벤트 생성 완료" : "스트림 이벤트 생성 완료";
+      expect(info).toHaveBeenCalledWith(expect.stringContaining(completionMessage), expect.objectContaining({
+        eventId: fixture.pointer,
+        source: "FALLBACK",
+        generationReason: "api_error",
+        generationStage: "provider",
+        fallbackUsed: true,
+      }));
+    } else if (ownershipLost) {
+      expect(fixture.generationToken).toBe("replacement-owner");
+      expect(fixture.events.size).toBe(1);
+      expect([...fixture.events.values()][0]).toMatchObject({ status: "DISCARDED" });
+    } else {
+      expect(fixture.generationToken).toBeNull();
+      expect(fixture.generationStartedAt).toBeNull();
+    }
   });
 
   it.each(["JSON", "SSE"] as const)("derives validated %s fallback content from age and residence context", async (kind) => {
@@ -365,7 +674,12 @@ describe("stateful JSON/SSE event authority", () => {
   });
 
   it("keeps a slow SSE AI leader authoritative while JSON and SSE followers wait", async () => {
+    vi.useFakeTimers();
     fixture.aiEnabled = true;
+    // Route lease = provider timeout + 5s. A zero provider timeout keeps this
+    // acceptance race short while preserving the production formula.
+    aiMocks.getOpenRouterTimeoutMs.mockReturnValue(0);
+    const leaseMs = 5_000;
     let finishProvider!: (value: unknown) => void;
     const provider = new Promise((resolve) => { finishProvider = resolve; });
     aiMocks.generateAiEventStream.mockReturnValue(provider);
@@ -383,14 +697,24 @@ describe("stateful JSON/SSE event authority", () => {
     expect(firstFrame).not.toContain("body_delta");
     expect(firstFrame).not.toContain("event: event");
     expect(fixture.pointer).toBeNull();
-    await vi.waitFor(() => expect(aiMocks.generateAiEventStream).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(aiMocks.generateAiEventStream).toHaveBeenCalledTimes(1), { timeout: 1_000 });
 
+    await vi.advanceTimersByTimeAsync(leaseMs);
     const jsonFollower = nextJson(new Request("http://localhost/api/characters/run-1/events/next", { method: "POST" }), { params: Promise.resolve({ id: "run-1" }) });
+    await vi.advanceTimersByTimeAsync(leaseMs);
     const sseFollower = nextStream(new Request("http://localhost/api/characters/run-1/events/next/stream", { method: "POST" }), { params: Promise.resolve({ id: "run-1" }) });
+    await vi.advanceTimersByTimeAsync(leaseMs);
+    const renewalCount = prismaMock.characterRun.updateMany.mock.calls.filter(([argument]) => {
+      const data = (argument as { data?: { eventGenerationStartedAt?: Date; eventGenerationToken?: unknown } }).data;
+      return data?.eventGenerationStartedAt instanceof Date && data.eventGenerationToken === undefined;
+    }).length;
+    expect(renewalCount).toBeGreaterThanOrEqual(3);
     finishProvider({
       success: true, event: aiEvent, providerId: "ollama", providerElapsedMs: 12_000,
       totalElapsedMs: 12_000, slow: true, retryUsed: false, providerFailures: [],
     });
+
+    await vi.runAllTimersAsync();
 
     let leaderRest = "";
     while (true) {
@@ -408,6 +732,7 @@ describe("stateful JSON/SSE event authority", () => {
     expect(leaderRest.indexOf("event: body_delta")).toBeLessThan(leaderRest.indexOf("event: event"));
     expect(aiMocks.generateAiEventStream).toHaveBeenCalledTimes(1);
     expect(aiMocks.generateAiEvent).not.toHaveBeenCalled();
+    expect(engineMocks.selectNextEvent).not.toHaveBeenCalled();
     expect([...fixture.events.values()].filter((item) => item.status === "ACTIVE")).toHaveLength(1);
     expect(leaderEvent.source).toBe("AI");
     expect(info).toHaveBeenCalledWith(expect.stringContaining("스트림 이벤트 생성 완료"), expect.objectContaining({
@@ -418,6 +743,65 @@ describe("stateful JSON/SSE event authority", () => {
       timeToFirstVisibleBodyMs: number; timeToFinalEventMs: number;
     };
     expect(timing.timeToFirstVisibleBodyMs).toBeLessThanOrEqual(timing.timeToFinalEventMs);
+  });
+
+  it.each([
+    { outcome: "AI", result: { success: true as const, event: routeEvent, providerId: "ollama", providerElapsedMs: 190, totalElapsedMs: 190, slow: false, retryUsed: false, providerFailures: [] } },
+    { outcome: "FALLBACK", result: { success: false as const, reason: "timeout", providerId: "openrouter", providerElapsedMs: 190, totalElapsedMs: 190, slow: false, retryUsed: false, providerFailures: [{ providerId: "openrouter", providerElapsedMs: 190, reason: "timeout", stage: "provider" as const }] } },
+  ])("records deterministic, distinct SSE milestones for $outcome", async ({ outcome, result }) => {
+    fixture.aiEnabled = true;
+    const clock = [1_000, 1_001, 1_100, 1_200, 1_300, 1_400, 1_500];
+    const now = vi.fn(() => {
+      const value = clock.shift();
+      if (value === undefined) throw new Error("unexpected clock sample");
+      return value;
+    });
+    const sends: Array<{ event: string; elapsedMs: number }> = [];
+    aiMocks.generateAiEventStream.mockImplementation(async (_state, onText: (text: string) => void) => {
+      onText("provider-first-body");
+      return result;
+    });
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const post = createNextEventStreamPost({ now, observeSend: (observation) => sends.push(observation) });
+
+    const response = await post(
+      new Request("http://localhost/api/characters/run-1/events/next/stream", { method: "POST" }),
+      { params: Promise.resolve({ id: "run-1" }) },
+    );
+    const text = await response.text();
+    const event = eventFromSse(text);
+    const logged = info.mock.calls.find(([message]) => String(message).includes("스트림 이벤트 생성 완료"))?.[1] as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(event).toMatchObject({ id: fixture.pointer, source: outcome });
+    expect(sends).toEqual([
+      { event: "status", elapsedMs: 1 },
+      { event: "body_delta", elapsedMs: 300 },
+      { event: "event", elapsedMs: 400 },
+    ]);
+    expect({
+      providerFirstBodyMs: logged.providerFirstBodyMs,
+      generationCompleteMs: logged.generationCompleteMs,
+      timeToFirstVisibleBodyMs: logged.timeToFirstVisibleBodyMs,
+      timeToFinalEventMs: logged.timeToFinalEventMs,
+      totalElapsedMs: logged.totalElapsedMs,
+      eventId: logged.eventId,
+      source: logged.source,
+      fallbackUsed: logged.fallbackUsed,
+      generationReason: logged.generationReason,
+      generationStage: logged.generationStage,
+    }).toEqual({
+      providerFirstBodyMs: 100,
+      generationCompleteMs: 200,
+      timeToFirstVisibleBodyMs: 300,
+      timeToFinalEventMs: 400,
+      totalElapsedMs: 500,
+      eventId: fixture.pointer,
+      source: outcome,
+      fallbackUsed: outcome === "FALLBACK",
+      generationReason: outcome === "FALLBACK" ? "timeout" : null,
+      generationStage: outcome === "FALLBACK" ? "provider" : null,
+    });
   });
 
   it("preserves nested and cyclic Error logger arguments for leakage detection", () => {
@@ -516,6 +900,8 @@ describe("stateful JSON/SSE event authority", () => {
       } : {}),
     }));
     expect(kind === "JSON" ? aiMocks.generateAiEvent : aiMocks.generateAiEventStream).toHaveBeenCalledTimes(1);
+    expect(fixture.generationToken).toBeNull();
+    expect(fixture.generationStartedAt).toBeNull();
     const logged = logger.serialized();
     expect(logged).not.toContain("API_KEY");
     expect(logged).not.toContain("prompt");
