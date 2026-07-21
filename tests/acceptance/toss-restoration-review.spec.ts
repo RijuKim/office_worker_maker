@@ -42,6 +42,11 @@ async function waitForToss() {
 
 async function installApi(page: Page) {
   let recordPayload = records;
+  let restorationState: "empty" | "populated" = "empty";
+  let resolveEmptyRestoration!: () => void;
+  const emptyRestoration = new Promise<void>((resolvePromise) => {
+    resolveEmptyRestoration = resolvePromise;
+  });
   const requests: Array<{ path: string; method: string; body: unknown }> = [];
   await page.route("**/api/**", async (route: Route) => {
     const request = route.request();
@@ -50,15 +55,23 @@ async function installApi(page: Page) {
     requests.push({ path, method: request.method(), body });
     const json = path === "/api/toss/session" ? { token: "deterministic-session" }
       : path === "/api/characters" && request.method() === "POST" ? { character }
-      : path === "/api/characters" ? { characters: [character] }
+      : path === "/api/characters" ? { characters: restorationState === "populated" ? [character] : [] }
       : path === "/api/characters/run-1" ? { character, currentEvent: firstEvent }
       : path === "/api/characters/run-1/choices" ? { result: { stats: { ...character.stats, practical: 7 }, statDelta: { practical: 2 }, relationshipDelta: [], summary: "차분한 답장으로 준비할 시간을 확보했습니다.", endingTriggered: false } }
       : path === "/api/characters/run-1/events/next" ? { event: nextEvent }
       : path === "/api/records" ? { records: recordPayload }
       : {};
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(json) });
+    if (path === "/api/characters" && request.method() === "GET" && restorationState === "empty") {
+      resolveEmptyRestoration();
+    }
   });
-  return { requests, setRecords(value: typeof records) { recordPayload = value; } };
+  return {
+    requests,
+    waitForEmptyRestoration() { return emptyRestoration; },
+    restorePopulatedCharacter() { restorationState = "populated"; },
+    setRecords(value: typeof records) { recordPayload = value; },
+  };
 }
 
 async function createDeterministicRun(page: Page) {
@@ -130,11 +143,17 @@ test("restored Toss gameplay, feedback, next-event and records match the pre-ref
     }
     await mkdir(artifactDir, { recursive: true });
     const api = await installApi(page);
+    await page.addInitScript(() => sessionStorage.clear());
 
-    for (const viewport of [{ width: 636, height: 1048 }, { width: 1504, height: 741 }]) {
+    for (const [index, viewport] of [{ width: 636, height: 1048 }, { width: 1504, height: 741 }].entries()) {
       await page.setViewportSize(viewport);
       await page.goto(baseUrl);
-      if (await page.getByRole("button", { name: "시작하기", exact: true }).isVisible()) await createDeterministicRun(page);
+      if (index === 0) {
+        await api.waitForEmptyRestoration();
+        await expect(page.getByRole("button", { name: "시작하기", exact: true })).toBeVisible();
+        await createDeterministicRun(page);
+        api.restorePopulatedCharacter();
+      }
       await expect(page.locator(".event-panel h2")).toHaveText(firstEvent.title);
       await expect(page.locator(".choice-stack button")).toHaveCount(3);
       for (const selector of oracle.structures.gameplay) await expect(page.locator(selector)).toHaveCount(1);
