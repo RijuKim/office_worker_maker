@@ -1134,15 +1134,17 @@ function normalizeChoice(raw: unknown) {
       }
       return [key, value];
     }),
-  ) : choice.statDelta;
+  ) : choice.statDelta ?? {};
   const summarySource = typeof choice.summary === "string" ? choice.summary :
+    typeof choice.next === "string" ? choice.next :  // handle Ollama "next" field
     choice.nextEvent;
   const summary = typeof summarySource === "string" && !summarySource.startsWith("당신은")
     ? `당신은 ${summarySource}`
-    : summarySource;
+    : summarySource ?? `당신은 ${String(choice.label ?? choice.text ?? "선택")}을(를) 선택했다`;
 
   return {
-    id: choice.id,
+    id: typeof choice.id === "string" ? choice.id :
+      (typeof choice.label === "string" ? choice.label : String(choice.text ?? "choice_0")).replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 40),
     label: typeof choice.label === "string" ? choice.label :
       choice.text,
     summary,
