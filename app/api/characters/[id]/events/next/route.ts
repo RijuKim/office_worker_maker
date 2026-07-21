@@ -185,6 +185,7 @@ export async function POST(request: Request, context: RouteContext) {
   let generationReason: string | null = null;
   let generationStage: "provider" | "parse" | "quality" | null = null;
   let generationSlow = false;
+  let qualityElapsedMs = 0;
   let providerId: string | null = null;
   let providerFailures: unknown[] = [];
 
@@ -228,7 +229,34 @@ export async function POST(request: Request, context: RouteContext) {
       preferCategories: diversityGuidance.preferCategories,
       avoidPeople: diversityGuidance.avoidPeople,
     };
-    const aiResult = await generateAiEvent(aiState, { skipPrimary: !limit.allowed });
+    const providerStartedAt = Date.now();
+    let aiResult: Awaited<ReturnType<typeof generateAiEvent>> | {
+      success: false; reason: "api_error"; providerId: null; providerLabel: null;
+      providerElapsedMs: number; totalElapsedMs: number; slow: boolean; retryUsed: false;
+      providerFailures: Array<{ providerId: null; providerLabel: null; providerElapsedMs: number; reason: "api_error"; stage: "provider" }>;
+    };
+    try {
+      aiResult = await generateAiEvent(aiState, { skipPrimary: !limit.allowed });
+    } catch {
+      const elapsed = Math.max(0, Date.now() - providerStartedAt);
+      aiResult = {
+        success: false,
+        reason: "api_error",
+        providerId: null,
+        providerLabel: null,
+        providerElapsedMs: elapsed,
+        totalElapsedMs: elapsed,
+        slow: elapsed > 10_000,
+        retryUsed: false,
+        providerFailures: [{
+          providerId: null,
+          providerLabel: null,
+          providerElapsedMs: elapsed,
+          reason: "api_error",
+          stage: "provider",
+        }],
+      };
+    }
     providerElapsedMs = aiResult.providerElapsedMs ?? 0;
     generationSlow = aiResult.slow ?? false;
     retryUsed = aiResult.retryUsed ?? false;
@@ -266,14 +294,15 @@ export async function POST(request: Request, context: RouteContext) {
         durationMs: initialEvaluation.durationMs,
         createdAt: new Date().toISOString(),
       });
+      qualityElapsedMs = initialEvaluation.durationMs;
 
       if (initialEvaluation.verdict.status === "pass" && isEventAllowedForLifeStage({ title: aiEvent.title, tags: aiEvent.tags }, selectionContext)) {
         selectedEvent = aiEvent;
         source = "AI";
       } else if (initialEvaluation.verdict.hardFailure) {
         aiFailed = true;
-      generationReason = "post_parse_quality_failure";
-      generationStage = "quality";
+        generationReason = "post_parse_quality_failure";
+        generationStage = "quality";
       } else {
         selectedEvent = aiEvent;
         source = "AI";
@@ -286,33 +315,13 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   if (!selectedEvent) {
-    const { type, event } = selectNextEvent(selectionContext, excludedEventTitles);
-    if (aiAttempted && type !== "forced") {
-      const fallback = findValidatedStaticFallback({
-        preferredEvent: event,
-        selectionContext,
-        excludedEventTitles,
-        qualityContext,
-      });
-      if (!fallback) {
-        log.error("검증된 대체 이벤트 없음", { userId, characterId: id, generationReason });
-        return NextResponse.json({ error: "다음 사건을 생성하지 못했습니다." }, { status: 500 });
-      }
-      selectedEvent = fallback.event;
-      source = "FALLBACK";
-      recordEventQualityLog({
-        characterRunId: id, eventId: null, phase: "static_fallback", source,
-        verdict: fallback.evaluation.verdict, reasons: fallback.evaluation.verdict.reasons,
-        diversityScore: fallback.evaluation.verdict.diversityScore,
-        continuityExemptions: fallback.evaluation.verdict.continuityExemptions,
-        retryUsed, fallbackUsed: true, selectedFallbackTitle: fallback.event.title,
-        durationMs: fallback.evaluation.durationMs, createdAt: new Date().toISOString(),
-      });
-    } else {
-      selectedEvent = event;
-      source = type === "forced" ? "FORCED" : event.source;
-    }
-    fallbackUsed = source === "FALLBACK";
+    // TEMP: fallback 제거 - AI 실패 원인을 보기 위해 에러를 그대로 반환
+    return NextResponse.json({
+      error: "AI 이벤트 생성 실패",
+      generationReason,
+      generationStage,
+      providerFailures,
+    }, { status: 500 });
   }
 
   let newEvent;
@@ -362,6 +371,7 @@ export async function POST(request: Request, context: RouteContext) {
     fallbackUsed,
     generationReason,
     generationStage,
+    qualityElapsedMs,
     providerId,
     providerFailures,
     providerElapsedMs,
@@ -372,6 +382,10 @@ export async function POST(request: Request, context: RouteContext) {
   });
 
   return NextResponse.json({ event: toPublicEvent(newEvent) });
+  } catch (error) {
+    console.error("Next event route failed", error);
+    log.error("이벤트 생성 중 예외", { userId, characterId: id, error: String(error) });
+    return NextResponse.json({ error: "다음 사건을 생성하지 못했습니다." }, { status: 500 });
   } finally {
     await generationLease.stop();
   }
