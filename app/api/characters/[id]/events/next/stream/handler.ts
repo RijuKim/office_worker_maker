@@ -3,7 +3,7 @@ import type { EventSource } from "@prisma/client";
 import { getStoryArc, isEventAllowedForLifeStage, selectNextEvent, type EventSelectionContext, type StaticEvent } from "@/lib/game/event-engine";
 import { evaluateCandidateEvent, findValidatedStaticFallback } from "@/lib/game/event-quality-policy";
 import { deriveLifeStageState } from "@/lib/game/life-stage";
-import { checkDailyAiLimit, generateAiEvent, getOpenRouterTimeoutMs, incrementAiUsage } from "@/lib/game/openrouter";
+import { checkDailyAiLimit, generateAiEventStream, getOpenRouterTimeoutMs, incrementAiUsage } from "@/lib/game/openrouter";
 import { recordEventQualityLog } from "@/lib/server/event-quality-log";
 import { acquireAuthoritativeEvent, createPrismaEventAuthorityStore, EventAuthorityLostError, resolveEventGenerationRole, startEventGenerationHeartbeat, toPublicEvent, type EventGenerationHeartbeat } from "@/lib/server/event-authority";
 import { prisma } from "@/lib/server/prisma";
@@ -304,13 +304,17 @@ export function createNextEventStreamPost({
           };
 
           const providerStartedAt = Date.now();
-          let aiResult: Awaited<ReturnType<typeof generateAiEvent>> | {
+          let aiResult: Awaited<ReturnType<typeof generateAiEventStream>> | {
             success: false; reason: "api_error"; providerId: null; providerLabel: null;
             providerElapsedMs: number; totalElapsedMs: number; slow: boolean; retryUsed: false;
             providerFailures: Array<{ providerId: null; providerLabel: null; providerElapsedMs: number; reason: "api_error"; stage: "provider" }>;
           };
           try {
-            aiResult = await generateAiEvent(aiState, { skipPrimary: !limit.allowed });
+            aiResult = await generateAiEventStream(aiState, (text) => {
+              if (text && providerFirstBodyMs === null) {
+                providerFirstBodyMs = now() - generationStartedAt;
+              }
+            }, { skipPrimary: !limit.allowed });
           } catch {
             const elapsed = Math.max(0, Date.now() - providerStartedAt);
             aiResult = {
@@ -348,7 +352,7 @@ export function createNextEventStreamPost({
             const aiEvent = {
               title: aiResult.event.title,
               body: aiResult.event.body,
-              choices: aiResult.event.choices.map((choice) => ({
+              choices: aiResult.event.choices.map((choice: any) => ({
                 ...choice,
                 relationshipDelta: choice.relationshipDelta ?? [],
                 flagDelta: { aiGenerated: true, storyPhase: storyArc.phase },
