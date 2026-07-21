@@ -594,15 +594,8 @@ export default function AppPage() {
     try {
       const streamed = await fetchNextEventStream(charId);
       if (!streamed) {
-        // 스트림 실패: AI 생성이 완료됐는데 SSE만 끊겼을 수 있음 → DB 먼저 확인
-        const { ok, data } = await doFetch(`/api/characters/${charId}`);
-        if (ok && data.currentEvent) {
-          setCurrentEvent(data.currentEvent);
-        } else {
-          // 진짜로 생성된 이벤트가 없을 때만 fallback
-          const { ok: ok2, data: data2 } = await doFetch(`/api/characters/${charId}/events/next`, "POST");
-          if (ok2) setCurrentEvent(data2.event);
-        }
+        // TEMP: 폴링 복구 제거 - AI 실패 원인을 보기 위해 에러를 그대로 노출
+        setError("다음 사건이 아직 확정되지 않았습니다. 잠시 후 다시 시도해 주세요.");
       }
       await loadCharacterEvent(charId);
       await loadSpecData(charId);
@@ -658,6 +651,24 @@ export default function AppPage() {
     }
 
     return receivedFinalEvent;
+  }
+
+  async function waitForCommittedNextEvent(charId: string, timeoutMs: number) {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      const { ok, data } = await doFetch(`/api/characters/${charId}`);
+      if (ok && data.currentEvent) {
+        setCurrentEvent(data.currentEvent);
+        return true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    }
+    const { ok, data } = await doFetch(`/api/characters/${charId}`);
+    if (ok && data.currentEvent) {
+      setCurrentEvent(data.currentEvent);
+      return true;
+    }
+    return false;
   }
 
   const handleSignup = useCallback(async () => {
