@@ -594,8 +594,10 @@ export default function AppPage() {
     try {
       const streamed = await fetchNextEventStream(charId);
       if (!streamed) {
-        // SSE error 이벤트가 이미 setError를 호출했으면 덮어쓰지 않는다
-        return;
+        const recovered = await waitForCommittedNextEvent(charId, 12_000);
+        if (!recovered) {
+          setError("다음 사건이 아직 확정되지 않았습니다. 잠시 후 다시 시도해 주세요.");
+        }
       }
       await loadCharacterEvent(charId);
       await loadSpecData(charId);
