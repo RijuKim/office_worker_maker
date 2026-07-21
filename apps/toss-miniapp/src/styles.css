@@ -133,14 +133,6 @@ h1 {
   line-height: 1.15;
 }
 
-.hero-copy {
-  margin: 0 0 14px;
-  color: #f7efe2;
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 1.55;
-}
-
 h2 {
   margin-bottom: 12px;
   font-size: 22px;
@@ -153,8 +145,7 @@ h2 {
   flex-wrap: wrap;
 }
 
-.status-row span,
-.source-pill {
+.status-row span {
   display: inline-flex;
   width: fit-content;
   border: 1px solid #765f48;

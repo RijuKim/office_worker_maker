@@ -201,6 +201,9 @@ export function App() {
         relationshipDelta: result.data.result?.relationshipDelta ?? [],
         summary: result.data.result?.summary ?? "",
       });
+      if (result.data.result?.stats) {
+        setCurrentCharacter((character) => character ? { ...character, stats: result.data.result!.stats! } : character);
+      }
       if (result.data.result?.endingTriggered) {
         setCurrentEvent(null);
         cue("ending");
@@ -296,7 +299,6 @@ export function App() {
             </nav>
           )}
         </div>
-        <p className="hero-copy">스펙, 멘탈, 통장잔고까지 관리해야 하는 가상 취준 생활을 직접 굴려보세요.</p>
         <div className="status-row">
           <span>{progressLabel(currentCharacter)}</span>
           <span>{apiBaseLabel}</span>
@@ -386,7 +388,6 @@ export function App() {
           )}
           {currentEvent ? (
             <article className="event-panel">
-              <span className="source-pill">{currentEvent.source}</span>
               <h2>{currentEvent.title}</h2>
               <p>{currentEvent.body}</p>
               <div className="choice-stack">
@@ -399,8 +400,8 @@ export function App() {
             </article>
           ) : (
             <div className="list-panel">
-              <p className="muted">현재 진행 가능한 상황이 없습니다.</p>
-              <button className="primary-button" type="button" onClick={() => currentCharacter && void api.nextEvent(currentCharacter.id).then(() => openCharacter(currentCharacter))}>다음 상황</button>
+              <p className="muted">현재 진행 가능한 사건이 없습니다.</p>
+              <button className="primary-button" type="button" onClick={() => currentCharacter && void api.nextEvent(currentCharacter.id).then(() => openCharacter(currentCharacter))}>다음 사건</button>
             </div>
           )}
         </section>
@@ -410,8 +411,9 @@ export function App() {
         <section className="screen-stack">
           <div className="action-grid">
             <button className="secondary-button" type="button" onClick={() => void loadRecords()}>새로고침</button>
-            <button className="secondary-button" type="button" onClick={() => setScreen("home")}>이어가기</button>
+            <button className="secondary-button" type="button" onClick={() => setScreen(currentCharacter ? "play" : "home")}>진행으로</button>
           </div>
+          {records.length === 0 && <div className="list-panel"><p className="muted">아직 남겨진 기록이 없습니다.</p></div>}
           {records.map((record) => (
             <article className="record-panel" key={record.id}>
               <strong>{record.title ?? record.destination ?? "선택의 결과"}</strong>

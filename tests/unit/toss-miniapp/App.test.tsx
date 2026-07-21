@@ -1,4 +1,4 @@
-import { act } from "react";
+import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -13,14 +13,12 @@ const apiMocks = vi.hoisted(() => ({
   createTossSession: vi.fn(async () => ({ ok: true, status: 200, data: {} })),
   records: vi.fn(async () => ({ ok: true, status: 200, data: { records: [] } })),
 }));
-const audioMocks = vi.hoisted(() => ({ playCue: vi.fn(), startBgm: vi.fn(), stopBgm: vi.fn(), vibrate: vi.fn() }));
 const authMocks = vi.hoisted(() => ({ getTossAnonymousKey: vi.fn(async () => "anonymous") }));
 
 vi.mock("../../../apps/toss-miniapp/src/api", () => ({
   api: { ...apiMocks, choose: vi.fn(), nextEvent: vi.fn() },
 }));
 vi.mock("../../../apps/toss-miniapp/src/toss-auth", () => authMocks);
-vi.mock("../../../apps/toss-miniapp/src/audio", () => audioMocks);
 
 const approvedCopy = [
   "눈을 뜨니 오전 6시 07분입니다. 휴대폰에는 읽지 않은 카톡 알림이 수북하게 쌓여 있습니다.",
@@ -32,7 +30,13 @@ const createdCharacter = {
   id: "run-1", name: "한서윤", age: 80, startGradeYear: 1, currentGradeYear: 1,
   major: "경영학", academicStatus: "enrolled", stats: { academic: 4, practical: 5 },
   relationships: [], eventHistory: [], currentEventId: "event-1", coreEventCount: 0,
-  events: [{ id: "event-1", title: "첫 수업으로 향합니다", body: "캠퍼스의 아침입니다.", source: "core", choices: [] }],
+  events: [{ id: "event-1", title: "첫 수업으로 향합니다", body: "캠퍼스의 아침입니다.", source: "AI 사건", choices: [] }],
+};
+const careerRecord = {
+  id: "record-1",
+  title: "첫 학기를 마쳤습니다",
+  summary: "작은 선택들이 한 학기의 기록으로 남았습니다.",
+  satisfaction: 74,
 };
 
 let container: HTMLDivElement;
@@ -64,30 +68,32 @@ function renderApp() {
   act(() => root.render(<App />));
 }
 
+async function renderFreshApp() {
+  vi.resetModules();
+  const { App: FreshApp } = await import("../../../apps/toss-miniapp/src/App");
+  act(() => root.render(createElement(FreshApp)));
+}
+
 function beginWithName(name = "한서윤") {
   click(button("시작하기"));
   change(container.querySelector<HTMLInputElement>('[aria-label="당신의 이름은 무엇인가요?"]')!, name);
   click(button("다음"));
 }
 
-function rgb(hex: string) {
-  return [1, 3, 5].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16));
-}
+const onboardingPrompts = [
+  "낯선 아침이 시작됩니다.",
+  "당신의 이름은 무엇인가요?",
+  "당신의 나이는 몇 살인가요?",
+  "당신은 어디에서 깨어났나요?",
+  "당신이 믿고 싶은 능력 두 가지는 무엇인가요?",
+] as const;
 
-function luminance(hex: string) {
-  const channels = rgb(hex).map((channel) => {
-    const value = channel / 255;
-    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
-}
-
-function hue(hex: string) {
-  const [red, green, blue] = rgb(hex).map((channel) => channel / 255);
-  const max = Math.max(red, green, blue); const min = Math.min(red, green, blue); const delta = max - min;
-  if (!delta) return 0;
-  const sector = max === red ? ((green - blue) / delta) % 6 : max === green ? (blue - red) / delta + 2 : (red - green) / delta + 4;
-  return (sector * 60 + 360) % 360;
+function expectOnlyOnboardingPrompt(expected: typeof onboardingPrompts[number]) {
+  expect(container.querySelectorAll(".create-step")).toHaveLength(1);
+  for (const prompt of onboardingPrompts) {
+    const occurrences = container.textContent?.split(prompt).length ?? 1;
+    expect(occurrences - 1, prompt).toBe(prompt === expected ? 1 : 0);
+  }
 }
 
 describe("Toss entry refresh", () => {
@@ -95,8 +101,11 @@ describe("Toss entry refresh", () => {
     localStorage.clear();
     vi.clearAllMocks();
     authMocks.getTossAnonymousKey.mockResolvedValue("anonymous");
+    apiMocks.createTossSession.mockResolvedValue({ ok: true, status: 200, data: {} });
     apiMocks.characters.mockResolvedValue({ ok: true, status: 200, data: { characters: [] } });
     apiMocks.createCharacter.mockResolvedValue({ ok: false, status: 400, data: { error: "not submitted" } });
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+    vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -105,9 +114,11 @@ describe("Toss entry refresh", () => {
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
-  it("renders the exact approved intro, explicit title lines, and inspected cross-free bright SVG", () => {
+  it("renders the exact approved intro and explicit title lines", () => {
     renderApp();
     expect([...container.querySelectorAll(".app-title > span")].map((node) => node.textContent)).toEqual(["일어나보니", "대한민국 취준생"]);
     expect([...container.querySelectorAll(".create-step > p")].map((node) => node.textContent)).toEqual(approvedCopy);
@@ -117,49 +128,28 @@ describe("Toss entry refresh", () => {
     expect(container.querySelector('[aria-label="설정"]')).toBeNull();
     expect(container.querySelector(".intro-dawn-art")?.textContent).not.toMatch(/[😀-🙏🌀-🫿]/u);
 
-    const svg = container.querySelector<SVGSVGElement>('[data-testid="intro-scene-svg"]')!;
-    const primitives = [...svg.querySelectorAll<SVGGraphicsElement>("rect,circle,ellipse,line,path,polygon,polyline")];
-    expect(primitives.length).toBeGreaterThan(10);
-    expect([...svg.children].every((node) => ["rect", "circle", "ellipse", "line", "path", "polygon", "polyline"].includes(node.tagName))).toBe(true);
-    const fills = primitives.map((node) => node.getAttribute("fill")).filter((fill): fill is string => /^#[0-9a-f]{6}$/i.test(fill ?? ""));
-    const dawnFills = primitives.filter((node) => /dawn|cream|window-(blue|apricot)/.test(node.getAttribute("data-part") ?? "")).map((node) => node.getAttribute("fill")!);
-    expect(dawnFills.some((fill) => luminance(fill) > 0.55)).toBe(true);
-    expect(dawnFills.some((fill) => { const value = hue(fill); return value >= 20 && value <= 50; })).toBe(true);
-    expect(fills.some((fill) => { const value = hue(fill); return value >= 205 && value <= 245; })).toBe(true);
-
-    type Box = { left: number; right: number; top: number; bottom: number; width: number; height: number };
-    const boxes = primitives.flatMap((node): Box[] => {
-      if (node.tagName !== "rect") return [];
-      const left = Number(node.getAttribute("x") ?? 0); const top = Number(node.getAttribute("y") ?? 0);
-      const width = Number(node.getAttribute("width") ?? 0); const height = Number(node.getAttribute("height") ?? 0);
-      return [{ left, right: left + width, top, bottom: top + height, width, height }];
-    });
-    const aboveRightComputer = boxes.filter((box) => box.left >= 190 && box.bottom <= 70);
-    const intersectsAsCross = (a: Box, b: Box) => {
-      const perpendicular = (a.width >= a.height * 2 && b.height >= b.width * 2) || (b.width >= b.height * 2 && a.height >= a.width * 2);
-      const intersects = a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-      return perpendicular && intersects;
-    };
-    expect(aboveRightComputer.some((first, index) => aboveRightComputer.slice(index + 1).some((second) => intersectsAsCross(first, second)))).toBe(false);
+    expect(container.querySelectorAll('[data-testid="intro-scene-svg"]')).toHaveLength(1);
   });
 
   it("keeps one question visible, transitions immediately, gates explicit choices, and retains answers", () => {
     renderApp();
+    expectOnlyOnboardingPrompt("낯선 아침이 시작됩니다.");
     click(button("시작하기"));
-    expect(container.querySelectorAll(".create-step")).toHaveLength(1);
-    expect(container.querySelector("h2")?.textContent).toBe("당신의 이름은 무엇인가요?");
+    expectOnlyOnboardingPrompt("당신의 이름은 무엇인가요?");
     expect(button("다음").disabled).toBe(true);
     change(container.querySelector<HTMLInputElement>("input.text-input")!, "한서윤");
     click(button("다음"));
+    expectOnlyOnboardingPrompt("당신의 나이는 몇 살인가요?");
     const age = container.querySelector<HTMLSelectElement>("select.text-input")!;
     expect(age).toBeTruthy();
     change(age, "80");
     click(button("다음"));
-    expect(container.querySelector("h2")?.textContent).toBe("당신은 어디에서 깨어났나요?");
+    expectOnlyOnboardingPrompt("당신은 어디에서 깨어났나요?");
     expect([...container.querySelectorAll('.residence-grid [aria-pressed="true"]')]).toEqual([]);
     expect(button("다음").disabled).toBe(true);
     click([...container.querySelectorAll(".residence-grid button")].find((node) => node.textContent?.startsWith("기숙사"))!);
     click(button("다음"));
+    expectOnlyOnboardingPrompt("당신이 믿고 싶은 능력 두 가지는 무엇인가요?");
     expect(container.querySelector("h2")?.textContent).toContain("(0/2)");
     expect(button("눈을 뜬다").disabled).toBe(true);
     click(button("실무"));
@@ -172,12 +162,19 @@ describe("Toss entry refresh", () => {
     click(button("멘탈"));
     expect(button("눈을 뜬다").disabled).toBe(false);
     click(button("이전"));
+    expectOnlyOnboardingPrompt("당신은 어디에서 깨어났나요?");
     expect(container.querySelector('.residence-grid [aria-pressed="true"] strong')?.textContent).toBe("기숙사");
     click(button("이전"));
+    expectOnlyOnboardingPrompt("당신의 나이는 몇 살인가요?");
     expect(container.querySelector<HTMLSelectElement>("select.text-input")?.value).toBe("80");
     click(button("이전"));
+    expectOnlyOnboardingPrompt("당신의 이름은 무엇인가요?");
     expect(container.querySelector<HTMLInputElement>("input.text-input")?.value).toBe("한서윤");
-    click(button("다음")); click(button("다음")); click(button("다음"));
+    click(button("이전")); expectOnlyOnboardingPrompt("낯선 아침이 시작됩니다.");
+    click(button("시작하기")); expectOnlyOnboardingPrompt("당신의 이름은 무엇인가요?");
+    click(button("다음")); expectOnlyOnboardingPrompt("당신의 나이는 몇 살인가요?");
+    click(button("다음")); expectOnlyOnboardingPrompt("당신은 어디에서 깨어났나요?");
+    click(button("다음")); expectOnlyOnboardingPrompt("당신이 믿고 싶은 능력 두 가지는 무엇인가요?");
     expect([...container.querySelectorAll('.chip-grid [aria-pressed="true"]')].map((node) => node.textContent)).toEqual(["실무", "멘탈"]);
   });
 
@@ -228,7 +225,7 @@ describe("Toss entry refresh", () => {
     click(menu); click(button("기록"));
     await flush();
     expect(button("새로고침")).toBeTruthy();
-    expect(button("이어가기")).toBeTruthy();
+    expect(button("진행으로")).toBeTruthy();
     expect(container.querySelector(".onboarding-panel")).toBeNull();
     click(menu); click(button("새 시뮬레이션"));
     expect(container.querySelector("h2")?.textContent).toBe("낯선 아침이 시작됩니다.");
@@ -238,9 +235,43 @@ describe("Toss entry refresh", () => {
     act(() => root.unmount());
     root = createRoot(container); renderApp();
     await flush(); await flush();
+    click(button("메뉴")); click(button("기록")); await flush();
+    expect(container.querySelector(".event-panel")).toBeNull();
+    expect(container.textContent).not.toContain("첫 수업으로 향합니다");
     click(button("메뉴")); click(button("진행"));
     expect(button("메뉴").getAttribute("aria-expanded")).toBe("false");
-    expect(container.textContent).toContain("이어하기");
+    expect(container.querySelector(".event-panel h2")?.textContent).toBe("첫 수업으로 향합니다");
+  });
+
+  it("restores the prior gameplay card structure without exposing event provenance", async () => {
+    apiMocks.characters.mockResolvedValue({ ok: true, status: 200, data: { characters: [createdCharacter] } } as never);
+    apiMocks.character.mockResolvedValue({ ok: true, status: 200, data: { character: createdCharacter, currentEvent: createdCharacter.events[0] } });
+    renderApp();
+    await flush(); await flush();
+
+    const stack = container.querySelector(".screen-stack");
+    const stats = stack?.querySelector(".stats-grid");
+    const event = stack?.querySelector("article.event-panel");
+    expect(stats?.querySelectorAll(":scope > span")).toHaveLength(2);
+    expect(event?.querySelector("h2")?.textContent).toBe("첫 수업으로 향합니다");
+    expect(event?.querySelector("p")?.textContent).toBe("캠퍼스의 아침입니다.");
+    expect(event?.querySelector(".choice-stack")).toBeTruthy();
+    expect(event?.querySelector(".source-pill")).toBeNull();
+    expect(container.textContent).not.toMatch(/AI 사건|FALLBACK|provider|source/i);
+  });
+
+  it("restores the prior records card layout and navigation copy", async () => {
+    apiMocks.records.mockResolvedValue({ ok: true, status: 200, data: { records: [careerRecord] } } as never);
+    renderApp(); click(button("메뉴")); click(button("기록")); await flush();
+
+    const stack = container.querySelector(".screen-stack");
+    expect(stack?.querySelector(":scope > .action-grid")).toBeTruthy();
+    const record = stack?.querySelector("article.record-panel");
+    expect(record?.querySelector("strong")?.textContent).toBe(careerRecord.title);
+    expect(record?.querySelector("p")?.textContent).toBe(careerRecord.summary);
+    expect(record?.querySelector("span")?.textContent).toBe("만족도 74");
+    expect(button("진행으로")).toBeTruthy();
+    expect(container.querySelector(".event-panel")).toBeNull();
   });
 
   it("persists every setting across remount and safely resets malformed or wrong-typed storage", () => {
@@ -264,11 +295,7 @@ describe("Toss entry refresh", () => {
     expect(() => click(container.querySelector('[aria-label="햅틱"]')!)).not.toThrow();
   });
 
-  it("keeps settings and onboarding usable when every optional caller throws or rejects", async () => {
-    audioMocks.playCue.mockImplementation(() => { throw new Error("cue"); });
-    audioMocks.vibrate.mockImplementation(() => { throw new Error("haptic"); });
-    audioMocks.startBgm.mockRejectedValue(new Error("music"));
-    audioMocks.stopBgm.mockImplementation(() => { throw new Error("stop"); });
+  it("keeps settings and onboarding usable when storage writes fail", async () => {
     const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("quota"); });
     renderApp(); click(button("메뉴"));
     click(container.querySelector('[aria-label="배경음"]')!);
@@ -282,6 +309,46 @@ describe("Toss entry refresh", () => {
     setItem.mockRestore();
   });
 
+  it.each(["absent", "resume-sync", "resume-async"] as const)("keeps a fresh real App and audio module usable when AudioContext is %s", async (failure) => {
+    const constructorSpy = vi.fn();
+    const resumeSpy = vi.fn(() => {
+      if (failure === "resume-sync") throw new Error("resume");
+      return failure === "resume-async" ? Promise.reject(new Error("resume")) : Promise.resolve();
+    });
+    if (failure === "absent") {
+      Object.defineProperty(globalThis, "AudioContext", { configurable: true, get: constructorSpy });
+    } else {
+      vi.stubGlobal("AudioContext", class {
+        state = "suspended";
+        currentTime = 0;
+        destination = {};
+        constructor() { constructorSpy(); }
+        resume() { return resumeSpy(); }
+        createOscillator() { return { frequency: { setValueAtTime() {} }, type: "square", connect() {}, start() {}, stop() {} }; }
+        createGain() { return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} }; }
+      });
+    }
+    await renderFreshApp();
+    click(button("메뉴"));
+    click(button("기록"));
+    await flush();
+    expect(constructorSpy).toHaveBeenCalled();
+    if (failure !== "absent") expect(resumeSpy).toHaveBeenCalled();
+    click(button("메뉴"));
+    for (const label of ["배경음", "효과음", "햅틱"]) click(container.querySelector(`[aria-label="${label}"]`)!);
+    expect(["배경음", "효과음", "햅틱"].map((label) => container.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!.checked)).toEqual([true, false, false]);
+    click(button("새 시뮬레이션"));
+    click(button("시작하기"));
+    expectOnlyOnboardingPrompt("당신의 이름은 무엇인가요?");
+    change(container.querySelector<HTMLInputElement>("input.text-input")!, "한서윤");
+    click(button("다음"));
+    expectOnlyOnboardingPrompt("당신의 나이는 몇 살인가요?");
+    expect(container.querySelector(".error-banner")).toBeNull();
+    await flush();
+    if (failure === "resume-async") expect(resumeSpy).toHaveReturned();
+    expect(container.querySelector(".error-banner")).toBeNull();
+  });
+
   it("falls back to usable defaults when storage reads and cleanup throw", () => {
     const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("blocked"); });
     const removeItem = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => { throw new Error("blocked"); });
@@ -291,12 +358,24 @@ describe("Toss entry refresh", () => {
     getItem.mockRestore(); removeItem.mockRestore();
   });
 
-  it("keeps onboarding usable without a banner when the host permission API rejects", async () => {
-    authMocks.getTossAnonymousKey.mockRejectedValue(new Error("permission denied"));
+  it.each([
+    ["permission missing", () => authMocks.getTossAnonymousKey.mockImplementation(() => undefined as never)],
+    ["permission synchronous throw", () => authMocks.getTossAnonymousKey.mockImplementation(() => { throw new Error("permission denied"); })],
+    ["permission rejection", () => authMocks.getTossAnonymousKey.mockRejectedValue(new Error("permission denied"))],
+    ["session missing", () => apiMocks.createTossSession.mockImplementation(() => undefined as never)],
+    ["session synchronous throw", () => apiMocks.createTossSession.mockImplementation(() => { throw new Error("session denied"); })],
+    ["session rejection", () => apiMocks.createTossSession.mockRejectedValue(new Error("session denied"))],
+  ])("keeps the rendered app usable without a banner when %s", async (_case, arrange) => {
+    arrange();
     renderApp(); await flush();
     expect(container.querySelector(".error-banner")).toBeNull();
+    click(button("메뉴"));
+    click(container.querySelector('[aria-label="효과음"]')!);
+    expect(container.querySelector<HTMLInputElement>('[aria-label="효과음"]')?.checked).toBe(false);
+    click(button("새 시뮬레이션"));
     click(button("시작하기"));
-    expect(container.querySelector("h2")?.textContent).toBe("당신의 이름은 무엇인가요?");
+    expectOnlyOnboardingPrompt("당신의 이름은 무엇인가요?");
+    expect(container.querySelector(".error-banner")).toBeNull();
   });
 
   it("defines deterministic responsive menu geometry, typography, targets, and overflow containment", () => {
@@ -308,5 +387,15 @@ describe("Toss entry refresh", () => {
     expect(css).toMatch(/@media \(max-width:\s*720px\)\s*\{[\s\S]*?\.menu-popover\s*\{[\s\S]*?left:\s*0;[\s\S]*?right:\s*0;[\s\S]*?width:\s*100%;/);
     for (const width of [390, 720]) expect(width).toBeLessThanOrEqual(720);
     for (const width of [721, 1024]) expect(width).toBeGreaterThan(720);
+  });
+
+  it("retains the pre-refresh gameplay and records visual tokens", () => {
+    const css = readFileSync(resolve(process.cwd(), "apps/toss-miniapp/src/styles.css"), "utf8");
+    expect(css).toMatch(/:root\s*\{[\s\S]*?color:\s*#f7efe2;[\s\S]*?background:\s*#17130f;/);
+    expect(css).toMatch(/\.hero-panel,\s*\.event-panel,\s*\.list-panel,\s*\.feedback-panel,\s*\.record-panel\s*\{[\s\S]*?border:\s*2px solid #4d3d2f;[\s\S]*?background:\s*#211a14;/);
+    expect(css).toMatch(/\.primary-button\s*\{[\s\S]*?border-color:\s*#f7d08b;[\s\S]*?background:\s*#f7d08b;/);
+    expect(css).toMatch(/\.secondary-button,\s*\.segmented \.selected,\s*\.chip-grid \.selected\s*\{[\s\S]*?border-color:\s*#79b7ad;/);
+    expect(css).toMatch(/\.stats-grid span\s*\{[\s\S]*?border:\s*1px solid #4d3d2f;[\s\S]*?background:\s*#211a14;/);
+    expect(css).not.toContain(".source-pill");
   });
 });

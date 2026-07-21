@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { expect, test } from "@playwright/test";
+import { inspectTossArt, type TossArtMutation } from "./helpers/toss-art-oracle";
 
 async function waitForToss() {
   for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -181,10 +182,10 @@ test("Toss dawn art has area-weighted approved color regions and no cross above 
       const thinAxes = shapes.flatMap((shape) => {
         const { box } = shape; const major = Math.max(box.width, box.height), minor = Math.min(box.width, box.height);
         if (major < 4 || major < minor * 3) return [];
-        const center = { x: (box.left + box.right) / 2, y: (box.top + box.bottom) / 2 };
-        const first = shape.points[0];
-        const farthest = shape.points.reduce((best, point) => Math.hypot(point.x - first.x, point.y - first.y) > Math.hypot(best.x - first.x, best.y - first.y) ? point : best, first);
-        const dx = farthest.x - first.x, dy = farthest.y - first.y, length = Math.hypot(dx, dy) || 1;
+        const center = shape.points.reduce((sum, point) => ({ x: sum.x + point.x / shape.points.length, y: sum.y + point.y / shape.points.length }), { x: 0, y: 0 });
+        let xx = 0, xy = 0, yy = 0;
+        for (const point of shape.points) { const dx = point.x - center.x, dy = point.y - center.y; xx += dx * dx; xy += dx * dy; yy += dy * dy; }
+        const angle = .5 * Math.atan2(2 * xy, xx - yy); const dx = Math.cos(angle), dy = Math.sin(angle); const length = 1;
         return [{ a: { x: center.x - dx / length * major / 2, y: center.y - dy / length * major / 2 }, b: { x: center.x + dx / length * major / 2, y: center.y + dy / length * major / 2 } }];
       }).filter(({ a, b }) => Math.max(a.y, b.y) < frame.box.top && Math.max(a.x, b.x) > frame.box.left && Math.min(a.x, b.x) < frame.box.right);
       const intersects = (one: { a: Point; b: Point }, two: { a: Point; b: Point }) => {
@@ -206,6 +207,49 @@ test("Toss dawn art has area-weighted approved color regions and no cross above 
     expect(inspection.room.apricot).toBeGreaterThan(0.18);
     expect(inspection.room.bright).toBeGreaterThan(0.28);
     expect(inspection.hasCross).toBe(false);
+  } finally {
+    if (server?.pid) process.kill(-server.pid, "SIGTERM");
+  }
+});
+
+test("shared Toss art oracle rejects cross mutations and tiny palette impostors", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "one Chromium run provides standards-based SVG geometry");
+  let server: ChildProcess | undefined;
+  try {
+    let alreadyRunning = false;
+    try { alreadyRunning = (await fetch("http://127.0.0.1:5173/")).ok; } catch { /* start it below */ }
+    if (!alreadyRunning) {
+      server = spawn("npm", ["run", "toss:dev", "--", "--host", "127.0.0.1", "--port", "5173"], { cwd: process.cwd(), stdio: "ignore", detached: true });
+      await waitForToss();
+    }
+    await page.setViewportSize({ width: 390, height: 900 });
+    await page.goto("http://127.0.0.1:5173/");
+    const inspect = (mutation: TossArtMutation) => page.evaluate(inspectTossArt, mutation);
+    const production = await inspect("none");
+    expect(production.geometryCount).toBe(production.primitiveCount);
+    expect(production.hasCross).toBe(false);
+    expect(production.dawn.blueLilac).toBeGreaterThan(.5);
+    expect(production.dawn.apricot).toBeGreaterThan(.2);
+    expect(production.dawn.bright).toBeGreaterThan(.45);
+    expect(production.room.blueLilac).toBeGreaterThan(.2);
+    expect(production.room.apricot).toBeGreaterThan(.18);
+    expect(production.room.bright).toBeGreaterThan(.28);
+
+    for (const mutation of ["cross-rect", "cross-line", "cross-path", "cross-polygon", "cross-polyline", "cross-rotated", "cross-stroked-endpoint"] as const) {
+      expect((await inspect(mutation)).hasCross, mutation).toBe(true);
+    }
+    for (const mutation of ["negative-parallel", "negative-separated", "negative-tiny"] as const) {
+      expect((await inspect(mutation)).hasCross, mutation).toBe(false);
+    }
+    const tinyRoom = await inspect("palette-tiny-room");
+    expect(tinyRoom.room.blueLilac).toBeLessThanOrEqual(.2);
+    expect(tinyRoom.room.apricot).toBeLessThanOrEqual(.18);
+    expect(tinyRoom.room.bright).toBeLessThanOrEqual(.28);
+    const tinyDawn = await inspect("palette-tiny-dawn");
+    expect(tinyDawn.dawn.apricot).toBeLessThanOrEqual(.2);
+    expect(tinyDawn.dawn.bright).toBeLessThanOrEqual(.45);
+    const tinyBlue = await inspect("palette-tiny-blue");
+    expect(tinyBlue.dawn.blueLilac).toBeLessThanOrEqual(.5);
   } finally {
     if (server?.pid) process.kill(-server.pid, "SIGTERM");
   }
