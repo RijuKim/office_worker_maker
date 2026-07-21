@@ -121,6 +121,7 @@ describe("Toss entry refresh", () => {
   it("renders the exact approved intro and explicit title lines", () => {
     renderApp();
     expect([...container.querySelectorAll(".app-title > span")].map((node) => node.textContent)).toEqual(["일어나보니", "대한민국 취준생"]);
+    expect(container.querySelector(".status-row")?.textContent).not.toMatch(/same-origin|provider|source/i);
     expect([...container.querySelectorAll(".create-step > p")].map((node) => node.textContent)).toEqual(approvedCopy);
     expect(container.querySelector("h2")?.textContent).toBe("낯선 아침이 시작됩니다.");
     expect(container.textContent).not.toContain("취준 생활 시뮬레이션");

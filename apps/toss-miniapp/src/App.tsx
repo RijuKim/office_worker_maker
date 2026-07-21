@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { api } from "./api";
 import { playCue, startBgm, stopBgm, vibrate, type AudioSettings } from "./audio";
@@ -109,8 +109,6 @@ export function App() {
   const [age, setAge] = useState(22);
   const [residence, setResidence] = useState("");
   const [selectedStats, setSelectedStats] = useState<string[]>([]);
-
-  const apiBaseLabel = useMemo(() => import.meta.env.VITE_API_BASE_URL || "same-origin", []);
 
   const startNewSimulation = useCallback(() => {
     setCreateStep("intro");
@@ -301,7 +299,6 @@ export function App() {
         </div>
         <div className="status-row">
           <span>{progressLabel(currentCharacter)}</span>
-          <span>{apiBaseLabel}</span>
         </div>
       </section>
 
