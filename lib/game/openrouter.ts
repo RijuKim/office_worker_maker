@@ -268,6 +268,7 @@ export type AiProviderFailureTelemetry = {
   reason: AiEventFailureReason | "invalid_response";
   stage: "provider" | "parse";
   issues?: string[];
+  contentPreview?: string;
 };
 
 export type AiEventFailureReason =
@@ -294,6 +295,7 @@ export interface OpenRouterFailure {
   retryUsed?: boolean;
   issues?: string[];
   providerFailures?: AiProviderFailureTelemetry[];
+  contentPreview?: string;
 }
 
 export interface OpenRouterEndingResult {
@@ -314,6 +316,7 @@ function toProviderFailureTelemetry(
     reason: failure.reason,
     stage: isParseFailure(failure.reason) ? "parse" : "provider",
     ...(failure.issues ? { issues: failure.issues } : {}),
+    ...(failure.contentPreview ? { contentPreview: failure.contentPreview } : {}),
   };
 }
 
@@ -372,13 +375,14 @@ async function generateAiEventWithProvider(
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  const failure = (reason: AiEventFailureReason, issues?: string[]): OpenRouterFailure => ({
+  const failure = (reason: AiEventFailureReason, issues?: string[], contentPreview?: string): OpenRouterFailure => ({
     success: false,
     reason,
     providerId: provider.id,
     providerLabel: provider.label,
     providerElapsedMs: Date.now() - startedAt,
     issues,
+    contentPreview,
   });
 
   try {
@@ -478,7 +482,7 @@ async function generateAiEventWithProvider(
         responseJsonMs: parseStartedAt - startedAt,
         parseMs: Date.now() - parseStartedAt,
       });
-      return failure(parsed.reason, parsed.issues);
+      return failure(parsed.reason, parsed.issues, content.slice(0, 500));
     }
 
     const providerElapsedMs = Date.now() - startedAt;
@@ -717,6 +721,7 @@ function buildAiEventRequestBody(state: AiEventPromptState, provider: AiProvider
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: buildUserPrompt(state) },
     ],
+    response_format: { type: "json_object" },
     max_tokens: getOpenRouterMaxTokens(),
     temperature: 0.85,
   };
@@ -734,6 +739,7 @@ For streaming responsiveness, output the JSON object in this field order exactly
       },
       { role: "user", content: buildUserPrompt(state) },
     ],
+    response_format: { type: "json_object" },
     max_tokens: getOpenRouterMaxTokens(),
     temperature: 0.85,
     stream: true,
