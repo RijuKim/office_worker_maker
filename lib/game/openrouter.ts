@@ -447,7 +447,15 @@ async function generateAiEventWithProvider(
     const choices = data?.choices;
     const firstChoice = Array.isArray(choices) ? choices[0] : null;
     const message = firstChoice && typeof firstChoice === "object" ? (firstChoice as Record<string, unknown>).message : null;
-    const content: string | undefined = message && typeof message === "object" ? (message as Record<string, unknown>).content as string | undefined : undefined;
+    let content: string | undefined = message && typeof message === "object" ? (message as Record<string, unknown>).content as string | undefined : undefined;
+    // deepseek-v4-flash:cloud on Ollama Cloud has thinking mode enabled by default,
+    // which puts the actual response in "reasoning" and leaves "content" empty.
+    if (!content && message && typeof message === "object") {
+      const reasoning = (message as Record<string, unknown>).reasoning;
+      if (typeof reasoning === "string" && reasoning.length > 0) {
+        content = reasoning;
+      }
+    }
 
     if (!content) {
       logAiAttempt({
