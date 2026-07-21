@@ -1,12 +1,21 @@
 import { getServerSession } from "next-auth";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 import { authOptions } from "@/lib/server/auth-options";
 import { prisma } from "@/lib/server/prisma";
+import { verifyTossSessionToken } from "@/lib/server/toss-session";
 
 export const GUEST_USER_COOKIE = "sano_guest_user_id";
 
 export async function getCurrentUserId() {
+  const requestHeaders = await headers();
+  const authorization = requestHeaders.get("authorization");
+
+  if (authorization?.startsWith("Bearer ")) {
+    const tossSession = verifyTossSessionToken(authorization.slice("Bearer ".length));
+    if (tossSession) return tossSession.userId;
+  }
+
   const session = await getServerSession(authOptions);
 
   return session?.user?.id ?? null;

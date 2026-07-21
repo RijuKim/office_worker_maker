@@ -8,11 +8,14 @@ export function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-request-id", requestId);
 
-  const response = NextResponse.next({
-    request: { headers: requestHeaders },
-  });
+  const response = request.method === "OPTIONS"
+    ? new NextResponse(null, { status: 204 })
+    : NextResponse.next({ request: { headers: requestHeaders } });
 
   response.headers.set("x-request-id", requestId);
+  response.headers.set("Access-Control-Allow-Origin", "*");
+  response.headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Request-Id");
+  response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
 
   const method = request.method;
   const path = request.nextUrl.pathname;

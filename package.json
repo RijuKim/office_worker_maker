@@ -8,7 +8,10 @@
     "start": "next start",
     "toss:dev": "vite --host 0.0.0.0 --config apps/toss-miniapp/vite.config.ts",
     "toss:build": "vite build --config apps/toss-miniapp/vite.config.ts",
+    "toss:build:production": "VITE_API_BASE_URL=https://sano-officeworker.vercel.app vite build --config apps/toss-miniapp/vite.config.ts",
     "toss:preview": "vite preview --host 0.0.0.0 --config apps/toss-miniapp/vite.config.ts",
+    "ait:build": "ait build",
+    "ait:deploy": "ait deploy",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -21,6 +24,7 @@
     "prisma:format": "prisma format"
   },
   "dependencies": {
+    "@apps-in-toss/web-framework": "^2.10.6",
     "@prisma/adapter-pg": "7.8.0",
     "@prisma/client": "7.8.0",
     "canvas": "^3.2.3",
@@ -54,6 +58,6 @@
     "vitest": "3.2.4"
   },
   "engines": {
-    "node": ">=20.9"
+    "node": ">=24.0.0"
   }
 }

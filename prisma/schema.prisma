@@ -61,14 +61,15 @@ enum ApplicationStage {
 }
 
 model User {
-  id           String               @id @default(uuid())
-  email        String               @unique
-  passwordHash String
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
-  characters   CharacterRun[]
-  records      CareerEndingRecord[]
-  aiUsage      AiUsage[]
+  id               String               @id @default(uuid())
+  email            String               @unique
+  passwordHash     String
+  tossAnonymousKey String?              @unique
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  characters       CharacterRun[]
+  records          CareerEndingRecord[]
+  aiUsage          AiUsage[]
 }
 
 model CharacterRun {
@@ -251,7 +252,7 @@ model JobApplication {
   finalResult            Boolean?
   isActive               Boolean           @default(true)
   createdAt              DateTime          @default(now())
-  updatedAt              DateTime          @updatedAt
+  updatedAt              DateTime           @updatedAt
   characterRun           CharacterRun      @relation(fields: [characterRunId], references: [id], onDelete: Cascade)
 }
 
