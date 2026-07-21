@@ -445,6 +445,12 @@ async function generateAiEventWithProvider(
     const parseStartedAt = Date.now();
     const parsed = parseAiEventContentDetailed(content);
     if (!parsed.success) {
+      console.warn("AI event parse failure", {
+        reason: parsed.reason,
+        issues: parsed.issues,
+        contentPreview: content.slice(0, 500),
+        contentLength: content.length,
+      });
       logAiAttempt({
         kind: "json",
         providerId: provider.id,
