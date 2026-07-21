@@ -93,8 +93,10 @@ export function createNextEventStreamPost({
         generationStartedAt,
         now,
         observe: ({ event, elapsedMs }) => {
-          if (event === "body_delta" && timeToFirstVisibleBodyMs === null) timeToFirstVisibleBodyMs = elapsedMs;
-          if (event === "event") timeToFinalEventMs = elapsedMs;
+          if (event === "event") {
+            timeToFirstVisibleBodyMs = elapsedMs;
+            timeToFinalEventMs = elapsedMs;
+          }
           observeSend?.({ event, elapsedMs });
         },
       });
@@ -352,7 +354,7 @@ export function createNextEventStreamPost({
             const aiEvent = {
               title: aiResult.event.title,
               body: aiResult.event.body,
-              choices: aiResult.event.choices.map((choice: any) => ({
+              choices: aiResult.event.choices.map((choice) => ({
                 ...choice,
                 relationshipDelta: choice.relationshipDelta ?? [],
                 flagDelta: { aiGenerated: true, storyPhase: storyArc.phase },
@@ -468,10 +470,9 @@ export function createNextEventStreamPost({
           },
         });
         assertConnected();
-        // Only stream the committed winner. Provider deltas are intentionally
-        // buffered because they belong to an uncommitted candidate.
-        await streamTextFallback(newEvent.body, (text) => send("body_delta", { text }), assertConnected);
-        assertConnected();
+        // Provider output stays buffered until the candidate is committed.
+        // Deliver the complete committed event at once so the client does not
+        // wait through a second, artificial typing phase.
         send("event", { event: toPublicEvent(newEvent) });
         const totalElapsedMs = now() - generationStartedAt;
         log.info("스트림 이벤트 생성 완료", {
@@ -531,16 +532,6 @@ export function createNextEventStreamPost({
 }
 
 export const POST = createNextEventStreamPost();
-
-async function streamTextFallback(body: string, sendDelta: (text: string) => void, assertConnected: () => void) {
-  const chunks = body.match(/.{1,80}(\s|$)|.+$/gs) ?? [body];
-  for (const chunk of chunks) {
-    assertConnected();
-    sendDelta(chunk);
-    await new Promise((resolve) => setTimeout(resolve, 18));
-    assertConnected();
-  }
-}
 
 function canUseAiForLifeStage(lifeStage: string, academicStatus: string) {
   return academicStatus === "ENROLLED" && (

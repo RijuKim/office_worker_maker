@@ -728,8 +728,8 @@ describe("stateful JSON/SSE event authority", () => {
 
     expect(jsonPayload.event).toEqual(leaderEvent);
     expect(eventFromSse(followerText)).toEqual(leaderEvent);
-    expect(leaderRest).toContain("event: body_delta");
-    expect(leaderRest.indexOf("event: body_delta")).toBeLessThan(leaderRest.indexOf("event: event"));
+    expect(leaderRest).not.toContain("event: body_delta");
+    expect(leaderRest).toContain("event: event");
     expect(aiMocks.generateAiEventStream).toHaveBeenCalledTimes(1);
     expect(aiMocks.generateAiEvent).not.toHaveBeenCalled();
     expect(engineMocks.selectNextEvent).not.toHaveBeenCalled();
@@ -748,7 +748,7 @@ describe("stateful JSON/SSE event authority", () => {
   it.each([
     { outcome: "AI", result: { success: true as const, event: routeEvent, providerId: "ollama", providerElapsedMs: 190, totalElapsedMs: 190, slow: false, retryUsed: false, providerFailures: [] } },
     { outcome: "FALLBACK", result: { success: false as const, reason: "timeout", providerId: "openrouter", providerElapsedMs: 190, totalElapsedMs: 190, slow: false, retryUsed: false, providerFailures: [{ providerId: "openrouter", providerElapsedMs: 190, reason: "timeout", stage: "provider" as const }] } },
-  ])("records deterministic, distinct SSE milestones for $outcome", async ({ outcome, result }) => {
+  ])("delivers one complete SSE event after generation for $outcome", async ({ outcome, result }) => {
     fixture.aiEnabled = true;
     const clock = [1_000, 1_001, 1_100, 1_200, 1_300, 1_400, 1_500];
     const now = vi.fn(() => {
@@ -776,8 +776,7 @@ describe("stateful JSON/SSE event authority", () => {
     expect(event).toMatchObject({ id: fixture.pointer, source: outcome });
     expect(sends).toEqual([
       { event: "status", elapsedMs: 1 },
-      { event: "body_delta", elapsedMs: 300 },
-      { event: "event", elapsedMs: 400 },
+      { event: "event", elapsedMs: 300 },
     ]);
     expect({
       providerFirstBodyMs: logged.providerFirstBodyMs,
@@ -794,8 +793,8 @@ describe("stateful JSON/SSE event authority", () => {
       providerFirstBodyMs: 100,
       generationCompleteMs: 200,
       timeToFirstVisibleBodyMs: 300,
-      timeToFinalEventMs: 400,
-      totalElapsedMs: 500,
+      timeToFinalEventMs: 300,
+      totalElapsedMs: 400,
       eventId: fixture.pointer,
       source: outcome,
       fallbackUsed: outcome === "FALLBACK",

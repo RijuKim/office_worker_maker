@@ -324,6 +324,13 @@ function PixelScene({ scene, label }: { scene: string; label?: string }) {
   return (
     <div className={`pixel-scene scene-${scene}`} aria-label={label ?? "장면 삽화"}>
       <div className="scene-sky" />
+      {scene === "transition" && (
+        <>
+          <div className="transition-cloud transition-cloud-a" />
+          <div className="transition-cloud transition-cloud-b" />
+          <div className="transition-lamp"><i /></div>
+        </>
+      )}
       <div className="scene-sun" />
       <div className="scene-building scene-building-left" />
       <div className="scene-building scene-building-right" />
@@ -363,7 +370,6 @@ export default function AppPage() {
   const [screen, setScreen] = useState<Screen>("create");
   const [currentChar, setCurrentChar] = useState<CharacterData | null>(null);
   const [currentEvent, setCurrentEvent] = useState<EventData | null>(null);
-  const [streamingEventBody, setStreamingEventBody] = useState("");
   const [streamingNextEvent, setStreamingNextEvent] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -588,7 +594,6 @@ export default function AppPage() {
     if (!options.preserveFeedback) {
       setChoiceFeedback(null);
     }
-    setStreamingEventBody("");
     setStreamingNextEvent(true);
     setLoading(true);
     try {
@@ -603,7 +608,6 @@ export default function AppPage() {
       await loadSpecData(charId);
       setPendingNext(false);
     } finally {
-      setStreamingEventBody("");
       setStreamingNextEvent(false);
       setLoading(false);
     }
@@ -633,12 +637,6 @@ export default function AppPage() {
         const dataLine = message.split("\n").find((line) => line.startsWith("data:"));
         if (!eventName || !dataLine) continue;
         const payload = JSON.parse(dataLine.slice(5).trim());
-        if (eventName === "body_delta" && typeof payload.text === "string") {
-          setStreamingEventBody((current) => current + payload.text);
-        }
-        if (eventName === "replace_body" && typeof payload.text === "string") {
-          setStreamingEventBody(payload.text);
-        }
         if (eventName === "status") {
           setStreamingNextEvent(true);
         }
@@ -838,7 +836,6 @@ export default function AppPage() {
   const resumeCharacter = useCallback(async (char: CharacterData) => {
     setCurrentChar(char);
     setCurrentEvent(null);
-    setStreamingEventBody("");
     setStreamingNextEvent(false);
     setPendingNext(false);
     setEndingNotice("");
@@ -858,7 +855,6 @@ export default function AppPage() {
     playFeedbackCue("tap");
     setCurrentChar(null);
     setCurrentEvent(null);
-    setStreamingEventBody("");
     setChoiceFeedback(null);
     setPendingNext(false);
     setEndingNotice("");
@@ -1516,21 +1512,19 @@ export default function AppPage() {
                 </div>
               </div>
             )}
-            {streamingNextEvent && !currentEvent && !endingNotice && (
-              <div className="event-frame pixel-panel overflow-hidden">
+            {!currentEvent && !endingNotice && (streamingNextEvent || loading || pendingNext) && (
+              <div className="event-frame event-transition-frame pixel-panel overflow-hidden" aria-busy="true" aria-live="polite">
                 <div className="grid grid-cols-[220px_minmax(0,1fr)] max-[720px]:grid-cols-1">
-                  <PixelScene scene="campus" label="생성 중인 장면" />
-                  <div className="p-6">
+                  <PixelScene scene="transition" label="다음 장면으로 이어지는 밤 풍경" />
+                  <div className="event-transition-copy p-6">
                     <div className="mb-4 flex flex-wrap items-center gap-2">
                       <span className="border-2 border-[#2a2018] bg-[#f7d08b] px-2 py-1 text-xs font-black text-[#2a2018]">새 장면</span>
-                      <h2 className="text-xl font-black leading-tight text-[#2a241e]">선택의 시간이 다가오고 있습니다...</h2>
                     </div>
-                    <div className="novel-text text-lg tracking-normal max-[900px]:text-[16px]">
-                      {streamingEventBody
-                        ? streamingEventBody.split("\n").filter(Boolean).map((p, i) => (<p className="mt-3 first:mt-0" key={i}>{p}</p>))
-                        : <p className="mt-3 first:mt-0 text-[#706b62]">장면이 문장으로 떠오르는 중입니다.</p>}
+                    <div className="event-transition-message novel-text text-xl font-black tracking-normal max-[900px]:text-[18px]">
+                      <p>당신이 모르는 곳에서,</p>
+                      <p>다음 일이 시작되고 있습니다<span className="transition-ellipsis" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span><span className="sr-only">...</span></p>
                     </div>
-                    <p className="mt-5 text-sm font-bold text-[#8a4f2d]">선택지는 장면이 완성되면 나타납니다.</p>
+                    <p className="event-transition-hint mt-5 text-sm font-bold text-[#8a4f2d]">선택의 시간이 곧 찾아옵니다.</p>
                   </div>
                 </div>
               </div>
@@ -1563,7 +1557,7 @@ export default function AppPage() {
                 </div>
               </>
             )}
-            {!currentEvent && !endingNotice && !streamingNextEvent && (
+            {!currentEvent && !endingNotice && !streamingNextEvent && !loading && !pendingNext && (
               <div
                 className="pixel-panel cursor-pointer p-8 text-center"
                 onClick={continueToNextEvent}
@@ -1579,7 +1573,6 @@ export default function AppPage() {
                 <p className="text-lg leading-8 text-[#3a332d]">
                   {pendingNext ? "다음 상황을 준비 중입니다." : "새 상황을 준비 중입니다."}
                 </p>
-                {loading && <p className="mt-3 text-sm text-[#706b62]">선택의 시간이 다가오고 있습니다...</p>}
               </div>
             )}
           </section>

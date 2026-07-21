@@ -1710,6 +1710,111 @@ button {
   animation: event-in 400ms steps(3, end) both;
 }
 
+.scene-transition {
+  background: linear-gradient(#516b91 0 48%, #d98f83 48% 62%, #443b4b 62%);
+}
+
+.scene-transition .scene-sun {
+  width: 28px;
+  height: 28px;
+  background: #fff0ba;
+  box-shadow: 0 0 0 6px rgba(255, 240, 186, 0.18);
+}
+
+.scene-transition .scene-building::before {
+  animation: transition-window-light 2.8s steps(2, end) infinite;
+}
+
+.transition-cloud {
+  position: absolute;
+  z-index: 1;
+  width: 42px;
+  height: 10px;
+  background: #dbe4ef;
+  box-shadow: 10px -8px 0 #dbe4ef, 22px 0 0 #dbe4ef;
+  opacity: 0.78;
+  animation: transition-cloud-drift 8s linear infinite;
+}
+
+.transition-cloud-a { top: 44px; left: -68px; }
+.transition-cloud-b { top: 82px; left: -110px; animation-delay: -4s; animation-duration: 11s; }
+
+.transition-lamp {
+  position: absolute;
+  z-index: 3;
+  right: 18px;
+  bottom: 38px;
+  width: 5px;
+  height: 70px;
+  border: 2px solid #2a2018;
+  background: #3f4653;
+}
+
+.transition-lamp i {
+  position: absolute;
+  left: -10px;
+  top: -15px;
+  width: 21px;
+  height: 16px;
+  border: 3px solid #2a2018;
+  background: #f7d08b;
+  box-shadow: 0 0 0 7px rgba(247, 208, 139, 0.2);
+  animation: transition-lamp-flicker 2.4s steps(2, end) infinite;
+}
+
+.event-transition-message p {
+  opacity: 0;
+  animation: transition-line-in 520ms steps(4, end) forwards;
+}
+
+.event-transition-message p + p { animation-delay: 360ms; }
+.event-transition-hint { opacity: 0; animation: transition-line-in 420ms 720ms steps(3, end) forwards; }
+
+.transition-ellipsis i {
+  font-style: normal;
+  animation: transition-dot 1.2s steps(2, end) infinite;
+}
+
+.transition-ellipsis i:nth-child(2) { animation-delay: 180ms; }
+.transition-ellipsis i:nth-child(3) { animation-delay: 360ms; }
+
+@keyframes transition-line-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes transition-dot {
+  0%, 30% { opacity: 0.2; }
+  55%, 100% { opacity: 1; }
+}
+
+@keyframes transition-cloud-drift {
+  from { transform: translateX(0); }
+  to { transform: translateX(310px); }
+}
+
+@keyframes transition-window-light {
+  0%, 42%, 100% { opacity: 1; }
+  48%, 70% { opacity: 0.48; }
+}
+
+@keyframes transition-lamp-flicker {
+  0%, 8%, 14%, 100% { opacity: 1; }
+  10%, 16% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .event-transition-message p,
+  .event-transition-hint,
+  .transition-ellipsis i,
+  .transition-cloud,
+  .transition-lamp i,
+  .scene-transition .scene-building::before {
+    animation: none;
+    opacity: 1;
+  }
+}
+
 @keyframes event-in {
   0% {
     opacity: 0;
