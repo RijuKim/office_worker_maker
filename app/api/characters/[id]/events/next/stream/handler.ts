@@ -3,7 +3,7 @@ import type { EventSource } from "@prisma/client";
 import { getStoryArc, isEventAllowedForLifeStage, selectNextEvent, type EventSelectionContext, type StaticEvent } from "@/lib/game/event-engine";
 import { evaluateCandidateEvent, findValidatedStaticFallback } from "@/lib/game/event-quality-policy";
 import { deriveLifeStageState } from "@/lib/game/life-stage";
-import { checkDailyAiLimit, generateAiEvent, generateAiEventStream, getOpenRouterTimeoutMs, incrementAiUsage } from "@/lib/game/openrouter";
+import { checkDailyAiLimit, generateAiEvent, getOpenRouterTimeoutMs, incrementAiUsage } from "@/lib/game/openrouter";
 import { recordEventQualityLog } from "@/lib/server/event-quality-log";
 import { acquireAuthoritativeEvent, createPrismaEventAuthorityStore, EventAuthorityLostError, resolveEventGenerationRole, startEventGenerationHeartbeat, toPublicEvent, type EventGenerationHeartbeat } from "@/lib/server/event-authority";
 import { prisma } from "@/lib/server/prisma";
@@ -304,17 +304,13 @@ export function createNextEventStreamPost({
           };
 
           const providerStartedAt = Date.now();
-          let aiResult: Awaited<ReturnType<typeof generateAiEventStream>> | {
+          let aiResult: Awaited<ReturnType<typeof generateAiEvent>> | {
             success: false; reason: "api_error"; providerId: null; providerLabel: null;
             providerElapsedMs: number; totalElapsedMs: number; slow: boolean; retryUsed: false;
             providerFailures: Array<{ providerId: null; providerLabel: null; providerElapsedMs: number; reason: "api_error"; stage: "provider" }>;
           };
           try {
-            aiResult = await generateAiEventStream(aiState, (text) => {
-              if (text && providerFirstBodyMs === null) {
-                providerFirstBodyMs = now() - generationStartedAt;
-              }
-            }, { skipPrimary: !limit.allowed });
+            aiResult = await generateAiEvent(aiState, { skipPrimary: !limit.allowed });
           } catch {
             const elapsed = Math.max(0, Date.now() - providerStartedAt);
             aiResult = {
@@ -342,35 +338,6 @@ export function createNextEventStreamPost({
           retryUsed = aiResult.retryUsed ?? false;
           providerId = aiResult.providerId ?? null;
           providerFailures = aiResult.providerFailures ?? [];
-
-          if (!aiResult.success) {
-            // Streaming failed (Ollama thinking mode puts everything in reasoning),
-            // fall back to non-streaming generateAiEvent which handles reasoning field.
-            const nonStreamStartedAt = now();
-            try {
-              const nonStreamResult = await generateAiEvent(aiState, { skipPrimary: !limit.allowed });
-              if (nonStreamResult.success) {
-                providerElapsedMs += (nonStreamResult.providerElapsedMs ?? 0);
-                providerId = nonStreamResult.providerId ?? null;
-                retryUsed = true;
-                if (nonStreamResult.providerFailures) {
-                  providerFailures = [...(providerFailures as unknown[]), ...nonStreamResult.providerFailures];
-                }
-                aiResult = nonStreamResult;
-                aiFailed = false;
-                generationReason = null;
-                generationStage = null;
-              } else {
-                aiFailed = true;
-                generationReason = nonStreamResult.reason;
-                generationStage = nonStreamResult.providerFailures?.at(-1)?.stage ?? "provider";
-              }
-            } catch (nonStreamErr) {
-              aiFailed = true;
-              generationReason = "api_error";
-              generationStage = "provider";
-            }
-          }
 
           if (aiResult.success) {
             if (aiResult.providerId === "ollama") {
