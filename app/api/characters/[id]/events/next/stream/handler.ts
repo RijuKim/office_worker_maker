@@ -400,9 +400,15 @@ export function createNextEventStreamPost({
           // TEMP: fallback 제거 - AI 실패 원인을 보기 위해 에러를 그대로 반환
           send("error", {
             error: "AI 이벤트 생성 실패",
-            generationReason,
-            generationStage,
-            providerFailures,
+            detail: {
+              aiAttempted,
+              aiFailed,
+              generationReason,
+              generationStage,
+              providerFailures,
+              providerId,
+              retryUsed,
+            },
           });
           return;
         }
