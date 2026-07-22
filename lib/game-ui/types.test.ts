@@ -57,6 +57,13 @@ describe("game-ui contracts", () => {
     expect(parseRouteIntent("https://example.com/nope")).toEqual({ kind: "play" });
   });
 
+  it("treats malformed route values as play routes instead of throwing", () => {
+    for (const value of [undefined, null, 0, 42, true, false, {}, []]) {
+      expect(() => parseRouteIntent(value as never)).not.toThrow();
+      expect(parseRouteIntent(value as never)).toEqual({ kind: "play" });
+    }
+  });
+
   it("rejects malformed share IDs and encoded separators as play routes", () => {
     expect(parseRouteIntent("/share/record%2F123")).toEqual({ kind: "play" });
     expect(parseRouteIntent("/share/record%5C123")).toEqual({ kind: "play" });
@@ -135,6 +142,7 @@ describe("game-ui contracts", () => {
     const files = [
       resolve(process.cwd(), "lib/game-ui/types.ts"),
       resolve(process.cwd(), "lib/game-ui/host.ts"),
+      resolve(process.cwd(), "lib/game-ui/web-host.ts"),
     ];
 
     for (const file of files) {
