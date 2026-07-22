@@ -28,7 +28,22 @@ test("low health transition persists the leave state after reload", async ({ pag
   expect((await choiceCommitted).status()).toBe(200);
   await page.reload();
   const recovered = await page.request.get(`/api/characters/${character.id}`);
-  expect((await recovered.json()).character.eventHistory.length).toBeGreaterThan(0);
+  expect(recovered.status()).toBe(200);
+  const recoveredBody = await recovered.json() as {
+    character: {
+      eventHistory: Array<{
+        eventId: string;
+        choiceId: string | null;
+        summary: string;
+      }>;
+    };
+  };
+  expect(recoveredBody.character.eventHistory).toHaveLength(1);
+  expect(recoveredBody.character.eventHistory[0]).toMatchObject({
+    eventId: forced.body.event.id,
+    choiceId: forced.body.event.choices[0].id,
+    summary: forced.body.event.choices[0].summary,
+  });
 });
 
 test("forced events return agency without direct pass or fail commands", async ({ page }) => {
