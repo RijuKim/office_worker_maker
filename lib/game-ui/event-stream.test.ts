@@ -30,6 +30,32 @@ function streamResponse(chunks: string[], status = 200) {
   });
 }
 
+function byteStreamResponse(chunks: Uint8Array[], status = 200) {
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const chunk of chunks) {
+        controller.enqueue(chunk);
+      }
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    status,
+    headers: { "Content-Type": "text/event-stream; charset=utf-8" },
+  });
+}
+
+function findByteSequence(haystack: Uint8Array, needle: Uint8Array) {
+  outer: for (let index = 0; index <= haystack.length - needle.length; index += 1) {
+    for (let offset = 0; offset < needle.length; offset += 1) {
+      if (haystack[index + offset] !== needle[offset]) continue outer;
+    }
+    return index;
+  }
+  return -1;
+}
+
 describe("game-ui event transport", () => {
   it("serializes JSON requests and merges host headers", async () => {
     const fetchImpl = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
@@ -90,6 +116,22 @@ describe("game-ui event transport", () => {
     ]);
   });
 
+  it("parses a final SSE block without a trailing blank line", () => {
+    expect(parseSseBlocks([
+      "event: event",
+      "data: {\"event\":{\"id\":\"event-1\"}}",
+    ].join("\n"))).toEqual([
+      {
+        event: "event",
+        data: "{\"event\":{\"id\":\"event-1\"}}",
+        fields: {
+          event: ["event"],
+          data: ["{\"event\":{\"id\":\"event-1\"}}"],
+        },
+      },
+    ]);
+  });
+
   it("returns the final event from one stream POST without polling recovery", async () => {
     const event = {
       id: "event-1",
@@ -107,13 +149,53 @@ describe("game-ui event transport", () => {
       expect(headers.get("Authorization")).toBe("Bearer token-1");
       return streamResponse([
         'event: status\ndata: {"message":"선택의 시간이 다가오고 있습니다..."}\n\n',
-        `event: event\ndata: ${JSON.stringify({ event })}\n\n`,
+        `event: event\ndata: ${JSON.stringify({ event })}`,
       ]);
     });
 
     const client = createGameApiClient({
       baseUrl: "https://api.example.com",
       headers: () => ({ Authorization: "Bearer token-1" }),
+      fetchImpl: fetchImpl as typeof fetch,
+    });
+
+    await expect(client.nextEventStream<typeof event>("run-1")).resolves.toEqual({
+      ok: true,
+      status: 200,
+      data: { event },
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("decodes chunk-split UTF-8 at EOF and returns the final event without recovery", async () => {
+    const event = {
+      id: "event-utf8",
+      title: "마지막🙂",
+      body: "멀티바이트 문자가 스트림 끝에서 잘려도 복원됩니다.",
+      source: "AI",
+      choices: [],
+    };
+    const encoder = new TextEncoder();
+    const responseText = [
+      'event: status\ndata: {"message":"선택의 시간이 다가오고 있습니다..."}\n\n',
+      `event: event\ndata: ${JSON.stringify({ event })}`,
+    ].join("");
+    const encoded = encoder.encode(responseText);
+    const splitAt = findByteSequence(encoded, encoder.encode("🙂"));
+    expect(splitAt).toBeGreaterThanOrEqual(0);
+
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input));
+      expect(url.pathname).toBe("/api/characters/run-1/events/next/stream");
+      expect(init?.method).toBe("POST");
+      return byteStreamResponse([
+        encoded.slice(0, splitAt + 2),
+        encoded.slice(splitAt + 2),
+      ]);
+    });
+
+    const client = createGameApiClient({
+      baseUrl: "https://api.example.com",
       fetchImpl: fetchImpl as typeof fetch,
     });
 

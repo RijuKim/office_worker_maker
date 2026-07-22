@@ -94,6 +94,36 @@ function normalizeSseText(text: string): string {
   return text.replace(/\r\n/g, "\n");
 }
 
+function consumeSseFrame<TEvent>(
+  frame: ParsedSseBlock | null,
+  onFrame?: (frame: ParsedSseBlock) => void,
+): { event: TEvent | null; failed: boolean } | null {
+  if (!frame) {
+    return { event: null, failed: true };
+  }
+
+  onFrame?.(frame);
+
+  if (frame.event === "status") {
+    return null;
+  }
+
+  if (frame.event === "error") {
+    return { event: null, failed: true };
+  }
+
+  if (frame.event !== "event") {
+    return null;
+  }
+
+  const payload = parseJsonOrEmpty<{ event?: TEvent }>(frame.data);
+  if (!payload || typeof payload !== "object" || !payload.event || typeof payload.event !== "object") {
+    return { event: null, failed: true };
+  }
+
+  return { event: payload.event, failed: false };
+}
+
 export function parseSseBlocks(text: string): ParsedSseBlock[] {
   const normalized = normalizeSseText(text);
   const blocks = normalized.split("\n\n");
@@ -148,7 +178,16 @@ async function readNextEventFromStream<TEvent>(
   try {
     while (true) {
       const { value, done } = await reader.read();
-      if (done) break;
+      if (done) {
+        buffer += decoder.decode();
+        buffer = normalizeSseText(buffer);
+
+        const finalFrame = consumeSseFrame<TEvent>(parseSseBlock(buffer), onFrame);
+        if (!finalFrame) {
+          return { event: null, failed: true };
+        }
+        return finalFrame;
+      }
 
       buffer += decoder.decode(value, { stream: true });
       buffer = normalizeSseText(buffer);
@@ -160,30 +199,17 @@ async function readNextEventFromStream<TEvent>(
         const block = buffer.slice(0, separatorIndex);
         buffer = buffer.slice(separatorIndex + 2);
 
-        const frame = parseSseBlock(block);
-        if (!frame) return { event: null, failed: true };
-        onFrame?.(frame);
-
-        if (frame.event === "status") continue;
-        if (frame.event === "error") return { event: null, failed: true };
-        if (frame.event !== "event") continue;
-
-        const payload = parseJsonOrEmpty<{ event?: TEvent }>(frame.data);
-        if (!payload || typeof payload !== "object" || !payload.event || typeof payload.event !== "object") {
+        const nextFrame = consumeSseFrame<TEvent>(parseSseBlock(block), onFrame);
+        if (!nextFrame) continue;
+        if (nextFrame.failed) {
           return { event: null, failed: true };
         }
-        return { event: payload.event, failed: false };
+        return nextFrame;
       }
     }
   } catch {
     return { event: null, failed: true };
   }
-
-  if (buffer.trim()) {
-    return { event: null, failed: true };
-  }
-
-  return { event: null, failed: true };
 }
 
 export function createGameApiClient(options: GameApiClientOptions = {}) {
