@@ -4,6 +4,7 @@ import {
   NEXT_EVENT_STREAM_RETRY_MESSAGE,
   createGameApiClient,
   parseSseBlocks,
+  readNextEventFromStream,
 } from "./event-stream";
 
 function jsonResponse(body: unknown, status = 200) {
@@ -44,26 +45,6 @@ function byteStreamResponse(chunks: Uint8Array[], status = 200) {
     status,
     headers: { "Content-Type": "text/event-stream; charset=utf-8" },
   });
-}
-
-async function collectDecodedText(response: Response) {
-  if (!response.body) return "";
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let decoded = "";
-
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) {
-      decoded += decoder.decode();
-      return decoded.replace(/\r\n/g, "\n");
-    }
-
-    if (value) {
-      decoded += decoder.decode(value, { stream: true });
-    }
-  }
 }
 
 function findByteSequence(haystack: Uint8Array, needle: Uint8Array) {
@@ -189,33 +170,25 @@ describe("game-ui event transport", () => {
 
   it("flushes an incomplete UTF-8 code point inside the final SSE payload at EOF", async () => {
     const encoder = new TextEncoder();
-    const responseText = [
-      'event: status\ndata: {"message":"선택의 시간이 다가오고 있습니다..."}\n\n',
-      "event: event\ndata: 마지막🙂",
-    ].join("");
+    const responseText = "event: status\ndata: 마지막🙂";
     const encoded = encoder.encode(responseText);
     const emojiBytes = encoder.encode("🙂");
     const splitAt = findByteSequence(encoded, emojiBytes);
     expect(splitAt).toBeGreaterThanOrEqual(0);
 
     const response = byteStreamResponse([encoded.slice(0, splitAt + emojiBytes.length - 1)]);
-    const decodedText = await collectDecodedText(response);
+    const frames: Array<{ event: string; data: string; fields: Record<string, string[]> }> = [];
 
-    expect(decodedText).toContain("event: event\ndata: 마지막�");
-    expect(parseSseBlocks(decodedText)).toEqual([
+    await expect(readNextEventFromStream(response, (frame) => frames.push(frame))).resolves.toEqual({
+      event: null,
+      failed: true,
+    });
+    expect(frames).toEqual([
       {
         event: "status",
-        data: '{"message":"선택의 시간이 다가오고 있습니다..."}',
-        fields: {
-          event: ["status"],
-          data: ['{"message":"선택의 시간이 다가오고 있습니다..."}'],
-        },
-      },
-      {
-        event: "event",
         data: "마지막�",
         fields: {
-          event: ["event"],
+          event: ["status"],
           data: ["마지막�"],
         },
       },

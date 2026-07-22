@@ -163,7 +163,7 @@ function parseSseBlock(block: string): ParsedSseBlock | null {
   };
 }
 
-async function readNextEventFromStream<TEvent>(
+export async function readNextEventFromStream<TEvent>(
   response: Response,
   onFrame?: (frame: ParsedSseBlock) => void,
 ): Promise<{ event: TEvent | null; failed: boolean }> {
