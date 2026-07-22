@@ -1,16 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
 import { logger } from "@/lib/server/logger";
 
-type RouteContext = { params: Promise<{ id: string }> };
+type RouteContext = { params: Promise<Record<string, string>> };
 
 const VALID_COMPANY_TYPES = ["대기업", "스타트업", "공기업", "전문직", "외국계"] as const;
 
 type CompanyTypeValue = (typeof VALID_COMPANY_TYPES)[number];
 
-export async function POST(request: Request, context: RouteContext) {
+export async function POST(request: Request | NextRequest, context: RouteContext) {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   const log = logger.withRequestId(requestId);
   const userId = await requireCurrentUserId();
@@ -60,7 +60,7 @@ export async function POST(request: Request, context: RouteContext) {
   return NextResponse.json({ application }, { status: 201 });
 }
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(_request: Request | NextRequest, context: RouteContext) {
   const userId = await requireCurrentUserId();
   if (!userId) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });

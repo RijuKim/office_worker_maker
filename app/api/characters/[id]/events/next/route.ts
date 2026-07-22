@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import type { EventSource } from "@prisma/client";
 
 import { getStoryArc, isEventAllowedForLifeStage, selectNextEvent, type StaticEvent } from "@/lib/game/event-engine";
@@ -11,9 +11,9 @@ import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
 import { logger } from "@/lib/server/logger";
 
-type RouteContext = { params: Promise<{ id: string }> };
+type RouteContext = { params: Promise<Record<string, string>> };
 
-export async function POST(request: Request, context: RouteContext) {
+export async function POST(request: Request | NextRequest, context: RouteContext) {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   const log = logger.withRequestId(requestId);
   const userId = await requireCurrentUserId();

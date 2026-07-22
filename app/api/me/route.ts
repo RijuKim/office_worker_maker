@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
@@ -8,7 +8,7 @@ function dateKey(date = new Date()) {
   return date.toISOString().slice(0, 10);
 }
 
-export async function GET(request: Request) {
+export async function GET(request: Request | NextRequest) {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   const log = logger.withRequestId(requestId);
   const userId = await requireCurrentUserId();

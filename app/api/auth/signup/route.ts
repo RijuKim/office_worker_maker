@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 
 import { signupSchema } from "@/lib/game/validation";
@@ -7,7 +7,7 @@ import { prisma } from "@/lib/server/prisma";
 import { GUEST_USER_COOKIE, getGuestUserId } from "@/lib/server/session";
 import { logger } from "@/lib/server/logger";
 
-export async function POST(request: Request) {
+export async function POST(request: Request | NextRequest) {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   const log = logger.withRequestId(requestId);
 

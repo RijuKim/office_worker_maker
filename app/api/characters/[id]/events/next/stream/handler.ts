@@ -1,4 +1,5 @@
 import type { EventSource } from "@prisma/client";
+import type { NextRequest } from "next/server";
 
 import { getStoryArc, isEventAllowedForLifeStage, selectNextEvent, type EventSelectionContext, type StaticEvent } from "@/lib/game/event-engine";
 import { evaluateCandidateEvent, findValidatedStaticFallback } from "@/lib/game/event-quality-policy";
@@ -10,7 +11,7 @@ import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
 import { logger } from "@/lib/server/logger";
 
-type RouteContext = { params: Promise<{ id: string }> };
+type RouteContext = { params: Promise<Record<string, string>> };
 
 export type SseSendObservation = {
   event: string;
@@ -68,7 +69,7 @@ export function createNextEventStreamPost({
   now = Date.now,
   observeSend,
 }: NextEventStreamRouteDependencies = {}) {
-  return async function nextEventStreamPost(request: Request, context: RouteContext) {
+  return async function nextEventStreamPost(request: Request | NextRequest, context: RouteContext) {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   const log = logger.withRequestId(requestId);
   const userId = await requireCurrentUserId();

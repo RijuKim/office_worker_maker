@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
@@ -7,7 +7,7 @@ function unavailable() {
   return NextResponse.json({ error: "Not found" }, { status: 404 });
 }
 
-export async function POST(request: Request) {
+export async function POST(request: Request | NextRequest) {
   if (process.env.NODE_ENV === "production") return unavailable();
 
   const userId = await requireCurrentUserId();

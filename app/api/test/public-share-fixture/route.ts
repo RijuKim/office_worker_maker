@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
 import { prisma } from "@/lib/server/prisma";
 
@@ -31,7 +31,7 @@ export async function POST() {
   return NextResponse.json({ recordId, cleanupId: userId }, { status: 201 });
 }
 
-export async function DELETE(request: Request) {
+export async function DELETE(request: Request | NextRequest) {
   if (process.env.NODE_ENV === "production") return unavailable();
   const cleanupId = new URLSearchParams(request.url.split("?")[1] ?? "").get("cleanupId");
   if (!cleanupId?.startsWith("share-user-")) {

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { prisma } from "@/lib/server/prisma";
@@ -10,7 +10,7 @@ const requestSchema = z.object({
   hash: z.string().min(16).max(512).regex(/^[A-Za-z0-9_-]+$/),
 });
 
-export async function POST(request: Request) {
+export async function POST(request: Request | NextRequest) {
   const parsed = requestSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "유효하지 않은 토스 사용자 식별키입니다." }, { status: 400 });

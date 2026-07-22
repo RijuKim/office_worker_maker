@@ -55,14 +55,14 @@ afterEach(() => {
 });
 
 describe("game-ui shared play surfaces", () => {
-  it("exposes a restored record title as a heading", () => {
+  it("exposes a restored record title with the shared oracle semantics", () => {
     render(<RecordCardShell expanded={false} id="record-1" title="한서윤의 새로운 결말" />);
 
     const article = container.querySelector("article");
     expect(article).toBeTruthy();
     expect(article?.id).toBe("record-1");
-    expect(article?.querySelector("h3")?.textContent).toBe("한서윤의 새로운 결말");
-    expect(article?.querySelector("h3")).toBeTruthy();
+    expect(article?.querySelector("strong")?.textContent).toBe("한서윤의 새로운 결말");
+    expect(article?.querySelector("strong")).toBeTruthy();
   });
 
   it("announces the loading state through a live region with the approved Korean copy", () => {

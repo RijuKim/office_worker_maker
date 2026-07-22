@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
@@ -29,7 +29,7 @@ const includeCharacterDetails = {
   },
 };
 
-export async function GET(request: Request) {
+export async function GET(request: Request | NextRequest) {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   const userId = await requireCurrentUserId();
 
@@ -73,7 +73,7 @@ export async function GET(request: Request) {
   return NextResponse.json({ characters: characters.map(serializeCharacterRun) });
 }
 
-export async function POST(request: Request) {
+export async function POST(request: Request | NextRequest) {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   const log = logger.withRequestId(requestId);
   const userId = await requireCurrentUserId();
