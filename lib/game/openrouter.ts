@@ -77,7 +77,7 @@ const aiEventSchema = z.object({
           academic: z.number().int().min(-15).max(15).optional(),
           practical: z.number().int().min(-15).max(15).optional(),
           health: z.number().int().min(-1).max(15).optional(),
-          mental: z.number().int().min(-15).max(15).optional(),
+          mental: z.number().int().min(-1).max(15).optional(),
           wealth: z.number().int().min(-15).max(15).optional(),
           reputation: z.number().int().min(-15).max(15).optional(),
           charm: z.number().int().min(-15).max(15).optional(),
@@ -120,7 +120,7 @@ const SYSTEM_PROMPT = `You are a Korean college-life text-adventure writer.
 
 Return ONLY valid JSON in a single JSON object with "title", "body", "tags", and "choices". "choices" must contain 2-4 complete objects, and each choice must include "id", "label", "summary", "statDelta", and "relationshipDelta". Keep the event in Korean, in "당신은" voice, with 2-3 paragraphs and 6-10 sentences. Make it one small incident inside the larger story arc.
 
-Keep continuity with recent choices, relationships, open threads, and stats. Avoid repeating closed proposals or stale scenes. Use only the public stats in statDelta, keep health decreases at -1 or above, and make at least one choice clearly risky with a downside. Choice labels should be natural actions. Summaries must start with "당신은".
+Keep continuity with recent choices, relationships, open threads, and stats. Avoid repeating closed proposals or stale scenes. Use only the public stats in statDelta, keep health and mental decreases at -1 or above, and make at least one choice clearly risky with a downside. Choice labels should be natural actions. Summaries must start with "당신은".
 
 The scene can come from college, work, family, romance, clubs, career prep, exams, overseas plans, hobbies, or other daily life. Treat the protagonist as a woman by default, avoid male-coded address, and use fictional/parody names only.
 `;
@@ -1129,7 +1129,7 @@ function normalizeChoice(raw: unknown) {
       if (allowedStats.includes(key as typeof allowedStats[number])) {
         const numeric = Number(value);
         if (Number.isFinite(numeric)) {
-          const minimum = key === "health" ? -1 : -15;
+          const minimum = key === "health" || key === "mental" ? -1 : -15;
           return [key, Math.max(minimum, Math.min(15, Math.round(numeric)))];
         }
       }

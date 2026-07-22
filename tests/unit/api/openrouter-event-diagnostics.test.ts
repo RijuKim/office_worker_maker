@@ -103,6 +103,20 @@ describe("AI event diagnostics", () => {
     expect(result.event.choices[0]?.statDelta).toEqual({ academic: 15, health: -1, wealth: -15 });
   });
 
+  it("clamps excessive mental loss instead of rejecting the generated event", () => {
+    const result = parseAiEventContentDetailed(JSON.stringify({
+      ...validEvent,
+      choices: [
+        { ...validEvent.choices[0], statDelta: { mental: -20, health: -8 } },
+        validEvent.choices[1],
+      ],
+    }));
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.event.choices[0]?.statDelta).toEqual({ mental: -1, health: -1 });
+  });
+
   it("accepts a slow successful provider response without fallback or a second call", async () => {
     process.env.OPENROUTER_API_KEY = "test-key";
     vi.spyOn(Date, "now")
