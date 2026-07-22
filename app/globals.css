@@ -1,6 +1,12 @@
+@import "../lib/game-ui/styles.css";
+
 @import "tailwindcss";
 
 :root {
+  --safe-area-top: 0px;
+  --safe-area-right: 0px;
+  --safe-area-bottom: 0px;
+  --safe-area-left: 0px;
   --background: #17263f;
   --foreground: #2a241e;
   --paper: #fff8e8;
@@ -63,8 +69,8 @@ button {
 }
 
 .app-screen {
-  padding-top: max(76px, calc(env(safe-area-inset-top) + 64px)) !important;
-  padding-bottom: max(22px, env(safe-area-inset-bottom));
+  padding-top: max(76px, calc(var(--safe-area-top) + 64px)) !important;
+  padding-bottom: max(22px, var(--safe-area-bottom));
 }
 
 .pixel-panel {
@@ -136,8 +142,8 @@ button {
     linear-gradient(90deg, rgba(42, 32, 24, 0.04) 1px, transparent 1px),
     #fbfaf6;
   background-size: 18px 18px;
-  padding-top: max(76px, calc(env(safe-area-inset-top) + 64px)) !important;
-  padding-bottom: max(24px, env(safe-area-inset-bottom));
+  padding-top: max(76px, calc(var(--safe-area-top) + 64px)) !important;
+  padding-bottom: max(24px, var(--safe-area-bottom));
 }
 
 .record-hero {
@@ -1409,7 +1415,7 @@ button {
   z-index: 80;
   display: flex;
   width: min(560px, calc(100% - 32px));
-  margin: max(18px, env(safe-area-inset-top)) auto 18px;
+  margin: max(18px, var(--safe-area-top)) auto 18px;
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;

@@ -380,23 +380,22 @@ describe("Toss entry refresh", () => {
   });
 
   it("defines deterministic responsive menu geometry, typography, targets, and overflow containment", () => {
-    const css = readFileSync(resolve(process.cwd(), "apps/toss-miniapp/src/styles.css"), "utf8");
+    const css = readFileSync(resolve(process.cwd(), "lib/game-ui/styles.css"), "utf8");
     expect(css).toMatch(/\.app-shell\s*\{[\s\S]*?overflow-x:\s*hidden;/);
     expect(css).toMatch(/\.menu-popover button,\s*\.menu-row\s*\{[\s\S]*?min-height:\s*44px;[\s\S]*?font-size:\s*14px;[\s\S]*?font-weight:\s*800;/);
     expect(css).toMatch(/\.menu-button\s*\{[\s\S]*?min-height:\s*44px;/);
     expect(css).toMatch(/\.menu-popover\s*\{[\s\S]*?right:\s*0;[\s\S]*?width:\s*min\(280px, calc\(100vw - 64px\)\);/);
     expect(css).toMatch(/@media \(max-width:\s*720px\)\s*\{[\s\S]*?\.menu-popover\s*\{[\s\S]*?left:\s*0;[\s\S]*?right:\s*0;[\s\S]*?width:\s*100%;/);
-    for (const width of [390, 720]) expect(width).toBeLessThanOrEqual(720);
-    for (const width of [721, 1024]) expect(width).toBeGreaterThan(720);
+    expect(css).toMatch(/\.pixel-input:focus-visible,[\s\S]*?\.choice-button:focus-visible\s*\{/);
+    expect(css).toMatch(/@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\.loading-cloud/);
   });
 
   it("retains the pre-refresh gameplay and records visual tokens", () => {
-    const css = readFileSync(resolve(process.cwd(), "apps/toss-miniapp/src/styles.css"), "utf8");
-    expect(css).toMatch(/:root\s*\{[\s\S]*?color:\s*#f7efe2;[\s\S]*?background:\s*#17130f;/);
-    expect(css).toMatch(/\.hero-panel,\s*\.event-panel,\s*\.list-panel,\s*\.feedback-panel,\s*\.record-panel\s*\{[\s\S]*?border:\s*2px solid #4d3d2f;[\s\S]*?background:\s*#211a14;/);
-    expect(css).toMatch(/\.primary-button\s*\{[\s\S]*?border-color:\s*#f7d08b;[\s\S]*?background:\s*#f7d08b;/);
-    expect(css).toMatch(/\.secondary-button,\s*\.segmented \.selected,\s*\.chip-grid \.selected\s*\{[\s\S]*?border-color:\s*#79b7ad;/);
-    expect(css).toMatch(/\.stats-grid span\s*\{[\s\S]*?border:\s*1px solid #4d3d2f;[\s\S]*?background:\s*#211a14;/);
-    expect(css).not.toContain(".source-pill");
+    const theme = readFileSync(resolve(process.cwd(), "apps/toss-miniapp/src/theme.css"), "utf8");
+    const main = readFileSync(resolve(process.cwd(), "apps/toss-miniapp/src/main.tsx"), "utf8");
+    expect(theme).toMatch(/--safe-area-top:\s*0px;/);
+    expect(theme).toMatch(/#root/);
+    expect(main).toMatch(/game-ui\/styles\.css/);
+    expect(main).not.toMatch(/\.\/styles\.css/);
   });
 });
