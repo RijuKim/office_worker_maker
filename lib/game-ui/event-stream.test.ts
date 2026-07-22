@@ -46,6 +46,21 @@ function byteStreamResponse(chunks: Uint8Array[], status = 200) {
   });
 }
 
+function decodeUtf8Chunks(chunks: Uint8Array[], flushAtEof = true) {
+  const decoder = new TextDecoder();
+  let decoded = "";
+
+  for (const chunk of chunks) {
+    decoded += decoder.decode(chunk, { stream: true });
+  }
+
+  if (flushAtEof) {
+    decoded += decoder.decode();
+  }
+
+  return decoded.replace(/\r\n/g, "\n");
+}
+
 function findByteSequence(haystack: Uint8Array, needle: Uint8Array) {
   outer: for (let index = 0; index <= haystack.length - needle.length; index += 1) {
     for (let offset = 0; offset < needle.length; offset += 1) {
@@ -167,7 +182,7 @@ describe("game-ui event transport", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("decodes chunk-split UTF-8 at EOF and returns the final event without recovery", async () => {
+  it("flushes an incomplete UTF-8 code point at EOF and still returns the final event", async () => {
     const event = {
       id: "event-utf8",
       title: "마지막🙂",
@@ -179,19 +194,38 @@ describe("game-ui event transport", () => {
     const responseText = [
       'event: status\ndata: {"message":"선택의 시간이 다가오고 있습니다..."}\n\n',
       `event: event\ndata: ${JSON.stringify({ event })}`,
+      "\n: tail🙂",
     ].join("");
     const encoded = encoder.encode(responseText);
-    const splitAt = findByteSequence(encoded, encoder.encode("🙂"));
+    const splitAt = findByteSequence(encoded, encoder.encode(": tail🙂"));
     expect(splitAt).toBeGreaterThanOrEqual(0);
+    const chunks = [encoded.slice(0, splitAt + 8)];
+    expect(decodeUtf8Chunks(chunks, false)).not.toContain("�");
+    expect(decodeUtf8Chunks(chunks)).toContain(": tail�");
+    expect(parseSseBlocks(decodeUtf8Chunks(chunks))).toEqual([
+      {
+        event: "status",
+        data: '{"message":"선택의 시간이 다가오고 있습니다..."}',
+        fields: {
+          event: ["status"],
+          data: ['{"message":"선택의 시간이 다가오고 있습니다..."}'],
+        },
+      },
+      {
+        event: "event",
+        data: JSON.stringify({ event }),
+        fields: {
+          event: ["event"],
+          data: [JSON.stringify({ event })],
+        },
+      },
+    ]);
 
     const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(String(input));
       expect(url.pathname).toBe("/api/characters/run-1/events/next/stream");
       expect(init?.method).toBe("POST");
-      return byteStreamResponse([
-        encoded.slice(0, splitAt + 2),
-        encoded.slice(splitAt + 2),
-      ]);
+      return byteStreamResponse(chunks);
     });
 
     const client = createGameApiClient({
