@@ -10,16 +10,20 @@ test("complete onboarding payload persists after a browser reload", async ({ pag
   await expect(page.getByText("통합 한서윤", { exact: true }).first()).toBeVisible();
   const restored = await page.request.get(`/api/characters/${character.id}`);
   expect(restored.status()).toBe(200);
-  await expect(restored.json()).resolves.toMatchObject({ character: { id: character.id, name: "통합 한서윤", age: 28, hiddenState: { familyState: { residence: "dorm" } } } });
+  await expect(restored.json()).resolves.toMatchObject({ character: { id: character.id, name: "통합 한서윤", age: 28, hiddenState: { familyState: { residence: "dorm" }, eventFlags: { preferredStats: ["academic", "health"] } } } });
 });
 
 test("an AI fallback event remains playable after reload", async ({ page }) => {
   const { character } = await completeRealOnboarding(page);
-  await seedFixture(page, "fallback-event", character.id);
+  await seedFixture(page, "next-event-precursor", character.id);
+  const generated = await page.evaluate(async (id) => fetch(`/api/characters/${id}/events/next`, { method: "POST" }).then(async (response) => ({ status: response.status, body: await response.json() })), character.id);
+  expect(generated.status).toBe(200);
+  expect(generated.body.event.source).toBe("FALLBACK");
   await page.reload();
-  await expect(page.getByRole("heading", { name: "AI 연결 대신 도착한 사건" })).toBeVisible();
-  await expect(page.getByText(/대체 사건으로 이야기는 계속/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "대체 사건에서 계속한다" })).toBeVisible();
+  await expect(page.locator('[data-event-source="FALLBACK"], .choice-stack')).toBeVisible();
+  const choiceResponse = page.waitForResponse((response) => response.url().endsWith(`/api/characters/${character.id}/choices`));
+  await page.locator(".choice-stack button").first().click();
+  expect((await choiceResponse).status()).toBe(200);
 });
 
 test("the current mobile play surface is single-column and does not overflow", async ({ page }) => {

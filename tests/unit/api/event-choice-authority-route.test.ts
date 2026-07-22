@@ -136,9 +136,10 @@ describe("choice event authority", () => {
     expect(response.status).toBe(200);
     expect(payload.result).toMatchObject({
       choiceId: "authoritative-choice",
-      summary: "확정된 사건에서 차분히 대응했다.",
       eventResolved: true,
     });
+    expect(payload.result.statDelta).toBeDefined();
+    expect(payload.result).not.toHaveProperty("summary");
     expect(mocks.eventUpdate).toHaveBeenCalledWith({
       where: { id: authoritative.id },
       data: { status: "RESOLVED" },

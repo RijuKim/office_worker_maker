@@ -1,5 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const runId = process.env.PLAYWRIGHT_RUN_ID || `${process.pid}`;
+const nextDistDir = `.next-playwright-${runId}`;
+
 export default defineConfig({
   testDir: './tests/acceptance',
   testMatch: '**/*.spec.ts',
@@ -28,11 +31,12 @@ export default defineConfig({
     // smoke test from reaching Next.js.
     // Webpack's single long-lived dev process is materially more stable for the
     // serialized database suite than Turbopack's transient worker pool.
-    command: 'npm run dev -- --webpack',
+    command: `NEXT_DIST_DIR=${nextDistDir} npm run dev -- --webpack`,
     url: 'http://localhost:3000',
     reuseExistingServer: false,
     timeout: 120_000,
   },
+  outputDir: `.tenet/runs/2026-07-22-toss-ui-unification/evidence/playwright-${runId}`,
   projects: [
     {
       name: 'desktop',

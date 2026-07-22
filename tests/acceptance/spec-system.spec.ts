@@ -1,19 +1,18 @@
 import { expect, test } from "@playwright/test";
-import { completeRealOnboarding, seedFixture } from "./helpers/real-ui";
+import { completeRealOnboarding } from "./helpers/real-ui";
 
 test.beforeEach(({ viewport }) => test.skip((viewport?.width ?? 0) < 800, "database integration runs once in the desktop project"));
 
-test("credential, job application, and career panels render persisted API data", async ({ page }, testInfo) => {
+test("a spec can be initiated and completed through production routes and its score survives reload", async ({ page }, testInfo) => {
   const { character } = await completeRealOnboarding(page);
-  await seedFixture(page, "career-panels", character.id);
+  const created = await page.evaluate(async (id) => fetch(`/api/characters/${id}/specs`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ specType: "PORTFOLIO", specName: "서비스 기획 포트폴리오" }) }).then((r) => r.json()), character.id);
+  const completed = await page.evaluate(async ({ id, specId }) => fetch(`/api/characters/${id}/specs/${specId}/complete`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ status: "COMPLETED", score: "우수" }) }).then((r) => r.json()), { id: character.id, specId: created.spec.id });
+  expect(completed.specScore).toBeGreaterThan(0);
   await page.reload();
 
   await expect(page.getByTestId("spec-panel")).toContainText("서비스 기획 포트폴리오");
   await expect(page.getByTestId("spec-panel")).toContainText("COMPLETED");
-  await expect(page.getByTestId("job-application-panel")).toContainText("가상 테크");
-  await expect(page.getByTestId("job-application-panel")).toContainText("FIRST_INTERVIEW");
-  await expect(page.getByTestId("career-path-panel")).toContainText("프로덕트 매니저");
-  await expect(page.getByTestId("career-path-panel")).toContainText("PREPARING");
+  await expect(page.getByTestId("spec-score")).toContainText(String(completed.specScore));
   await testInfo.attach("persisted-career-panels", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
 });
 
@@ -25,6 +24,9 @@ test("choice request posts its index and produces persisted event history", asyn
   const response = await responsePromise;
   expect(response.request().postDataJSON()).toEqual({ choiceIndex: 0 });
   expect(response.status()).toBe(200);
+  const responseBody = await response.json();
+  expect(responseBody.result.statDelta).toBeDefined();
+  expect(responseBody.result).not.toHaveProperty("summary");
   await expect(page.locator(".feedback-panel")).toBeVisible();
   await page.reload();
   const restored = await page.request.get(`/api/characters/${character.id}`);

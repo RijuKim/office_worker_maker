@@ -33,7 +33,13 @@ export async function completeRealOnboarding(
 }
 
 export async function seedFixture(page: Page, action: string, characterId: string) {
-  const response = await page.request.post("/api/test/integration-fixture", { data: { action, characterId } });
+  let response = await page.request.post("/api/test/integration-fixture", { data: { action, characterId } });
+  // Neon can briefly reject the first connection after an idle period. Retry
+  // setup connectivity only; production route assertions are never retried.
+  for (let attempt = 1; response.status() >= 500 && attempt < 3; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, attempt * 250));
+    response = await page.request.post("/api/test/integration-fixture", { data: { action, characterId } });
+  }
   expect(response.status()).toBeLessThan(300);
   return response;
 }

@@ -1,0 +1,20 @@
+{
+  "run": "toss-ui-unification-retry3",
+  "generatedAt": "2026-07-22T10:02:00Z",
+  "status": "infrastructure_blocked",
+  "checks": {
+    "typecheck": { "status": "passed", "command": "NEXT_DIST_DIR=.next-typecheck-retry3 npm run typecheck" },
+    "unit": { "status": "passed", "command": "npm test", "files": 41, "tests": 460 },
+    "lint": { "status": "passed_with_existing_warnings", "command": "npm run lint", "errors": 0, "warnings": 30 },
+    "build": { "status": "passed", "command": "NEXT_DIST_DIR=.next-build-webpack-retry3 npm run build -- --webpack" },
+    "browser": {
+      "status": "blocked",
+      "command": "PLAYWRIGHT_RUN_ID=retry3 npx playwright test tests/acceptance/college-career-sim.spec.ts tests/acceptance/life-stage-state-machine.spec.ts tests/acceptance/spec-system.spec.ts --project=desktop --reporter=json",
+      "reason": "listen EPERM: operation not permitted 0.0.0.0:3000",
+      "executed": 0
+    },
+    "smoke": { "status": "blocked", "reason": "managed sandbox forbids binding port 3000" }
+  },
+  "screenshots": [],
+  "screenshotBlocker": "No page could render because the managed sandbox rejected the server bind before startup."
+}
