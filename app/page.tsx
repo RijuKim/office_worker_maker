@@ -5,10 +5,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import type { CareerEndingRecord } from "@prisma/client";
 import { EndingArt, getEndingArtType } from "@/lib/game/ending-art";
+import { CharacterSheet, PlaySurface, RelationshipsSheet } from "@/lib/game-ui/App";
 import { CODEX_CATALOG, type CodexSlot } from "@/lib/game/codex-catalog";
 import { deriveCodexState, type CodexState } from "@/lib/game/derive-codex-state";
+import { SharedGameChrome, SharedOnboardingFlow } from "@/lib/game-ui/shell";
 import { CodexGrid } from "@/app/components/codex/CodexGrid";
 import { CodexDetailModal } from "@/app/components/codex/CodexDetailModal";
+import { RecordCardShell, RecordShareActions, copyEndingShareLink } from "@/lib/game-ui/App";
 
 type Screen = "auth" | "create" | "play" | "records" | "character_detail" | "relationships";
 
@@ -108,12 +111,6 @@ const statIcons: Record<string, string> = {
   charm: "CH",
   reputation: "RP",
 };
-
-const residenceOptions = [
-  { id: "family_home", label: "본가", description: "가족의 규칙과 지원 사이에서 하루가 시작됩니다." },
-  { id: "studio", label: "자취방", description: "혼자 버티는 자유와 생활비의 압박이 함께 옵니다." },
-  { id: "dorm", label: "기숙사", description: "타인의 생활 리듬과 우연한 관계가 가까이 있습니다." },
-];
 
 function statLevel(value: number) {
   return Math.max(1, Math.min(10, Math.round(value)));
@@ -393,9 +390,6 @@ export default function AppPage() {
   const musicStepRef = useRef(0);
   const bgmAudioRef = useRef<HTMLAudioElement | null>(null);
   const loadedAudioSettingsRef = useRef(false);
-  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
-  const menuPanelRef = useRef<HTMLDivElement | null>(null);
-  const menuWasOpenedRef = useRef(false);
 
   const careerRecords = useMemo(() => records as unknown as CareerEndingRecord[], [records]);
   const codexState: CodexState = useMemo(() => deriveCodexState(careerRecords, CODEX_CATALOG), [careerRecords]);
@@ -763,27 +757,6 @@ export default function AppPage() {
   }, [audioSettings]);
 
   useEffect(() => {
-    if (menuOpen) {
-      menuWasOpenedRef.current = true;
-      menuPanelRef.current?.querySelector<HTMLElement>("button, a, input")?.focus();
-    } else if (menuWasOpenedRef.current) {
-      menuButtonRef.current?.focus();
-    }
-  }, [menuOpen]);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [menuOpen]);
-
-  useEffect(() => {
     if (audioSettings.music) {
       void startMusic();
     } else {
@@ -950,14 +923,29 @@ export default function AppPage() {
   }, [loadRecords]);
 
   const shareRecord = useCallback(async (recordId: string) => {
-    const shareUrl = `${window.location.origin}/share/${recordId}`;
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setError("");
-      alert("공유 링크가 복사되었습니다!");
-    } catch {
-      setError("링크 복사에 실패했습니다.");
+    const result = await copyEndingShareLink(
+      {
+        sharing: {
+          async createEndingShareLink(targetRecordId: string) {
+            return new URL(`/share/${encodeURIComponent(targetRecordId)}`, window.location.origin).toString();
+          },
+        },
+        clipboard: {
+          async copy(text: string) {
+            await navigator.clipboard.writeText(text);
+          },
+        },
+      },
+      recordId,
+    );
+
+    if (!result.ok) {
+      setError(result.message);
+      return;
     }
+
+    setError("");
+    alert("공유 링크가 복사되었습니다!");
   }, []);
 
   const shareRecordImage = useCallback(async (recordId: string) => {
@@ -977,137 +965,31 @@ export default function AppPage() {
     }
   }, []);
 
-  const shareRecordSocial = useCallback(async (platform: string, recordId: string) => {
-    const shareUrl = `${window.location.origin}/share/${recordId}`;
-    const text = "대학생 커리어 시뮬레이터 - 선택의 결과";
-    const urls: Record<string, string> = {
-      twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`,
-      instagram: "", // Instagram doesn't support direct URL sharing
-      kakaotalk: `https://share.kakao.com/talk/share?url=${encodeURIComponent(shareUrl)}`,
-    };
-    const url = urls[platform];
-    if (url) {
-      window.open(url, "_blank", "noopener,noreferrer");
-    } else {
-      await navigator.clipboard.writeText(shareUrl);
-      alert("공유 링크가 복사되었습니다!");
-    }
-  }, []);
-
   const academicProgressLabel = getAcademicProgressLabel(currentChar);
   const runCompleted = Boolean(endingNotice);
-  const audioControls = (
-      <div className="menu-settings" data-audio-ready={audioReady}>
-        {([
-          ["music", "배경음"],
-          ["sfx", "효과음"],
-          ["haptics", "햅틱"],
-        ] as const).map(([key, label]) => (
-          <label className="audio-toggle menu-row" key={key}>
-            <span>{label}</span>
-            <input
-              checked={audioSettings[key]}
-              onChange={(event) => updateAudioSetting(key, event.target.checked)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  event.currentTarget.click();
-                }
-              }}
-              onPointerDown={() => {
-                if (key === "music" && !audioSettings.music) {
-                  void ensureAudio();
-                }
-              }}
-              type="checkbox"
-            />
-          </label>
-        ))}
-      </div>
-  );
   const topChrome = (
-    <header className="app-title-header">
-      <h1 className="app-title"><span>일어나보니</span><span>대한민국 취준생</span></h1>
-      <button
-        aria-expanded={menuOpen}
-        aria-label="메뉴"
-        className="chrome-icon-button chrome-menu-button"
-        ref={menuButtonRef}
-        onClick={() => {
-          setMenuOpen((open) => !open);
-        }}
-        type="button"
-      >
-        <span />
-        <span />
-        <span />
-      </button>
-      {menuOpen && (
-        <div
-          className="app-popover app-menu-popover"
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.preventDefault();
-              setMenuOpen(false);
-            }
-          }}
-          ref={menuPanelRef}
-        >
-          {currentChar && <button
-            onClick={() => {
-              setScreen("play");
-              setMenuOpen(false);
-            }}
-            type="button"
-          >
-            진행
-          </button>}
-          <button
-            onClick={() => {
-              setExpandedRecord(null);
-              setScreen("records");
-              setMenuOpen(false);
-              void loadRecords();
-            }}
-            type="button"
-          >
-            기록
-          </button>
-          <button
-            onClick={() => {
-              startNewCharacter();
-              setMenuOpen(false);
-            }}
-            type="button"
-          >
-            새 시뮬레이션
-          </button>
-          <button
-            onClick={() => {
-              setScreen("auth");
-              setMenuOpen(false);
-            }}
-            type="button"
-          >
-            {status === "authenticated" ? "계정" : "로그인/저장"}
-          </button>
-          <a
-            className="menu-row"
-            href="/privacy"
-            onClick={() => setMenuOpen(false)}
-            onKeyDown={(event) => {
-              if (event.key === " ") {
-                event.preventDefault();
-                event.currentTarget.click();
-              }
-            }}
-          >
-            개인정보처리방침
-          </a>
-          {audioControls}
-        </div>
-      )}
-    </header>
+    <SharedGameChrome
+      variant="web"
+      menuOpen={menuOpen}
+      onMenuOpenChange={setMenuOpen}
+      onOpenProgress={currentChar ? () => setScreen("play") : undefined}
+      onOpenRecords={() => {
+        setExpandedRecord(null);
+        setScreen("records");
+        void loadRecords();
+      }}
+      onStartNewSimulation={startNewCharacter}
+      accountLabel={status === "authenticated" ? "계정" : "로그인/저장"}
+      showAccountAction
+      onOpenAccount={() => setScreen("auth")}
+      onOpenPrivacy={() => {
+        window.location.href = "/privacy";
+      }}
+      audioSettings={audioSettings}
+      onAudioSettingChange={updateAudioSetting}
+      audioReady={audioReady}
+      currentCharacterName={currentChar?.name ?? null}
+    />
   );
 
   if (activeScreen === "auth") {
@@ -1162,73 +1044,25 @@ export default function AppPage() {
         <main className="pixel-shell app-screen flex min-h-screen items-start justify-center p-4">
           <div className="w-full max-w-[560px]">
           {error && <p className="mb-4 border-2 border-[#b3423c] bg-[#ffe1db] p-2 text-sm font-bold text-[#8d2f2a]">{error}</p>}
-          <div className="pixel-panel create-panel p-6">
-            {createStep === "intro" && <section className="create-step" data-testid="onboarding-intro">
-            <div className="create-hero-art overflow-hidden border-4 border-[#2a2018]" data-testid="intro-dawn-art">
-              <PixelScene scene="intro" label="오전 6시 07분의 밝은 새벽 방 픽셀아트" />
-            </div>
-            <div className="space-y-3 pt-5 text-[15px] leading-7 text-[#3a332d]">
-              <h2 className="create-question">낯선 아침이 시작됩니다.</h2>
-              <p>눈을 뜨니 오전 6시 07분입니다. 휴대폰에는 읽지 않은 카톡 알림이 수북하게 쌓여 있습니다.</p>
-              <p>학과 단체방 공지, 새로 올라온 동아리 모집 글, 아르바이트 연락, 그리고 아직 열어보지 않은 메시지 하나가 화면 위에 겹쳐 있습니다. 마지막 메시지에는 짧은 문장만 남아 있습니다. “이번에는 어떤 사람이 될 수 있을까요?”</p>
-              <p>오늘은 평범한 학기의 첫날일 수도, 오래 미뤄둔 변화를 시작하는 날일 수도 있습니다. 지금 고르는 작은 선택들은 수업과 관계, 생활과 진로를 조금씩 다른 방향으로 이끌게 될 것입니다.</p>
-              <p className="text-xs text-[#706b62]">이 이야기는 실제 진로 예측이 아닌 재미를 위한 허구의 시뮬레이션입니다.</p>
-            </div>
-            <button className="pixel-button-dark mt-5 w-full px-4 py-3 text-sm font-bold" onClick={() => setCreateStep("name")}>시작하기</button>
-            </section>}
-            {createStep === "name" && <section className="create-step">
-              <h2 className="create-question">당신의 이름은 무엇인가요?</h2>
-              <input aria-label="당신의 이름은 무엇인가요?" autoFocus className="pixel-input w-full px-4 py-3 text-sm" maxLength={24} placeholder="한서윤" value={charName} onChange={(e) => setCharName(e.target.value)} />
-              <div className="onboarding-actions"><button onClick={() => setCreateStep("intro")}>이전</button><button disabled={!charName.trim()} onClick={() => setCreateStep("age")}>다음</button></div>
-            </section>}
-            {createStep === "age" && <section className="create-step">
-              <h2 className="create-question">당신의 나이는 몇 살인가요?</h2>
-              <select aria-label="당신의 나이는 몇 살인가요?" className="pixel-input w-full px-4 py-3 text-sm" value={charAge} onChange={(e) => setCharAge(e.target.value)}>
-                {Array.from({ length: 63 }, (_, i) => i + 18).map((age) => (<option key={age} value={age}>{age}세</option>))}
-              </select>
-              <div className="onboarding-actions"><button onClick={() => setCreateStep("name")}>이전</button><button onClick={() => setCreateStep("residence")}>다음</button></div>
-            </section>}
-            {createStep === "residence" && <section className="create-step">
-              <h2 className="create-question">당신은 어디에서 깨어났나요?</h2>
-              <div className="grid gap-2">
-                {residenceOptions.map((option) => (
-                  <button
-                    aria-pressed={charResidence === option.id}
-                    className={`pixel-button px-4 py-3 text-left text-sm ${charResidence === option.id ? "is-selected" : ""}`}
-                    key={option.id}
-                    onClick={() => {
-                      playFeedbackCue("tap");
-                      setCharResidence(option.id);
-                    }}
-                    type="button"
-                  >
-                    <span className="block font-bold">{option.label}</span>
-                    <span className="mt-1 block text-xs leading-5 text-[#706b62]">{option.description}</span>
-                  </button>
-                ))}
-              </div>
-              <div className="onboarding-actions"><button onClick={() => setCreateStep("age")}>이전</button><button disabled={!charResidence} onClick={() => setCreateStep("abilities")}>다음</button></div>
-            </section>}
-            {createStep === "abilities" && <section className="create-step">
-              <h2 className="create-question">당신이 믿고 싶은 능력 두 가지는 무엇인가요? ({preferredStats.length}/2)</h2>
-              <div className="grid grid-cols-2 gap-2">
-                {Object.entries(statLabels).map(([key, label]) => (
-                  <button
-                    aria-pressed={preferredStats.includes(key)}
-                    className={`pixel-button px-3 py-3 text-left text-sm ${preferredStats.includes(key) ? "bg-[#ffe0a2]" : ""}`}
-                    key={key}
-                    onClick={() => togglePreferredStat(key)}
-                    type="button"
-                  >
-                    <span className="mr-2 text-xs text-[#8a4f2d]">{preferredStats.includes(key) ? "●" : "○"} {statIcons[key]}</span>
-                    <span className="font-bold">{label}</span>
-                  </button>
-                ))}
-              </div>
-              <p className="mt-2 text-xs text-[#706b62]">선택한 두 능력은 첫 능력치에 조금 더 높게 반영됩니다.</p>
-              <div className="onboarding-actions"><button onClick={() => setCreateStep("residence")}>이전</button><button disabled={loading || preferredStats.length !== 2} onClick={createCharacter}>눈을 뜬다</button></div>
-            </section>}
-          </div>
+          <SharedOnboardingFlow
+            variant="web"
+            step={createStep}
+            name={charName}
+            age={Number(charAge)}
+            residence={charResidence}
+            selectedStats={preferredStats}
+            loading={loading}
+            onStepChange={setCreateStep}
+            onNameChange={setCharName}
+            onAgeChange={(value: number) => setCharAge(String(value))}
+            onResidenceChange={(value: string) => {
+              playFeedbackCue("tap");
+              setCharResidence(value);
+            }}
+            onToggleStat={togglePreferredStat}
+            onSubmit={createCharacter}
+            submitDisabled={loading || preferredStats.length !== 2}
+          />
           </div>
         </main>
       </>
@@ -1287,23 +1121,16 @@ export default function AppPage() {
                 const narrativeText = recordText(r, "longNarrative");
                 const narrativePreview = narrativeText.length > 150 ? narrativeText.slice(0, 150) + "..." : narrativeText;
                 return (
-                  <div className={`record-card record-card-${getRecordTone(r)} pixel-panel overflow-hidden`} id={`record-card-${r.id as string}`} key={r.id as string}>
-                    <button
-                      className="grid w-full grid-cols-[156px_minmax(0,1fr)_32px] items-center gap-5 p-5 text-left max-[720px]:grid-cols-[96px_minmax(0,1fr)_24px] max-[520px]:grid-cols-1"
-                      onClick={() => setExpandedRecord(isExpanded ? null : r.id as string)}
-                    >
-                      <RecordPoster record={r} />
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-3">
-                          <span className="text-lg font-bold text-[#2a241e]">{title}</span>
-                        </div>
-                        <p className="mt-1 text-sm text-[#706b62]">{summary}</p>
-                        {!isExpanded && narrativePreview && (
-                          <p className="mt-2 text-xs leading-relaxed text-[#a9967d]">{narrativePreview}</p>
-                        )}
-                      </div>
-                      <span className="text-xl text-[#8a4f2d] max-[520px]:hidden">{isExpanded ? "▲" : "▼"}</span>
-                    </button>
+                  <RecordCardShell
+                    className={`record-card record-card-${getRecordTone(r)} pixel-panel overflow-hidden`}
+                    expanded={isExpanded}
+                    id={`record-card-${r.id as string}`}
+                    onToggle={() => setExpandedRecord(isExpanded ? null : r.id as string)}
+                    poster={<RecordPoster record={r} />}
+                    preview={narrativePreview}
+                    summary={summary}
+                    title={title}
+                  >
                     {isExpanded && (
                       <div className="border-t-4 border-[#2a2018] bg-[#fffaf0] p-5">
                         <div className="prose prose-sm max-w-none whitespace-pre-wrap text-sm leading-relaxed text-[#2a241e]">
@@ -1319,35 +1146,14 @@ export default function AppPage() {
                           <span className="border-2 border-[#ded9ce] bg-[#f2efe7] px-2.5 py-1 text-xs">{healthState}</span>
                           <span className="border-2 border-[#ded9ce] bg-[#f2efe7] px-2.5 py-1 text-xs">관계: {relationshipStateText}</span>
                         </div>
-                        <div className="mt-4 flex flex-wrap gap-2 border-t-2 border-[#f2efe7] pt-4">
-                          <button
-                            className="pixel-button-dark px-3 py-2 text-xs font-bold"
-                            onClick={() => shareRecord(r.id as string)}
-                          >
-                            🔗 링크 복사
-                          </button>
-                          <button
-                            className="pixel-button-dark px-3 py-2 text-xs font-bold"
-                            onClick={() => shareRecordImage(r.id as string)}
-                          >
-                            🖼️ 이미지 저장
-                          </button>
-                          <button
-                            className="pixel-button px-3 py-2 text-xs font-bold"
-                            onClick={() => shareRecordSocial("twitter", r.id as string)}
-                          >
-                            𝕏 공유
-                          </button>
-                          <button
-                            className="pixel-button px-3 py-2 text-xs font-bold"
-                            onClick={() => shareRecordSocial("kakaotalk", r.id as string)}
-                          >
-                            💬 카톡 공유
-                          </button>
-                        </div>
+                        <RecordShareActions
+                          onCopyLink={shareRecord}
+                          onSaveImage={shareRecordImage}
+                          recordId={r.id as string}
+                        />
                       </div>
                     )}
-                  </div>
+                  </RecordCardShell>
                 );
               })}
               {records.length === 0 && (
@@ -1463,199 +1269,29 @@ export default function AppPage() {
 
       <main className="play-main bg-[#f7efe2] px-11 py-[34px]">
         {activeScreen === "play" && (
-          <section className="mx-auto max-w-[760px]">
-            <div className="play-status-strip mb-4">
-              <span>{academicProgressLabel}</span>
-              <span>{currentChar?.major ?? "전공 미정"}</span>
-              <span>{currentChar ? formatWealth(currentChar.stats?.wealth ?? 0) : "자산"}</span>
-            </div>
-            {error && <p className="mb-4 rounded bg-red-50 p-2 text-sm text-red-600">{error}</p>}
-            {choiceFeedback && (
-              <div className="feedback-pop pixel-panel mb-5 p-4">
-                <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-4 max-[520px]:grid-cols-1">
-                  <ChoiceResultArt tone={getChoiceFeedbackTone(choiceFeedback)} />
-                  <div className="min-w-0">
-                    <p className="text-sm font-black text-[#6d4a2f]">선택의 결과</p>
-                    {choiceFeedback.summary && <p className="mt-2 text-sm leading-6">{choiceFeedback.summary}</p>}
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {Object.entries(choiceFeedback.statDelta).map(([key, delta]) => (
-                        <span className={`border-2 px-2 py-1 text-xs font-bold ${delta > 0 ? "border-[#305d73] bg-[#d5edf6] text-[#244c5e]" : "border-[#b3423c] bg-[#ffe1db] text-[#7b2d29]"}`} key={key}>
-                          {statLabels[key] ?? key} {key === "wealth" ? `${delta > 0 ? "+" : ""}${delta}만원` : `${delta > 0 ? "+" : ""}${delta}`}
-                        </span>
-                      ))}
-                      {choiceFeedback.relationshipDelta.map((rel) => (
-                        <span className={`border-2 px-2 py-1 text-xs font-bold ${rel.trust > 0 ? "border-[#a53f66] bg-[#ffe1ec] text-[#842b50]" : "border-[#2b3348] bg-[#dce2f5] text-[#26304a]"}`} key={`${rel.name}-${rel.trust}`}>
-                          {rel.name} {rel.trust > 0 ? "♥+" : "💀"}{rel.trust}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            {endingNotice && (
-              <div className="ending-splash pixel-panel mb-5 overflow-hidden border-[#b3423c] bg-[#ffe1db] text-[#6f211d]">
-                <div className="grid grid-cols-[180px_minmax(0,1fr)] gap-5 p-5 max-[640px]:grid-cols-1">
-                  <div className="ending-splash-art">
-                    <EndingArt type="default" size={160} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-black text-[#8a4f2d]">RESULT UNLOCKED</p>
-                    <p className="mt-1 text-2xl font-black">선택의 결과</p>
-                    <p className="mt-2 text-sm leading-6">{endingNotice}</p>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <button className="pixel-button-dark px-4 py-2 text-sm font-bold" onClick={showLatestRecord}>결과 바로 보기</button>
-                      <button className="pixel-button px-4 py-2 text-sm font-bold" onClick={startNewCharacter}>새로 시작하기</button>
-                    </div>
-                    {latestRecordId && (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button className="pixel-button-dark px-3 py-2 text-xs font-bold" onClick={() => shareRecord(latestRecordId)}>🔗 링크 복사</button>
-                        <button className="pixel-button px-3 py-2 text-xs font-bold" onClick={() => shareRecordSocial("twitter", latestRecordId)}>𝕏 공유</button>
-                        <button className="pixel-button px-3 py-2 text-xs font-bold" onClick={() => shareRecordSocial("kakaotalk", latestRecordId)}>💬 카톡 공유</button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-            {!currentEvent && !endingNotice && (streamingNextEvent || loading || pendingNext) && (
-              <div className="event-frame event-transition-frame pixel-panel overflow-hidden" aria-busy="true" aria-live="polite">
-                <div className="grid grid-cols-[220px_minmax(0,1fr)] max-[720px]:grid-cols-1">
-                  <PixelScene scene="transition" label="다음 장면으로 이어지는 밤 풍경" />
-                  <div className="event-transition-copy p-6">
-                    <div className="mb-4 flex flex-wrap items-center gap-2">
-                      <span className="border-2 border-[#2a2018] bg-[#f7d08b] px-2 py-1 text-xs font-black text-[#2a2018]">새 장면</span>
-                    </div>
-                    <div className="event-transition-message novel-text text-xl font-black tracking-normal max-[900px]:text-[18px]">
-                      <p>당신이 모르는 곳에서,</p>
-                      <p>다음 일이 시작되고 있습니다<span className="transition-ellipsis" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span><span className="sr-only">...</span></p>
-                    </div>
-                    <p className="event-transition-hint mt-5 text-sm font-bold text-[#8a4f2d]">선택의 시간이 곧 찾아옵니다.</p>
-                  </div>
-                </div>
-              </div>
-            )}
-            {currentEvent && (
-              <>
-                <div className="event-frame pixel-panel overflow-hidden">
-                  <div className="grid grid-cols-[220px_minmax(0,1fr)] max-[720px]:grid-cols-1">
-                    <PixelScene scene={getEventScene(currentEvent)} label={currentEvent.title} />
-                    <div className="p-6">
-                      <div className="mb-4 flex flex-wrap items-center gap-2">
-                        <span className="border-2 border-[#2a2018] bg-[#f7d08b] px-2 py-1 text-xs font-black text-[#2a2018]">
-                          {currentEvent.source === "FORCED" ? "긴급 상황" : currentEvent.source === "AI" ? "새 장면" : "오늘의 사건"}
-                        </span>
-                        <h2 className="text-xl font-black leading-tight text-[#2a241e]">{currentEvent.title}</h2>
-                      </div>
-                      <div className="novel-text text-lg tracking-normal max-[900px]:text-[16px]">
-                        {currentEvent.body.split("\n").map((p, i) => (<p className="mt-3 first:mt-0" key={i}>{p}</p>))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="choice-stack mt-7 grid gap-3">
-                  {currentEvent.choices.map((choice, idx) => (
-                    <button className="choice-button pixel-button grid min-h-12 grid-cols-[32px_minmax(0,1fr)] items-center gap-3 px-4 py-3.5 text-left text-[15px] disabled:opacity-50" disabled={loading} key={choice.id} onClick={() => makeChoice(idx)}>
-                      <span className="choice-index">{idx + 1}</span>
-                      <span>{choice.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-            {!currentEvent && !endingNotice && !streamingNextEvent && !loading && !pendingNext && (
-              <div
-                className="pixel-panel cursor-pointer p-8 text-center"
-                onClick={continueToNextEvent}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    continueToNextEvent();
-                  }
-                }}
-              >
-                <p className="text-lg leading-8 text-[#3a332d]">
-                  {pendingNext ? "다음 상황을 준비 중입니다." : "새 상황을 준비 중입니다."}
-                </p>
-              </div>
-            )}
-          </section>
+          <PlaySurface
+            currentCharacter={currentChar}
+            currentEvent={currentEvent}
+            feedback={choiceFeedback}
+            loading={streamingNextEvent || loading}
+            pendingNext={pendingNext}
+            endingNotice={endingNotice}
+            onChoose={(choiceIndex) => void makeChoice(choiceIndex)}
+            onContinueToNextEvent={() => void continueToNextEvent()}
+            onShowLatestRecord={() => void showLatestRecord()}
+            onStartNewCharacter={startNewCharacter}
+            endingActions={latestRecordId ? (
+              <RecordShareActions
+                onCopyLink={shareRecord}
+                recordId={latestRecordId}
+                wrapperClassName="mt-3 flex flex-wrap gap-2"
+                copyButtonClassName="pixel-button-dark px-3 py-2 text-xs font-bold"
+              />
+            ) : undefined}
+          />
         )}
-        {activeScreen === "character_detail" && currentChar && (
-          <section className="mx-auto max-w-[760px]">
-            <h2 className="screen-title text-xl font-black">캐릭터 상세</h2>
-            <div className="character-sheet pixel-panel mt-4 overflow-hidden">
-              <div className="character-portrait-stage">
-                <PixelPortrait name={currentChar.name} large />
-              </div>
-              <div className="character-sheet-body p-5">
-                <p className="text-xs font-black text-[#8a4f2d]">CURRENT STUDENT FILE</p>
-                <h3 className="mt-1 text-2xl font-black leading-tight">{currentChar.name}</h3>
-                <div className="mt-4 grid grid-cols-2 gap-2 text-sm max-[520px]:grid-cols-1">
-                  <p className="profile-chip"><strong>이름:</strong> {currentChar.name}</p>
-                  <p className="profile-chip"><strong>전공:</strong> {currentChar.major}</p>
-                  <p className="profile-chip"><strong>학사 진행:</strong> {getAcademicProgressLabel(currentChar)}</p>
-                  <p className="profile-chip"><strong>나이:</strong> {currentChar.age}세</p>
-                  <p className="profile-chip"><strong>학적:</strong> {formatAcademicStatus(currentChar.academicStatus)}</p>
-                </div>
-                <div className="mt-5 grid grid-cols-2 gap-2 max-[520px]:grid-cols-1">
-                  {Object.entries(statLabels).map(([key, label]) => (
-                    <div className="stat-card" key={key}>
-                      <div className="flex items-center justify-between gap-2">
-                        <span><span className="mr-1 text-xs text-[#8a4f2d]">{statIcons[key]}</span>{label}</span>
-                        <strong>{key === "wealth" ? formatWealth(currentChar.stats?.[key] ?? 0) : `${statLevel(currentChar.stats?.[key] ?? 0)}/10`}</strong>
-                      </div>
-                      {key !== "wealth" && (
-                        <div className="mt-2 h-2 border-2 border-[#2a2018] bg-[#e2d7c8]">
-                          <div className="h-full bg-[#2f7a84]" style={{ width: `${statLevel(currentChar.stats?.[key] ?? 0) * 10}%` }} />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-        {activeScreen === "relationships" && currentChar && (
-          <section className="mx-auto max-w-[760px]">
-            <h2 className="screen-title text-xl font-black">관계</h2>
-            <div className="relationship-grid mt-4 grid gap-3">
-              {currentChar.relationships?.map((rel) => (
-                <div className="relationship-card pixel-panel flex items-start gap-4 p-4" key={rel.name}>
-                  <PixelPortrait name={rel.name} variant={rel.name} large />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-3 max-[520px]:block">
-                      <span className="text-lg font-black">{rel.name}</span>
-                      <span className="text-sm text-[#706b62]">{rel.role}</span>
-                    </div>
-                    <div className="mt-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-bold text-[#8a4f2d]">{relationshipState(rel.trust)}</span>
-                        <span className="font-bold">{trustHearts(rel.trust)}</span>
-                      </div>
-                      <div className="relationship-meter mt-2 h-3 border-2 border-[#2a2018] bg-[#d8c8b4]">
-                        <div
-                          className={`${rel.trust >= 0 ? "bg-[#d85f87]" : "bg-[#3f5f9f]"} h-full`}
-                          style={{ width: `${Math.min(100, Math.abs(rel.trust))}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-1">{(rel.tags ?? []).map((tag: string) => (<span className="relation-tag border-2 border-[#2a2018] bg-[#efe5d7] px-2 py-1 text-xs text-[#68412b]" key={tag}>{tag}</span>))}</div>
-                  </div>
-                </div>
-              ))}
-              {(!currentChar.relationships || currentChar.relationships.length === 0) && (
-                <div className="pixel-panel empty-relationship p-6 text-center">
-                  <PixelPortrait name="?" large />
-                  <p className="mt-3 text-sm text-[#706b62]">아직 관계 정보가 없습니다.</p>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
+        {activeScreen === "character_detail" && currentChar && <CharacterSheet character={currentChar} />}
+        {activeScreen === "relationships" && currentChar && <RelationshipsSheet character={currentChar} />}
       </main>
 
       <aside className="right-sidebar border-l border-[#3b3025] bg-[#241b15] p-[22px] text-[#fff3d7]">

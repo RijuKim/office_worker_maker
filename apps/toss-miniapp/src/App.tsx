@@ -3,6 +3,10 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
 import { playCue, startBgm, stopBgm, vibrate, type AudioSettings } from "./audio";
 import { getTossAnonymousKey } from "./toss-auth";
+import { PlaySurface } from "@/lib/game-ui/App";
+import { SharedGameChrome, SharedOnboardingFlow } from "../../../lib/game-ui/shell";
+import { RecordCardShell, RecordShareActions, copyEndingShareLink } from "@/lib/game-ui/App";
+import { createTossEndingShareLink } from "./toss-host";
 import type { CareerRecord, CharacterData, ChoiceFeedback, EventData, Screen } from "./types";
 
 const statLabels: Record<string, string> = {
@@ -17,12 +21,6 @@ const statLabels: Record<string, string> = {
 
 const preferredStats = ["academic", "practical", "health", "mental", "wealth", "reputation"];
 const defaultAudioSettings: AudioSettings = { music: false, sfx: true, haptics: true };
-const ageOptions = Array.from({ length: 63 }, (_, index) => index + 18);
-const residenceOptions = [
-  { id: "family_home", label: "본가", description: "익숙한 가족의 생활 소리 속에서 시작합니다." },
-  { id: "studio", label: "자취방", description: "작지만 온전히 내 몫인 방에서 시작합니다." },
-  { id: "dorm", label: "기숙사", description: "학교와 가까운 공동생활 공간에서 시작합니다." },
-] as const;
 type CreateStep = "intro" | "name" | "age" | "residence" | "abilities";
 
 function readAudioSettings(): AudioSettings {
@@ -51,33 +49,6 @@ function runOptional(action: () => unknown) {
   } catch {
     // Audio, haptics, storage, and host capabilities never block interaction.
   }
-}
-
-function IntroDawnArt() {
-  return (
-    <div className="intro-dawn-art" data-testid="intro-dawn-art">
-      <div className="pixel-scene-intro" aria-label="오전 6시 07분의 밝은 새벽 방 픽셀아트" data-palette="blue-lilac-apricot-cream" data-testid="pixel-scene-intro">
-        <svg aria-hidden="true" data-testid="intro-scene-svg" shapeRendering="crispEdges" viewBox="0 0 320 180">
-          <rect data-part="room-blue" width="320" height="180" fill="#536f9b" />
-          <rect data-part="lilac-wall" y="55" width="320" height="60" fill="#d98f83" />
-          <rect data-part="apricot-dawn" y="82" width="320" height="33" fill="#f3b477" />
-          <rect data-part="room-shadow" y="115" width="320" height="65" fill="#51404a" />
-          <rect data-part="window-cream" x="16" y="17" width="136" height="100" fill="#f5d7a0" />
-          <rect data-part="window-blue" x="23" y="24" width="122" height="86" fill="#718fbb" />
-          <rect data-part="window-apricot" x="23" y="70" width="122" height="40" fill="#f0a06f" />
-          <rect data-part="window-cream-light" x="23" y="91" width="122" height="19" fill="#ffd58f" />
-          <rect data-part="computer-desk" x="197" y="106" width="94" height="13" fill="#352b31" />
-          <rect data-part="computer" x="207" y="70" width="62" height="37" fill="#2f3542" />
-          <rect data-part="computer-screen" x="214" y="77" width="48" height="24" fill="#bdeee6" />
-          <rect data-part="computer-line-primary" x="222" y="82" width="31" height="4" fill="#ffffff" />
-          <rect data-part="computer-line-secondary" x="222" y="90" width="24" height="3" fill="#6fa3aa" />
-          <rect data-part="bed" x="164" y="120" width="132" height="45" fill="#72566b" />
-          <rect data-part="phone" x="176" y="111" width="72" height="20" fill="#96788d" />
-          <rect data-part="floor" y="154" width="320" height="26" fill="#302931" />
-        </svg>
-      </div>
-    </div>
-  );
 }
 
 function progressLabel(character: CharacterData | null) {
@@ -110,6 +81,7 @@ export function App() {
   const [age, setAge] = useState(22);
   const [residence, setResidence] = useState("");
   const [selectedStats, setSelectedStats] = useState<string[]>([]);
+  const audioReady = true;
 
   const startNewSimulation = useCallback(() => {
     setLoading(false);
@@ -128,6 +100,19 @@ export function App() {
     runOptional(() => playCue(kind, audioSettings.sfx));
     runOptional(() => vibrate(audioSettings.haptics, kind === "warning" ? [16, 20, 16] : 12));
   }, [audioSettings.haptics, audioSettings.sfx]);
+
+  const updateAudioSetting = useCallback((key: keyof AudioSettings, value: boolean) => {
+    setAudioSettings((current) => ({ ...current, [key]: value }));
+    if (key === "music" && value) {
+      runOptional(() => startBgm(true));
+    }
+    if (key === "music" && !value) {
+      runOptional(stopBgm);
+    }
+    if ((key === "sfx" || key === "haptics") && value) {
+      cue("tap");
+    }
+  }, [cue]);
 
   const openCharacter = useCallback(async (character: CharacterData) => {
     setLoading(true);
@@ -244,6 +229,29 @@ export function App() {
     }
   }, [cue]);
 
+  const shareRecord = useCallback(async (recordId: string) => {
+    const result = await copyEndingShareLink(
+      {
+        sharing: {
+          createEndingShareLink: createTossEndingShareLink,
+        },
+        clipboard: {
+          async copy(text: string) {
+            await navigator.clipboard.writeText(text);
+          },
+        },
+      },
+      recordId,
+    );
+
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
+
+    setError("");
+  }, []);
+
   useEffect(() => {
     runOptional(() => localStorage.setItem("sano-toss-audio", JSON.stringify(audioSettings)));
     if (audioSettings.music) runOptional(() => startBgm(true));
@@ -286,29 +294,20 @@ export function App() {
 
   return (
     <main className="app-shell">
-      <section className="hero-panel">
-        <div className="title-row">
-          <h1 className="app-title"><span>일어나보니</span><span>대한민국 취준생</span></h1>
-          <button className="menu-button" type="button" aria-label="메뉴" aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}>메뉴</button>
-          {menuOpen && (
-            <nav className="menu-popover" aria-label="메뉴">
-              {currentCharacter && <button type="button" onClick={() => { cue(); setScreen("play"); setMenuOpen(false); }}>진행</button>}
-              <button type="button" onClick={startNewSimulation}>새 시뮬레이션</button>
-              <button type="button" onClick={() => { setMenuOpen(false); void loadRecords(); }}>기록</button>
-              <div className="menu-divider" />
-              {([ ["music", "배경음"], ["sfx", "효과음"], ["haptics", "햅틱"] ] as const).map(([key, label]) => (
-                <label className="menu-row" key={key}>
-                  <span>{label}</span>
-                  <input aria-label={label} type="checkbox" checked={audioSettings[key]} onChange={(event) => setAudioSettings((value) => ({ ...value, [key]: event.target.checked }))} />
-                </label>
-              ))}
-            </nav>
-          )}
-        </div>
-        <div className="status-row">
-          <span>{progressLabel(currentCharacter)}</span>
-        </div>
-      </section>
+      <SharedGameChrome
+        variant="toss"
+        menuOpen={menuOpen}
+        onMenuOpenChange={setMenuOpen}
+        onOpenProgress={currentCharacter ? () => { cue(); setScreen("play"); } : undefined}
+        onOpenRecords={() => {
+          setMenuOpen(false);
+          void loadRecords();
+        }}
+        onStartNewSimulation={startNewSimulation}
+        audioSettings={audioSettings}
+        onAudioSettingChange={updateAudioSetting}
+        currentCharacterName={currentCharacter?.name ?? null}
+      />
 
       {error && <p className="error-banner">{error}</p>}
 
@@ -334,97 +333,39 @@ export function App() {
       )}
 
       {screen === "create" && (
-        <section className="screen-stack onboarding-panel">
-          {createStep === "intro" && <section className="create-step">
-            <IntroDawnArt />
-            <h2>낯선 아침이 시작됩니다.</h2>
-            <p>눈을 뜨니 오전 6시 07분입니다. 휴대폰에는 읽지 않은 카톡 알림이 수북하게 쌓여 있습니다.</p>
-            <p>학과 단체방 공지, 새로 올라온 동아리 모집 글, 아르바이트 연락, 그리고 아직 열어보지 않은 메시지 하나가 화면 위에 겹쳐 있습니다. 마지막 메시지에는 짧은 문장만 남아 있습니다. “이번에는 어떤 사람이 될 수 있을까요?”</p>
-            <p>오늘은 평범한 학기의 첫날일 수도, 오래 미뤄둔 변화를 시작하는 날일 수도 있습니다. 지금 고르는 작은 선택들은 수업과 관계, 생활과 진로를 조금씩 다른 방향으로 이끌게 될 것입니다.</p>
-            <p className="disclaimer">이 이야기는 실제 진로 예측이 아닌 재미를 위한 허구의 시뮬레이션입니다.</p>
-            <button className="primary-button" type="button" onClick={() => setCreateStep("name")}>시작하기</button>
-          </section>}
-          {createStep === "name" && <section className="create-step">
-            <h2>당신의 이름은 무엇인가요?</h2>
-            <input aria-label="당신의 이름은 무엇인가요?" className="text-input" maxLength={24} value={name} onChange={(event) => setName(event.target.value)} />
-            <div className="onboarding-actions"><button onClick={() => setCreateStep("intro")}>이전</button><button disabled={!name.trim()} onClick={() => setCreateStep("age")}>다음</button></div>
-          </section>}
-          {createStep === "age" && <section className="create-step">
-            <h2>당신의 나이는 몇 살인가요?</h2>
-            <select aria-label="당신의 나이는 몇 살인가요?" className="text-input" value={age} onChange={(event) => setAge(Number(event.target.value))}>
-              {ageOptions.map((option) => <option key={option} value={option}>{option}세</option>)}
-            </select>
-            <div className="onboarding-actions"><button onClick={() => setCreateStep("name")}>이전</button><button onClick={() => setCreateStep("residence")}>다음</button></div>
-          </section>}
-          {createStep === "residence" && <section className="create-step">
-            <h2>당신은 어디에서 깨어났나요?</h2>
-            <div className="residence-grid">{residenceOptions.map((option) => (
-              <button aria-pressed={residence === option.id} className={residence === option.id ? "selected" : ""} type="button" key={option.id} onClick={() => setResidence(option.id)}>
-                <strong>{option.label}</strong><span>{option.description}</span>
-              </button>
-            ))}</div>
-            <div className="onboarding-actions"><button onClick={() => setCreateStep("age")}>이전</button><button disabled={!residence} onClick={() => setCreateStep("abilities")}>다음</button></div>
-          </section>}
-          {createStep === "abilities" && <section className="create-step">
-            <h2>당신이 믿고 싶은 능력 두 가지는 무엇인가요? ({selectedStats.length}/2)</h2>
-            <div className="chip-grid">{preferredStats.map((stat) => (
-              <button aria-pressed={selectedStats.includes(stat)} className={selectedStats.includes(stat) ? "selected" : ""} type="button" key={stat} onClick={() => setSelectedStats((current) => current.includes(stat) ? current.filter((item) => item !== stat) : current.length < 2 ? [...current, stat] : current)}>{statLabels[stat]}</button>
-            ))}</div>
-            <p className="muted">선택한 두 능력은 첫 능력치에 조금 더 높게 반영됩니다.</p>
-            <div className="onboarding-actions"><button onClick={() => setCreateStep("residence")}>이전</button><button disabled={loading || selectedStats.length !== 2 || !name.trim() || !residence} onClick={() => void createCharacter()}>눈을 뜬다</button></div>
-          </section>}
-        </section>
+        <SharedOnboardingFlow
+          variant="toss"
+          step={createStep}
+          name={name}
+          age={age}
+          residence={residence}
+          selectedStats={selectedStats}
+          loading={loading}
+          onStepChange={setCreateStep}
+          onNameChange={setName}
+          onAgeChange={setAge}
+          onResidenceChange={(value: string) => {
+            cue("tap");
+            setResidence(value);
+          }}
+          onToggleStat={(stat: string) => {
+            cue("tap");
+            setSelectedStats((current) => current.includes(stat) ? current.filter((item) => item !== stat) : current.length < 2 ? [...current, stat] : current);
+          }}
+          onSubmit={() => void createCharacter()}
+          submitDisabled={selectedStats.length !== 2 || !name.trim() || !residence}
+        />
       )}
 
       {screen === "play" && (
-        <section className="screen-stack">
-          {currentCharacter && (
-            <div className="stats-grid">
-              {Object.entries(currentCharacter.stats).map(([key, value]) => (
-                <span key={key}><b>{statLabels[key] ?? key}</b>{value}</span>
-              ))}
-            </div>
-          )}
-          {feedback && (
-            <div className="feedback-panel">
-              <strong>{statDeltaText(feedback.statDelta)}</strong>
-              <p>{feedback.summary}</p>
-            </div>
-          )}
-          {generatingNextEvent && !currentEvent ? (
-            <div className="event-loading-panel" aria-busy="true" aria-live="polite">
-              <div className="event-loading-scene" aria-hidden="true">
-                <i className="loading-cloud loading-cloud-a" />
-                <i className="loading-cloud loading-cloud-b" />
-                <span className="loading-building"><i /><i /><i /></span>
-                <span className="loading-lamp"><i /></span>
-              </div>
-              <div className="event-loading-copy">
-                <span className="event-loading-badge">새 장면</span>
-                <p>당신이 모르는 곳에서,</p>
-                <p>다음 일이 시작되고 있습니다<span className="loading-dots"><i>.</i><i>.</i><i>.</i></span></p>
-                <small>선택의 시간이 곧 찾아옵니다.</small>
-              </div>
-            </div>
-          ) : currentEvent ? (
-            <article className="event-panel">
-              <h2>{currentEvent.title}</h2>
-              <p>{currentEvent.body}</p>
-              <div className="choice-stack">
-                {currentEvent.choices.map((choice, index) => (
-                  <button type="button" key={choice.id} disabled={loading} onClick={() => void choose(index)}>
-                    {choice.label}
-                  </button>
-                ))}
-              </div>
-            </article>
-          ) : (
-            <div className="list-panel">
-              <p className="muted">현재 진행 가능한 사건이 없습니다.</p>
-              <button className="primary-button" type="button" onClick={() => currentCharacter && void api.nextEvent(currentCharacter.id).then(() => openCharacter(currentCharacter))}>다음 사건</button>
-            </div>
-          )}
-        </section>
+        <PlaySurface
+          currentCharacter={currentCharacter}
+          currentEvent={currentEvent}
+          feedback={feedback}
+          loading={loading || generatingNextEvent}
+          onChoose={(choiceIndex) => void choose(choiceIndex)}
+          onContinueToNextEvent={currentCharacter ? () => void api.nextEvent(currentCharacter.id).then(() => openCharacter(currentCharacter)) : undefined}
+        />
       )}
 
       {screen === "records" && (
@@ -435,11 +376,19 @@ export function App() {
           </div>
           {records.length === 0 && <div className="list-panel"><p className="muted">아직 남겨진 기록이 없습니다.</p></div>}
           {records.map((record) => (
-            <article className="record-panel" key={record.id}>
-              <strong>{record.title ?? record.destination ?? "선택의 결과"}</strong>
-              <p>{record.summary ?? ""}</p>
-              <span>{record.satisfaction ? `만족도 ${record.satisfaction}` : record.createdAt?.slice(0, 10)}</span>
-            </article>
+            <RecordCardShell
+              className="record-panel overflow-hidden p-0"
+              expanded
+              id={record.id}
+              key={record.id}
+              summary={record.summary ?? ""}
+              title={record.title ?? record.destination ?? "선택의 결과"}
+            >
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <span>{record.satisfaction ? `만족도 ${record.satisfaction}` : record.createdAt?.slice(0, 10)}</span>
+                <RecordShareActions onCopyLink={shareRecord} recordId={record.id} wrapperClassName="flex flex-wrap gap-2 border-t-0 p-0" />
+              </div>
+            </RecordCardShell>
           ))}
         </section>
       )}
