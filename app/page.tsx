@@ -853,6 +853,11 @@ export default function AppPage() {
 
   const startNewCharacter = useCallback(() => {
     playFeedbackCue("tap");
+    // A previous event request may still own the shared loading flag when the
+    // user starts a new run from the menu. Do not let that stale request keep
+    // the final onboarding action disabled.
+    setLoading(false);
+    setStreamingNextEvent(false);
     setCurrentChar(null);
     setCurrentEvent(null);
     setChoiceFeedback(null);
@@ -1209,6 +1214,7 @@ export default function AppPage() {
               <div className="grid grid-cols-2 gap-2">
                 {Object.entries(statLabels).map(([key, label]) => (
                   <button
+                    aria-pressed={preferredStats.includes(key)}
                     className={`pixel-button px-3 py-3 text-left text-sm ${preferredStats.includes(key) ? "bg-[#ffe0a2]" : ""}`}
                     key={key}
                     onClick={() => togglePreferredStat(key)}

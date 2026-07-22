@@ -111,6 +111,8 @@ export function App() {
   const [selectedStats, setSelectedStats] = useState<string[]>([]);
 
   const startNewSimulation = useCallback(() => {
+    setLoading(false);
+    setError("");
     setCreateStep("intro");
     setName("");
     setAge(22);
