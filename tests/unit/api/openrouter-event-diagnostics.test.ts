@@ -41,13 +41,13 @@ describe("AI event diagnostics", () => {
   });
 
   it.each([
-    [undefined, 1_800],
-    ["abc", 1_800],
-    ["399", 1_800],
+    [undefined, 4_000],
+    ["abc", 4_000],
+    ["399", 4_000],
     ["400", 400],
     ["1800", 1_800],
     ["4000", 4_000],
-    ["4001", 1_800],
+    ["4001", 4_000],
   ])("parses max tokens %s as %i", (raw, expected) => {
     expect(getOpenRouterMaxTokens(raw)).toBe(expected);
   });
@@ -67,26 +67,40 @@ describe("AI event diagnostics", () => {
     [{ ...validEvent, body: "짧다" }, "narrative_schema"],
     [{ ...validEvent, choices: [validEvent.choices[0]] }, "choice_count"],
     [{ ...validEvent, choices: [...validEvent.choices, validEvent.choices[0], validEvent.choices[1], validEvent.choices[0]] }, "choice_count"],
-    [{ ...validEvent, choices: [{ ...validEvent.choices[0], id: undefined }, validEvent.choices[1]] }, "choice_field"],
-    [{ ...validEvent, choices: [{ ...validEvent.choices[0], id: 42 }, validEvent.choices[1]] }, "choice_field"],
+    [{ ...validEvent, choices: [{ ...validEvent.choices[0], id: undefined }, validEvent.choices[1]] }, null],
+    [{ ...validEvent, choices: [{ ...validEvent.choices[0], id: 42 }, validEvent.choices[1]] }, null],
     [{ ...validEvent, choices: [{ ...validEvent.choices[0], label: undefined }, validEvent.choices[1]] }, "choice_field"],
     [{ ...validEvent, choices: [{ ...validEvent.choices[0], label: 42 }, validEvent.choices[1]] }, "choice_field"],
-    [{ ...validEvent, choices: [{ ...validEvent.choices[0], summary: undefined }, validEvent.choices[1]] }, "choice_field"],
-    [{ ...validEvent, choices: [{ ...validEvent.choices[0], summary: 42 }, validEvent.choices[1]] }, "choice_field"],
-    [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: undefined }, validEvent.choices[1]] }, "choice_schema"],
+    [{ ...validEvent, choices: [{ ...validEvent.choices[0], summary: undefined }, validEvent.choices[1]] }, null],
+    [{ ...validEvent, choices: [{ ...validEvent.choices[0], summary: 42 }, validEvent.choices[1]] }, null],
+    [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: undefined }, validEvent.choices[1]] }, null],
     [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: "bad" }, validEvent.choices[1]] }, "choice_schema"],
     [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: { mental: "bad" } }, validEvent.choices[1]] }, "choice_schema"],
     [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: { secretStat: -1 } }, validEvent.choices[1]] }, "choice_schema"],
     [{ ...validEvent, choices: [{ ...validEvent.choices[0], label: "x".repeat(201) }, validEvent.choices[1]] }, "choice_field"],
     [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: { mental: -15, health: -1 } }, validEvent.choices[1]] }, null],
     [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: { mental: 15, health: 15 } }, validEvent.choices[1]] }, null],
-    [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: { mental: -16 } }, validEvent.choices[1]] }, "choice_stat_range"],
-    [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: { mental: 16 } }, validEvent.choices[1]] }, "choice_stat_range"],
-    [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: { health: -2 } }, validEvent.choices[1]] }, "choice_stat_range"],
+    [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: { mental: -16 } }, validEvent.choices[1]] }, null],
+    [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: { mental: 16 } }, validEvent.choices[1]] }, null],
+    [{ ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: { health: -2 } }, validEvent.choices[1]] }, null],
   ])("returns the diagnostic reason %s", (candidate, reason) => {
     const result = parseAiEventContentDetailed(JSON.stringify(candidate));
     if (reason === null) expect(result).toMatchObject({ success: true });
     else expect(result).toMatchObject({ success: false, reason });
+  });
+
+  it("clamps numeric provider stat deltas instead of discarding an otherwise valid event", () => {
+    const result = parseAiEventContentDetailed(JSON.stringify({
+      ...validEvent,
+      choices: [
+        { ...validEvent.choices[0], statDelta: { academic: 28, health: -8, wealth: "-30" } },
+        validEvent.choices[1],
+      ],
+    }));
+
+    expect(result).toMatchObject({ success: true });
+    if (!result.success) throw new Error("expected a normalized event");
+    expect(result.event.choices[0]?.statDelta).toEqual({ academic: 15, health: -1, wealth: -15 });
   });
 
   it("accepts a slow successful provider response without fallback or a second call", async () => {
@@ -198,8 +212,8 @@ describe("AI event diagnostics", () => {
     const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(request.max_tokens).toBeLessThanOrEqual(1_800);
-    expect(request.response_format).toEqual({ type: "json_object" });
+    expect(request.max_tokens).toBeLessThanOrEqual(4_000);
+    expect(request.response_format).toBeUndefined();
     const instructions = request.messages.map((message: { content: string }) => message.content).join("\n");
     for (const required of ["title", "body", "tags", "choices", "id", "label", "summary", "statDelta", "relationshipDelta"]) {
       expect(instructions).toContain(`\"${required}\"`);
@@ -256,7 +270,6 @@ describe("AI event diagnostics", () => {
     ["choice_count", { ...validEvent, choices: [validEvent.choices[0]] }],
     ["choice_field", { ...validEvent, choices: [{ ...validEvent.choices[0], label: 42 }, validEvent.choices[1]] }],
     ["choice_schema", { ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: "bad" }, validEvent.choices[1]] }],
-    ["choice_stat_range", { ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: { mental: 16 } }, validEvent.choices[1]] }],
   ] as const)("classifies real provider choice output as %s with one bounded call", async (reason, candidate) => {
     process.env.OPENROUTER_API_KEY = "test-key";
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({

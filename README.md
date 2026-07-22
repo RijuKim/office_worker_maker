@@ -46,6 +46,7 @@ Required local/Vercel environment variables:
 DATABASE_URL="postgresql://..."
 NEXTAUTH_SECRET="generate-a-long-random-secret"
 NEXTAUTH_URL="https://your-vercel-domain.vercel.app"
+OLLAMA_API_KEY="..."
 OPENROUTER_API_KEY="..."
 OPENROUTER_MODEL="openrouter/model-name"
 OPENROUTER_TIMEOUT_MS="60000"
@@ -53,6 +54,7 @@ OPENROUTER_MAX_TOKENS="1800"
 ```
 
 For local development, put these values in `.env.local`. Do not commit `.env.local`.
+Keep provider secrets in Vercel Environment Variables and redeploy after changing them; never store real API keys in Git, Codex, or OpenCode configuration.
 
 Run migrations against Neon after setting `DATABASE_URL`:
 

@@ -1126,9 +1126,12 @@ function normalizeChoice(raw: unknown) {
   const rawDelta = readRecord(choice.statDelta) ?? readRecord(choice.statChanges) ?? readRecord(choice.effects);
   const statDelta = rawDelta ? Object.fromEntries(
     Object.entries(rawDelta).map(([key, value]) => {
-      if (allowedStats.includes(key as typeof allowedStats[number]) && typeof value === "string") {
+      if (allowedStats.includes(key as typeof allowedStats[number])) {
         const numeric = Number(value);
-        if (Number.isFinite(numeric)) return [key, Math.round(numeric)];
+        if (Number.isFinite(numeric)) {
+          const minimum = key === "health" ? -1 : -15;
+          return [key, Math.max(minimum, Math.min(15, Math.round(numeric)))];
+        }
       }
       return [key, value];
     }),
