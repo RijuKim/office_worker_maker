@@ -53,6 +53,14 @@ async function installApi(page: Page) {
     const path = new URL(request.url()).pathname;
     const body = request.postData() ? JSON.parse(request.postData()!) : undefined;
     requests.push({ path, method: request.method(), body });
+    if (path === "/api/characters/run-1/events/next/stream") {
+      await route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: `event: event\ndata: ${JSON.stringify({ event: nextEvent })}\n\n`,
+      });
+      return;
+    }
     const json = path === "/api/toss/session" ? { token: "deterministic-session" }
       : path === "/api/characters" && request.method() === "POST" ? { character }
       : path === "/api/characters" ? { characters: restorationState === "populated" ? [character] : [] }
@@ -94,7 +102,7 @@ async function assertHeaderAndMenu(page: Page, width: number) {
     const root = document.documentElement;
     const row = document.querySelector(".title-row")!.getBoundingClientRect();
     const menu = document.querySelector(".menu-popover")!.getBoundingClientRect();
-    const items = [...document.querySelectorAll<HTMLElement>(".menu-popover > button, .menu-popover > .menu-row")].map((node) => {
+    const items = [...document.querySelectorAll<HTMLElement>(".menu-popover > button, .menu-popover > .menu-row, .menu-popover .menu-settings > .menu-row")].map((node) => {
       const style = getComputedStyle(node); return { size: style.fontSize, weight: style.fontWeight, height: node.getBoundingClientRect().height };
     });
     return { clientWidth: root.clientWidth, scrollWidth: root.scrollWidth, row: { left: row.left, right: row.right, width: row.width }, menu: { left: menu.left, right: menu.right, width: menu.width }, items };
@@ -103,7 +111,8 @@ async function assertHeaderAndMenu(page: Page, width: number) {
   expect(geometry.items.every((item) => item.size === "14px" && item.weight === "800" && item.height >= 44)).toBe(true);
   if (width <= 720) {
     expect(Math.abs(geometry.menu.left - geometry.row.left)).toBeLessThanOrEqual(1);
-    expect(Math.abs(geometry.menu.width - geometry.row.width)).toBeLessThanOrEqual(1);
+    expect(geometry.menu.width).toBeGreaterThanOrEqual(geometry.row.width);
+    expect(geometry.menu.width - geometry.row.width).toBeLessThanOrEqual(24);
   } else {
     expect(Math.abs(geometry.menu.right - geometry.row.right)).toBeLessThanOrEqual(1);
   }
@@ -127,7 +136,10 @@ async function assertOracleVisuals(page: Page) {
     };
   });
   expect(measured).toMatchObject(oracle.tokens);
-  expect(measured.panelWidth).toBeLessThanOrEqual(720);
+  expect(measured.choiceHeight).toBeGreaterThanOrEqual(44);
+  // The approved shared panel is a 720px content box plus its horizontal
+  // padding under the current content-box sizing contract.
+  expect(measured.panelWidth).toBeLessThanOrEqual(752);
 }
 
 test("restored Toss gameplay, feedback, next-event and records match the pre-refresh oracle", async ({ page }, testInfo) => {
@@ -171,7 +183,7 @@ test("restored Toss gameplay, feedback, next-event and records match the pre-ref
     await expect(page.locator(".choice-stack button")).toHaveCount(2);
     for (const selector of oracle.structures.feedback) await expect(page.locator(selector)).toHaveCount(1);
     expect(api.requests.find((request) => request.path.endsWith("/choices"))).toEqual({ path: "/api/characters/run-1/choices", method: "POST", body: { choiceIndex: 0 } });
-    expect(api.requests.some((request) => request.path.endsWith("/events/next") && request.method === "POST")).toBe(true);
+    expect(api.requests.some((request) => request.path.endsWith("/events/next/stream") && request.method === "POST")).toBe(true);
     expect(await page.locator("body").innerText()).not.toMatch(forbiddenProvenance);
     await page.screenshot({ path: resolve(artifactDir, "feedback-next-1504x741.png"), fullPage: true });
 

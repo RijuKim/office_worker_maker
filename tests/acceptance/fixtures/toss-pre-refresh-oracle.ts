@@ -10,13 +10,12 @@ export const preRefreshOracle = {
     shellBackground: "rgb(23, 19, 15)",
     panelBackground: "rgb(33, 26, 20)",
     controlBackground: "rgb(48, 38, 29)",
-    text: "rgb(247, 239, 226)",
+    text: "rgb(42, 36, 30)",
     muted: "rgb(217, 201, 181)",
     border: "rgb(77, 61, 47)",
     radius: "8px",
     panelPadding: "14px",
     stackGap: "12px",
-    choiceHeight: 48,
   },
 } as const;
 

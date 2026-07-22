@@ -8,7 +8,10 @@ export default defineConfig({
   // is still using, which can strand the run without a useful final report.
   workers: 1,
   fullyParallel: false,
-  globalTimeout: 10 * 60_000,
+  // The full matrix is intentionally serialized because a few specs own fixed
+  // auxiliary Vite ports. Give both browser projects enough time to finish;
+  // the previous ten-minute cap interrupted the suite before cleanup/reporting.
+  globalTimeout: 30 * 60_000,
   reporter: 'line',
   timeout: 30_000,
   expect: {

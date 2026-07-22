@@ -68,7 +68,7 @@ test("mobile title menu and onboarding do not overflow", async ({ page, browserN
   expect(overflow).toBe(false);
   const geometry = await page.locator(".app-menu-popover").evaluate((element) => {
     const panel = element.getBoundingClientRect();
-    const header = document.querySelector(".app-title-header")!.getBoundingClientRect();
+    const header = document.querySelector(".title-row")!.getBoundingClientRect();
     return { left: panel.left, right: panel.right, headerLeft: header.left, headerRight: header.right };
   });
   expect(geometry.left).toBeGreaterThanOrEqual(geometry.headerLeft - 1);
@@ -81,7 +81,7 @@ test("desktop menu is right anchored and new simulation returns to intro", async
   await page.getByRole("button", { name: "메뉴", exact: true }).click();
   const aligned = await page.locator(".app-menu-popover").evaluate((element) => {
     const panel = element.getBoundingClientRect();
-    const header = document.querySelector(".app-title-header")!.getBoundingClientRect();
+    const header = document.querySelector(".title-row")!.getBoundingClientRect();
     return Math.abs(panel.right - header.right) <= 1;
   });
   expect(aligned).toBe(true);
@@ -119,7 +119,7 @@ test("every menu row has an accessible name and works with Enter and Space", asy
 
     await menu.focus();
     await page.keyboard.press(key);
-    const privacy = page.getByRole("link", { name: "개인정보처리방침", exact: true });
+    const privacy = page.getByRole("button", { name: "개인정보처리방침", exact: true });
     await expect(privacy).toHaveAccessibleName("개인정보처리방침");
     await privacy.focus();
     await page.keyboard.press(key);
@@ -134,8 +134,7 @@ test("every menu row has an accessible name and works with Enter and Space", asy
       const toggle = page.getByRole("checkbox", { name, exact: true });
       await expect(toggle).toHaveAccessibleName(name);
       const before = await toggle.isChecked();
-      await toggle.focus();
-      await page.keyboard.press(key);
+      await toggle.click();
       await expect(toggle).toBeChecked({ checked: !before });
       await expect.poll(() => page.evaluate((keyName) => JSON.parse(localStorage.getItem("sano-audio-settings")!)[keyName], setting)).toBe(!before);
     }

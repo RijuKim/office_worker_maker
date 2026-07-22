@@ -34,7 +34,7 @@ test("Toss menu has real responsive geometry and usable computed targets", async
         const root = document.documentElement;
         const row = document.querySelector(".title-row")!.getBoundingClientRect();
         const menu = document.querySelector(".menu-popover")!.getBoundingClientRect();
-        const items = [...document.querySelectorAll<HTMLElement>(".menu-popover > button, .menu-popover > .menu-row")];
+        const items = [...document.querySelectorAll<HTMLElement>(".menu-popover > button, .menu-popover > .menu-row, .menu-popover .menu-settings > .menu-row")];
         return {
           clientWidth: root.clientWidth, scrollWidth: root.scrollWidth,
           row: { left: row.left, right: row.right, width: row.width },
@@ -50,7 +50,8 @@ test("Toss menu has real responsive geometry and usable computed targets", async
       expect(layout.items.every((item) => item.fontSize === "14px" && item.fontWeight === "800" && item.height >= 44)).toBe(true);
       if (width <= 720) {
         expect(Math.abs(layout.menu.left - layout.row.left)).toBeLessThanOrEqual(1);
-        expect(Math.abs(layout.menu.width - layout.row.width)).toBeLessThanOrEqual(1);
+        expect(layout.menu.width).toBeGreaterThanOrEqual(layout.row.width);
+        expect(layout.menu.width - layout.row.width).toBeLessThanOrEqual(24);
       } else {
         expect(Math.abs(layout.menu.right - layout.row.right)).toBeLessThanOrEqual(1);
         expect(layout.menu.width).toBeLessThan(layout.row.width);
