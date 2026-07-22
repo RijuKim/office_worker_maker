@@ -28,7 +28,7 @@ const fallbackProvider = (): AiProvider => ({
   label: "OpenRouter",
   baseUrl: "https://openrouter.ai/api/v1",
   key: process.env.OPENROUTER_API_KEY ?? null,
-  model: process.env.OPENROUTER_MODEL ?? "qwen/qwen3-30b-a3b:free",
+  model: process.env.OPENROUTER_MODEL ?? "openrouter/free",
   headers: {
     "HTTP-Referer": process.env.NEXTAUTH_URL ?? "https://sano-officeworker.vercel.app",
     "X-Title": "Sano Officeworker",
