@@ -44,6 +44,7 @@ vi.mock("@/lib/game/openrouter", async (importOriginal) => {
   return { ...actual, generateAiEnding: vi.fn() };
 });
 
+import { GET as getCharacter } from "@/app/api/characters/[id]/route";
 import { POST as choose } from "@/app/api/characters/[id]/choices/route";
 
 function activeEvent(id: string, title: string) {
@@ -147,12 +148,60 @@ describe("choice event authority", () => {
     expect(mocks.historyCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({ eventId: authoritative.id, choiceId: "authoritative-choice" }),
     });
+    expect(mocks.historyCreate).toHaveBeenCalledTimes(1);
     expect(mocks.runUpdateMany).toHaveBeenCalledWith({
       where: { id: "run-1", userId: "user-1", currentEventId: authoritative.id },
       data: { currentEventId: null },
     });
     expect(mocks.runUpdate).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "run-1" } }));
     expect(JSON.stringify(mocks.eventUpdate.mock.calls)).not.toContain(newerOrphan.id);
+  });
+
+  it("persists one forced-event history entry that the character route returns after reload", async () => {
+    const forced = { ...activeEvent("forced-leave-recovery", "휴학 회복 선택"), source: "FORCED" };
+    const run = {
+      ...character([forced], forced.id),
+      startGradeYear: 1,
+      lifeStatus: "ALIVE",
+      createdAt: new Date("2026-07-22T00:00:00.000Z"),
+      updatedAt: new Date("2026-07-22T00:00:00.000Z"),
+      records: [],
+    };
+    const persistedHistory: Array<Record<string, unknown>> = [];
+    mocks.characterFindFirst
+      .mockResolvedValueOnce(run)
+      .mockImplementationOnce(async () => ({
+        ...run,
+        currentEventId: null,
+        events: [],
+        eventHistory: persistedHistory,
+      }));
+    mocks.historyCreate.mockImplementationOnce(async ({ data }: { data: Record<string, unknown> }) => {
+      const saved = { id: "history-1", createdAt: new Date("2026-07-22T00:01:00.000Z"), ...data };
+      persistedHistory.push(saved);
+      return saved;
+    });
+
+    const choiceResponse = await choose(request(), { params: Promise.resolve({ id: "run-1" }) });
+    expect(choiceResponse.status).toBe(200);
+    expect(mocks.historyCreate).toHaveBeenCalledTimes(1);
+
+    const reloadResponse = await getCharacter(
+      new Request("http://localhost/api/characters/run-1"),
+      { params: Promise.resolve({ id: "run-1" }) },
+    );
+    expect(reloadResponse.status).toBe(200);
+    await expect(reloadResponse.json()).resolves.toMatchObject({
+      character: {
+        id: "run-1",
+        eventHistory: [expect.objectContaining({
+          eventId: forced.id,
+          choiceId: "forced-leave-recovery-choice",
+          summary: "휴학 회복 선택에서 차분히 대응했다.",
+        })],
+      },
+    });
+    expect(persistedHistory).toHaveLength(1);
   });
 
   it("returns the existing no-active response when only orphan ACTIVE rows exist", async () => {

@@ -41,7 +41,9 @@
     ".next-playwright-retry5-host/types/**/*.ts",
     ".next-playwright-retry5-host/dev/types/**/*.ts",
     ".next-build-webpack-retry6/types/**/*.ts",
-    ".next-build-webpack-retry6/dev/types/**/*.ts"
+    ".next-build-webpack-retry6/dev/types/**/*.ts",
+    ".next-playwright-retry6-host/types/**/*.ts",
+    ".next-playwright-retry6-host/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

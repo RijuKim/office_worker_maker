@@ -43,7 +43,10 @@ test("production-generated endings persist, group near-duplicates, and restore t
   await page.reload();
   await openRecords(page);
   await expect(page.getByRole("heading", { name: first.title, exact: true }).first()).toBeVisible();
-  await expect(page.locator("article.record-panel")).toHaveCount(2);
+  const renderedProductionRecords = page.getByRole("article").filter({
+    has: page.getByRole("heading", { name: first.title, exact: true }),
+  });
+  await expect(renderedProductionRecords).toHaveCount(2);
   await page.getByRole("tab", { name: "결말 모음" }).click();
 
   const progress = page.getByRole("heading", { name: /\d+\s*\/\s*\d+\s*달성/ });

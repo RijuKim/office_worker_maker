@@ -20,7 +20,12 @@ test("low health transition persists the leave state after reload", async ({ pag
   await expect(page.getByRole("heading", { name: forced.body.event.title, exact: true })).toBeVisible();
   const recovery = page.getByRole("button", { name: forced.body.event.choices[0].label });
   await expect(recovery).toBeVisible();
+  const choiceCommitted = page.waitForResponse((response) =>
+    response.url().endsWith(`/api/characters/${character.id}/choices`) &&
+    response.request().method() === "POST",
+  );
   await recovery.click();
+  expect((await choiceCommitted).status()).toBe(200);
   await page.reload();
   const recovered = await page.request.get(`/api/characters/${character.id}`);
   expect((await recovered.json()).character.eventHistory.length).toBeGreaterThan(0);
