@@ -1155,6 +1155,37 @@ describe("stateful JSON/SSE event authority", () => {
     expect([...fixture.events.values()]).toHaveLength(1);
   });
 
+  it("converges twenty concurrent JSON generation requests to one ACTIVE event and identical payloads", async () => {
+    const count = 20;
+    const promises = Array.from({ length: count }, () =>
+      nextJson(new Request("http://localhost/api/characters/run-1/events/next", { method: "POST" }), {
+        params: Promise.resolve({ id: "run-1" }),
+      }).then(async (response) => ({ status: response.status, payload: await response.json() })),
+    );
+
+    const results = await Promise.all(promises);
+    const active = [...fixture.events.values()].filter((event) => event.status === "ACTIVE");
+    const persistedWinner = fixture.events.get(fixture.pointer!);
+    const winnerPayload = persistedWinner && {
+      id: persistedWinner.id,
+      title: persistedWinner.title,
+      body: persistedWinner.body,
+      source: persistedWinner.source,
+      choices: persistedWinner.choices,
+      forced: false,
+    };
+
+    expect(fixture.generationCalls).toBe(1);
+    expect(active).toHaveLength(1);
+    expect(active[0].id).toBe(fixture.pointer);
+    expect([...fixture.events.values()]).toHaveLength(1);
+
+    for (const result of results) {
+      expect(result.status).toBe(200);
+      expect(result.payload.event).toEqual(winnerPayload);
+    }
+  });
+
   it("recovers a committed stream event through GET and JSON when the client ignores the final SSE", async () => {
     const streamResponse = await nextStream(new Request("http://localhost/api/characters/run-1/events/next/stream", { method: "POST" }), {
       params: Promise.resolve({ id: "run-1" }),

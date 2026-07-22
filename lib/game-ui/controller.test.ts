@@ -280,6 +280,36 @@ describe("game controller", () => {
     });
   });
 
+  it("calls nextEventStream exactly once per choose and does not render the same event twice", async () => {
+    const host = makeHost();
+    const stubs = createApiStubs();
+    const events = [makeEvent("event-2"), makeEvent("event-3")];
+    let eventIndex = 0;
+    stubs.nextEventStream.mockImplementation(async () => {
+      const event = events[eventIndex];
+      eventIndex += 1;
+      return { ok: true as const, status: 200, data: { event } };
+    });
+    const controller = createGameController({ host, apiFactory: () => stubs.api });
+
+    await controller.bootstrap();
+    await controller.resumeRun("run-1");
+
+    await controller.choose(0);
+    expect(stubs.nextEventStream).toHaveBeenCalledTimes(1);
+    expect(controller.getState()).toMatchObject({
+      loadingTask: null,
+      currentEvent: expect.objectContaining({ id: "event-2" }),
+    });
+
+    await controller.choose(0);
+    expect(stubs.nextEventStream).toHaveBeenCalledTimes(2);
+    expect(controller.getState()).toMatchObject({
+      loadingTask: null,
+      currentEvent: expect.objectContaining({ id: "event-3" }),
+    });
+  });
+
   it("loads records and exposes settings and detail navigation as state transitions", async () => {
     const host = makeHost();
     const stubs = createApiStubs();

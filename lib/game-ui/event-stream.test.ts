@@ -298,6 +298,42 @@ describe("game-ui event transport", () => {
     expect(sleeps).toEqual(Array.from({ length: 20 }, () => 600));
   });
 
+  it("sends exactly one stream POST and does not issue a second generation request on recovery", async () => {
+    const committedEvent = {
+      id: "event-one-post",
+      title: "한 번의 POST로 확정된 사건",
+      body: "클라이언트는 정확히 하나의 스트림 POST만 보내야 합니다.",
+      source: "STATIC",
+      choices: [],
+    };
+    let streamPosts = 0;
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/events/next/stream")) {
+        streamPosts += 1;
+        expect(init?.method).toBe("POST");
+        return streamResponse([
+          'event: status\ndata: {"message":"선택의 시간이 다가오고 있습니다..."}\n\n',
+          `event: event\ndata: ${JSON.stringify({ event: committedEvent })}`,
+        ]);
+      }
+      return jsonResponse({ currentEvent: null });
+    });
+    const client = createGameApiClient({
+      baseUrl: "https://api.example.com",
+      headers: () => ({ Authorization: "Bearer token-1" }),
+      fetchImpl: fetchImpl as typeof fetch,
+    });
+
+    await expect(client.nextEventStream<typeof committedEvent>("run-1")).resolves.toEqual({
+      ok: true,
+      status: 200,
+      data: { event: committedEvent },
+    });
+    expect(streamPosts).toBe(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it("returns immediately after the final SSE frame even if the body stays open", async () => {
     vi.useFakeTimers();
     try {
