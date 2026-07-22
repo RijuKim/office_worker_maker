@@ -3,6 +3,13 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests/acceptance',
   testMatch: '**/*.spec.ts',
+  // Several acceptance specs own auxiliary Vite servers on fixed ports. Running
+  // those specs concurrently lets one worker tear down a server another worker
+  // is still using, which can strand the run without a useful final report.
+  workers: 1,
+  fullyParallel: false,
+  globalTimeout: 10 * 60_000,
+  reporter: 'line',
   timeout: 30_000,
   expect: {
     timeout: 10_000,
@@ -12,10 +19,11 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    // Acceptance tests exercise the configured development database. Apply the
-    // repository's committed migrations before Next.js can serve a request so
-    // the generated Prisma client and runtime schema cannot silently drift.
-    command: 'npx prisma migrate deploy && npm run dev',
+    // Keep server startup independent from the availability of the remote
+    // development database. Database-backed specs should report connectivity or
+    // schema failures as test results instead of preventing every browser and
+    // smoke test from reaching Next.js.
+    command: 'npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
