@@ -17,8 +17,8 @@ test("low health transition persists the leave state after reload", async ({ pag
   await page.reload();
   const restored = await page.request.get(`/api/characters/${character.id}`);
   await expect(restored.json()).resolves.toMatchObject({ character: { academicStatus: "LEAVE", stats: { health: 2, mental: 2 } } });
-  await expect(page.getByRole("heading", { name: "번아웃 경고" })).toBeVisible();
-  const recovery = page.locator(".choice-stack button").first();
+  await expect(page.getByRole("heading", { name: forced.body.event.title, exact: true })).toBeVisible();
+  const recovery = page.getByRole("button", { name: forced.body.event.choices[0].label });
   await expect(recovery).toBeVisible();
   await recovery.click();
   await page.reload();
@@ -29,10 +29,13 @@ test("low health transition persists the leave state after reload", async ({ pag
 test("forced events return agency without direct pass or fail commands", async ({ page }) => {
   const { character } = await completeRealOnboarding(page);
   await seedFixture(page, "life-stage-precursor", character.id);
-  await page.evaluate((id) => fetch(`/api/characters/${id}/events/forced-check`, { method: "POST" }), character.id);
+  const forced = await page.evaluate(async (id) => fetch(`/api/characters/${id}/events/forced-check`, { method: "POST" }).then((response) => response.json()), character.id);
   await page.reload();
   await expect(page.getByRole("button", { name: /통과한다|합격한다|탈락한다|떨어진다|다음 회차/ })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "충분히 쉬고 상담을 받는다" })).toBeVisible();
+  expect(forced.event.choices.length).toBeGreaterThan(1);
+  for (const choice of forced.event.choices) {
+    await expect(page.getByRole("button", { name: choice.label })).toBeVisible();
+  }
 });
 
 test("records never expose internal route grades", async ({ page }) => {

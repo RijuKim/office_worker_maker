@@ -28,6 +28,7 @@ interface CharacterData {
   eventHistory: { summary: string; createdAt: string }[];
   currentEventId: string | null;
   coreEventCount: number;
+  specScore: number;
   progressLabel?: string;
   lifeStage?: {
     term?: { label?: string };
@@ -413,6 +414,7 @@ export default function AppPage() {
   const [createStep, setCreateStep] = useState<CreateStep>("intro");
 
   const mountedRef = useRef(false);
+  const navigationVersionRef = useRef(0);
   const activeScreen = screen;
 
   const stopMusic = useCallback(() => {
@@ -551,13 +553,14 @@ export default function AppPage() {
   }
 
   async function loadCharacters() {
+    const navigationVersion = navigationVersionRef.current;
     setLoading(true);
     try {
       const { ok, data } = await doFetch("/api/characters");
       if (ok) {
         const loadedCharacters = data.characters ?? [];
         if (!currentChar && loadedCharacters.length > 0) {
-          await resumeCharacter(loadedCharacters[0]);
+          await resumeCharacter(loadedCharacters[0], navigationVersion);
         }
       }
     } finally {
@@ -806,7 +809,7 @@ export default function AppPage() {
     }
   }, [charName, charAge, charResidence, preferredStats, playFeedbackCue]);
 
-  const resumeCharacter = useCallback(async (char: CharacterData) => {
+  const resumeCharacter = useCallback(async (char: CharacterData, navigationVersion = navigationVersionRef.current) => {
     setCurrentChar(char);
     setCurrentEvent(null);
     setStreamingNextEvent(false);
@@ -821,7 +824,9 @@ export default function AppPage() {
     } else {
       await fetchNextEvent(char.id);
     }
-    setScreen("play");
+    if (navigationVersionRef.current === navigationVersion) {
+      setScreen("play");
+    }
   }, []);
 
   const startNewCharacter = useCallback(() => {
@@ -968,28 +973,46 @@ export default function AppPage() {
   const academicProgressLabel = getAcademicProgressLabel(currentChar);
   const runCompleted = Boolean(endingNotice);
   const topChrome = (
-    <SharedGameChrome
-      variant="web"
-      menuOpen={menuOpen}
-      onMenuOpenChange={setMenuOpen}
-      onOpenProgress={currentChar ? () => setScreen("play") : undefined}
-      onOpenRecords={() => {
-        setExpandedRecord(null);
-        setScreen("records");
-        void loadRecords();
-      }}
-      onStartNewSimulation={startNewCharacter}
-      accountLabel={status === "authenticated" ? "계정" : "로그인/저장"}
-      showAccountAction
-      onOpenAccount={() => setScreen("auth")}
-      onOpenPrivacy={() => {
-        window.location.href = "/privacy";
-      }}
-      audioSettings={audioSettings}
-      onAudioSettingChange={updateAudioSetting}
-      audioReady={audioReady}
-      currentCharacterName={currentChar?.name ?? null}
-    />
+    <>
+      <SharedGameChrome
+        variant="web"
+        menuOpen={menuOpen}
+        onMenuOpenChange={setMenuOpen}
+        onOpenProgress={currentChar ? () => setScreen("play") : undefined}
+        onOpenRecords={() => {
+          navigationVersionRef.current += 1;
+          setExpandedRecord(null);
+          setScreen("records");
+          void loadRecords();
+        }}
+        onStartNewSimulation={startNewCharacter}
+        accountLabel={status === "authenticated" ? "계정" : "로그인/저장"}
+        showAccountAction
+        onOpenAccount={() => setScreen("auth")}
+        onOpenPrivacy={() => {
+          window.location.href = "/privacy";
+        }}
+        audioSettings={audioSettings}
+        onAudioSettingChange={updateAudioSetting}
+        audioReady={audioReady}
+        currentCharacterName={currentChar?.name ?? null}
+      />
+      {status !== "authenticated" && (
+        <div className="pixel-shell flex justify-end px-4 pb-2">
+          <a
+            className="text-xs font-bold text-[#8a4f2d] underline"
+            href="#auth"
+            onClick={(event) => {
+              event.preventDefault();
+              setAuthMode("signup");
+              setScreen("auth");
+            }}
+          >
+            회원가입/로그인
+          </a>
+        </div>
+      )}
+    </>
   );
 
   if (activeScreen === "auth") {
@@ -1012,24 +1035,27 @@ export default function AppPage() {
               <button className="pixel-button w-full px-4 py-3 text-sm font-bold" onClick={() => signOut()}>로그아웃</button>
             </div>
           ) : (
-            <div className="space-y-4">
-              <input className="pixel-input w-full px-4 py-3 text-sm" placeholder="이메일" type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} />
-              <input className="pixel-input w-full px-4 py-3 text-sm" placeholder="비밀번호 (8자 이상)" type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} />
+            <form className="space-y-4" onSubmit={(event) => {
+              event.preventDefault();
+              void (authMode === "login" ? handleLogin() : handleSignup());
+            }}>
+              <input className="pixel-input w-full px-4 py-3 text-sm" aria-label="이메일" name="email" placeholder="이메일" type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} />
+              <input className="pixel-input w-full px-4 py-3 text-sm" aria-label="비밀번호" name="password" placeholder="비밀번호 (8자 이상)" type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} />
               {authMode === "login" ? (
                 <div className="space-y-3">
-                  <button className="pixel-button-dark w-full px-4 py-3 text-sm font-bold disabled:opacity-50" disabled={loading} onClick={handleLogin}>로그인</button>
-                  <p className="text-center text-xs text-[#706b62]">처음 저장하시나요? <button className="text-[#8a4f2d] underline" onClick={() => setAuthMode("signup")}>회원가입하고 현재 진행 저장</button></p>
+                  <button className="pixel-button-dark w-full px-4 py-3 text-sm font-bold disabled:opacity-50" disabled={loading} type="submit">로그인</button>
+                  <p className="text-center text-xs text-[#706b62]">처음 저장하시나요? <button className="text-[#8a4f2d] underline" type="button" onClick={() => setAuthMode("signup")}>회원가입하고 현재 진행 저장</button></p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <button className="pixel-button-dark w-full px-4 py-3 text-sm font-bold disabled:opacity-50" disabled={loading} onClick={handleSignup}>회원가입하고 저장</button>
-                  <p className="text-center text-xs text-[#706b62]">이미 계정이 있으신가요? <button className="text-[#8a4f2d] underline" onClick={() => setAuthMode("login")}>로그인</button></p>
+                  <button className="pixel-button-dark w-full px-4 py-3 text-sm font-bold disabled:opacity-50" disabled={loading} type="submit">회원가입하고 저장</button>
+                  <p className="text-center text-xs text-[#706b62]">이미 계정이 있으신가요? <button className="text-[#8a4f2d] underline" type="button" onClick={() => setAuthMode("login")}>로그인</button></p>
                 </div>
               )}
               <div className="border-t border-[#eee8dd] pt-3">
-                <button className="w-full text-center text-xs text-[#706b62] underline" onClick={() => setScreen(currentChar ? "play" : "create")}>나중에 저장하기</button>
+                <button className="w-full text-center text-xs text-[#706b62] underline" type="button" onClick={() => setScreen(currentChar ? "play" : "create")}>나중에 저장하기</button>
               </div>
-            </div>
+            </form>
           )}
           </div>
         </main>
@@ -1201,7 +1227,7 @@ export default function AppPage() {
           <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "play" ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`} onClick={() => setScreen("play")}>진행</button>
           <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "character_detail" ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`} onClick={() => setScreen("character_detail")}>캐릭터</button>
           <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "relationships" ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`} onClick={() => setScreen("relationships")}>관계</button>
-          <button className="rounded-lg px-2.5 py-2 text-left text-sm text-[#d9c9b5]" onClick={() => { setExpandedRecord(null); setScreen("records"); loadRecords(); }}>기록</button>
+          <button className="rounded-lg px-2.5 py-2 text-left text-sm text-[#d9c9b5]" onClick={() => { navigationVersionRef.current += 1; setExpandedRecord(null); setScreen("records"); loadRecords(); }}>기록</button>
           <button
             aria-expanded={mobileStatsOpen}
             className={`mobile-stats-toggle rounded-lg px-2.5 py-2 text-left text-sm ${mobileStatsOpen ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`}
@@ -1244,8 +1270,11 @@ export default function AppPage() {
               </dl>
             </section>
             {specs.length > 0 && (
-              <section className={`sidebar-stats mt-3.5 rounded-lg border border-[#4d3d2f] bg-[#1b1612] p-3.5 ${mobileStatsOpen ? "sidebar-stats-open" : ""}`}>
-                <h2 className="text-base font-bold">스펙</h2>
+              <section className={`sidebar-stats mt-3.5 rounded-lg border border-[#4d3d2f] bg-[#1b1612] p-3.5 ${mobileStatsOpen ? "sidebar-stats-open" : ""}`} data-testid="spec-panel">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-base font-bold">스펙</h2>
+                  <span className="text-xs font-bold text-[#f7d08b]" data-testid="spec-score">총점 {currentChar.specScore}</span>
+                </div>
                 <div className="mt-2 space-y-1">
                   {specs.filter(s => s.status === "COMPLETED" || s.status === "IN_PROGRESS").map((spec, i) => (
                     <div className="rounded-md bg-[#2c231b] px-2.5 py-2 text-[12px]" key={i}>

@@ -32,6 +32,7 @@ const character = {
   eventHistory: [],
   currentEventId: "event-1",
   coreEventCount: 14,
+  specScore: 13,
   progressLabel: "4학년 2학기 · 졸업요건 점검",
   lifeStage: {
     lifeStage: "college_late",
@@ -256,6 +257,7 @@ describe("Home page scaffold", () => {
       const path = new URL(String(input), "http://localhost").pathname;
       if (path === "/api/characters") return Response.json({ characters: [character] });
       if (path === "/api/characters/char-1") return Response.json({ character, currentEvent: { id: "event-1", title: "현재 사건", body: "진행 중", choices: [], source: "STATIC" } });
+      if (path === "/api/characters/char-1/specs") return Response.json({ specs: [{ specType: "PORTFOLIO", specName: "서비스 기획 포트폴리오", status: "COMPLETED", score: "우수" }] });
       if (path === "/api/records") return Response.json({ records: [] });
       return Response.json({});
     }));
@@ -264,6 +266,8 @@ describe("Home page scaffold", () => {
     const root = createRoot(container);
     await act(async () => root.render(<Home />));
     await waitForAssertion(() => expect(container.textContent).toContain("현재 사건"));
+    expect(container.querySelector('[data-testid="spec-panel"]')?.textContent).toContain("서비스 기획 포트폴리오");
+    expect(container.querySelector('[data-testid="spec-score"]')?.textContent).toBe("총점 13");
     const menu = container.querySelector("button[aria-label='메뉴']") as HTMLButtonElement;
     menu.focus();
     act(() => menu.click());
