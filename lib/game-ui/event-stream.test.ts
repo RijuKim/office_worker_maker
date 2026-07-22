@@ -182,14 +182,22 @@ describe("game-ui event transport", () => {
     const splitAt = findByteSequence(encoded, emojiBytes);
     expect(splitAt).toBeGreaterThanOrEqual(0);
 
-    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+    let recoveryFetches = 0;
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(String(input));
-      if (url.pathname.endsWith("/events/next/stream")) {
+      expect(url.pathname).toBe("/api/characters/run-1/events/next/stream");
+      expect(url.origin).toBe("https://api.example.com");
+      expect(init?.method).toBe("POST");
+      expect(new Headers(init?.headers).get("Accept")).toBe("text/event-stream");
+      expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer token-1");
+
+      if (url.pathname === "/api/characters/run-1/events/next/stream") {
         return byteStreamResponse([
           encoded.slice(0, splitAt + 2),
           encoded.slice(splitAt + 2),
         ]);
       }
+      recoveryFetches += 1;
       throw new Error(`unexpected recovery request: ${url.pathname}`);
     });
     const client = createGameApiClient({
@@ -204,6 +212,7 @@ describe("game-ui event transport", () => {
       data: { event },
     });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(recoveryFetches).toBe(0);
   });
 
   it.each([
