@@ -26,9 +26,11 @@ export default defineConfig({
     // development database. Database-backed specs should report connectivity or
     // schema failures as test results instead of preventing every browser and
     // smoke test from reaching Next.js.
-    command: 'npm run dev',
+    // Webpack's single long-lived dev process is materially more stable for the
+    // serialized database suite than Turbopack's transient worker pool.
+    command: 'npm run dev -- --webpack',
     url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120_000,
   },
   projects: [

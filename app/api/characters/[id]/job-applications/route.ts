@@ -82,5 +82,5 @@ export async function GET(_request: Request, context: RouteContext) {
     orderBy: { createdAt: "asc" },
   });
 
-  return NextResponse.json({ applications });
+  return NextResponse.json({ jobApplications: applications });
 }

@@ -52,7 +52,7 @@ export async function installSharedUiApi(page: Page, options: { restored?: boole
             : path === "/api/records"
               ? { records: options.records ? [sharedRecord] : [] }
               : path.includes("/specs") ? { specs: [] }
-              : path.includes("/job-applications") ? { applications: [] }
+              : path.includes("/job-applications") ? { jobApplications: [] }
               : path.includes("/career-paths") ? { paths: [] }
               : {};
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(json) });

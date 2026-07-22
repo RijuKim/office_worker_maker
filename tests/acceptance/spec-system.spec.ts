@@ -1,23 +1,34 @@
 import { expect, test } from "@playwright/test";
-import { completeSharedOnboarding, installSharedUiApi, sharedEvent } from "./helpers/shared-ui";
+import { completeRealOnboarding, seedFixture } from "./helpers/real-ui";
 
-test("a current shared-UI choice posts its index and shows the result", async ({ page }) => {
-  const api = await installSharedUiApi(page);
-  await page.goto("/");
-  await completeSharedOnboarding(page);
-  await page.getByRole("button", { name: sharedEvent.choices[0].label }).click();
+test.beforeEach(({ viewport }) => test.skip((viewport?.width ?? 0) < 800, "database integration runs once in the desktop project"));
 
-  expect(api.requests.find(({ path }) => path.endsWith("/choices"))).toMatchObject({
-    method: "POST", path: "/api/characters/run-1/choices", body: { choiceIndex: 0 },
-  });
-  await expect(page.locator(".feedback-panel")).toContainText("실무 +2");
-  await expect(page.locator(".feedback-panel")).toContainText("준비가 기록되었습니다.");
+test("credential, job application, and career panels render persisted API data", async ({ page }, testInfo) => {
+  const { character } = await completeRealOnboarding(page);
+  await seedFixture(page, "career-panels", character.id);
+  await page.reload();
+
+  await expect(page.getByTestId("spec-panel")).toContainText("서비스 기획 포트폴리오");
+  await expect(page.getByTestId("spec-panel")).toContainText("COMPLETED");
+  await expect(page.getByTestId("job-application-panel")).toContainText("가상 테크");
+  await expect(page.getByTestId("job-application-panel")).toContainText("FIRST_INTERVIEW");
+  await expect(page.getByTestId("career-path-panel")).toContainText("프로덕트 매니저");
+  await expect(page.getByTestId("career-path-panel")).toContainText("PREPARING");
+  await testInfo.attach("persisted-career-panels", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
 });
 
-test("the shared gameplay surface renders current stats and event choices", async ({ page }) => {
-  await installSharedUiApi(page);
-  await page.goto("/");
-  await completeSharedOnboarding(page);
-  await expect(page.locator(".stats-grid")).toContainText("실무");
-  await expect(page.locator(".choice-stack button")).toHaveCount(sharedEvent.choices.length);
+test("choice request posts its index and produces persisted event history", async ({ page }) => {
+  const { character } = await completeRealOnboarding(page);
+  const choice = page.locator(".choice-stack button").first();
+  const responsePromise = page.waitForResponse((response) => response.url().endsWith(`/api/characters/${character.id}/choices`) && response.request().method() === "POST");
+  await choice.click();
+  const response = await responsePromise;
+  expect(response.request().postDataJSON()).toEqual({ choiceIndex: 0 });
+  expect(response.status()).toBe(200);
+  await expect(page.locator(".feedback-panel")).toBeVisible();
+  await page.reload();
+  const restored = await page.request.get(`/api/characters/${character.id}`);
+  const restoredBody = await restored.json();
+  expect(restoredBody.character.eventHistory.length).toBeGreaterThan(0);
+  expect(restoredBody.character.eventHistory[0].summary).toBeTruthy();
 });

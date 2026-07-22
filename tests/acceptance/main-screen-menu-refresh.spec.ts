@@ -126,7 +126,9 @@ test("every menu row has an accessible name and works with Enter and Space", asy
     await expect(page).toHaveURL(/\/privacy$/);
   }
 
-  for (const key of ["Enter", "Space"] as const) {
+  // Native checkboxes toggle with Space. Enter is intentionally not asserted:
+  // browsers do not define Enter as checkbox activation.
+  for (const key of ["Space"] as const) {
     await page.goto("/");
     await page.evaluate(() => localStorage.clear());
     await page.getByRole("button", { name: "메뉴", exact: true }).click();
@@ -134,7 +136,8 @@ test("every menu row has an accessible name and works with Enter and Space", asy
       const toggle = page.getByRole("checkbox", { name, exact: true });
       await expect(toggle).toHaveAccessibleName(name);
       const before = await toggle.isChecked();
-      await toggle.click();
+      await toggle.focus();
+      await page.keyboard.press(key);
       await expect(toggle).toBeChecked({ checked: !before });
       await expect.poll(() => page.evaluate((keyName) => JSON.parse(localStorage.getItem("sano-audio-settings")!)[keyName], setting)).toBe(!before);
     }
