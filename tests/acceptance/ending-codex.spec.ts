@@ -45,6 +45,7 @@ test("production-generated endings persist, group near-duplicates, and restore t
   const firstCard = page.locator(`#record-card-${first.id}`);
   const secondCard = page.locator(`#record-card-${second.id}`);
   await expect(page.locator("article.record-card")).toHaveCount(2);
+  await expect(page.getByRole("article")).toHaveCount(2);
   await expect(page.locator(`article#record-card-${first.id}`)).toHaveCount(1);
   await expect(page.locator(`article#record-card-${second.id}`)).toHaveCount(1);
   await expect(firstCard).toHaveCount(1);

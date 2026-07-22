@@ -38,14 +38,8 @@ test("low health transition persists the leave state after reload", async ({ pag
       }>;
     };
   };
-  const matchingHistory = recoveredBody.character.eventHistory.filter((entry) => (
-    entry.eventId === forced.body.event.id &&
-    entry.choiceId === forced.body.event.choices[0].id &&
-    entry.summary === forced.body.event.choices[0].summary
-  ));
   expect(recoveredBody.character.eventHistory).toHaveLength(1);
-  expect(matchingHistory).toHaveLength(1);
-  expect(matchingHistory[0]).toMatchObject({
+  expect(recoveredBody.character.eventHistory[0]).toMatchObject({
     eventId: forced.body.event.id,
     choiceId: forced.body.event.choices[0].id,
     summary: forced.body.event.choices[0].summary,
