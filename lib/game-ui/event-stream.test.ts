@@ -175,26 +175,33 @@ describe("game-ui event transport", () => {
     const splitAt = findByteSequence(encoded, emojiBytes);
     expect(splitAt).toBeGreaterThanOrEqual(0);
 
+    const decodeSpy = vi.spyOn(TextDecoder.prototype, "decode");
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/events/next/stream")) {
+        return byteStreamResponse([encoded.slice(0, splitAt + emojiBytes.length - 1)]);
+      }
+      throw new Error(`unexpected recovery request: ${url.pathname}`);
+    });
     const client = createGameApiClient({
       baseUrl: "https://api.example.com",
+      headers: () => ({ Authorization: "Bearer token-1" }),
+      fetchImpl: fetchImpl as typeof fetch,
+      pollTimeoutMs: 0,
     });
-    const response = byteStreamResponse([encoded.slice(0, splitAt + emojiBytes.length - 1)]);
-    const frames: Array<{ event: string; data: string; fields: Record<string, string[]> }> = [];
 
-    await expect(client.readNextEventStream(response, (frame) => frames.push(frame))).resolves.toEqual({
-      event: null,
-      failed: true,
-    });
-    expect(frames).toEqual([
-      {
-        event: "status",
-        data: "마지막�",
-        fields: {
-          event: ["status"],
-          data: ["마지막�"],
-        },
-      },
-    ]);
+    try {
+      await expect(client.nextEventStream("run-1")).resolves.toEqual({
+        ok: false,
+        status: 504,
+        data: { error: NEXT_EVENT_STREAM_RETRY_MESSAGE },
+        error: NEXT_EVENT_STREAM_RETRY_MESSAGE,
+      });
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(decodeSpy.mock.calls.some((args) => args.length === 0)).toBe(true);
+    } finally {
+      decodeSpy.mockRestore();
+    }
   });
 
   it.each([
