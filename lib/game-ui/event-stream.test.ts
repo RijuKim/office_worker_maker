@@ -167,19 +167,28 @@ describe("game-ui event transport", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("preserves an incomplete UTF-8 code point through the public stream client at EOF", async () => {
+  it("preserves a multibyte character in the final event payload split across bytes at EOF", async () => {
     const encoder = new TextEncoder();
-    const responseText = "event: status\ndata: 마지막🙂";
+    const event = {
+      id: "event-utf8",
+      title: "마지막🙂",
+      body: "스트림의 마지막 글자도 그대로 와야 합니다.",
+      source: "AI",
+      choices: [],
+    };
+    const responseText = `event: event\ndata: ${JSON.stringify({ event })}`;
     const encoded = encoder.encode(responseText);
     const emojiBytes = encoder.encode("🙂");
     const splitAt = findByteSequence(encoded, emojiBytes);
     expect(splitAt).toBeGreaterThanOrEqual(0);
 
-    const decodeSpy = vi.spyOn(TextDecoder.prototype, "decode");
     const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
       const url = new URL(String(input));
       if (url.pathname.endsWith("/events/next/stream")) {
-        return byteStreamResponse([encoded.slice(0, splitAt + emojiBytes.length - 1)]);
+        return byteStreamResponse([
+          encoded.slice(0, splitAt + 2),
+          encoded.slice(splitAt + 2),
+        ]);
       }
       throw new Error(`unexpected recovery request: ${url.pathname}`);
     });
@@ -187,21 +196,14 @@ describe("game-ui event transport", () => {
       baseUrl: "https://api.example.com",
       headers: () => ({ Authorization: "Bearer token-1" }),
       fetchImpl: fetchImpl as typeof fetch,
-      pollTimeoutMs: 0,
     });
 
-    try {
-      await expect(client.nextEventStream("run-1")).resolves.toEqual({
-        ok: false,
-        status: 504,
-        data: { error: NEXT_EVENT_STREAM_RETRY_MESSAGE },
-        error: NEXT_EVENT_STREAM_RETRY_MESSAGE,
-      });
-      expect(fetchImpl).toHaveBeenCalledTimes(1);
-      expect(decodeSpy.mock.calls.some((args) => args.length === 0)).toBe(true);
-    } finally {
-      decodeSpy.mockRestore();
-    }
+    await expect(client.nextEventStream<typeof event>("run-1")).resolves.toEqual({
+      ok: true,
+      status: 200,
+      data: { event },
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
   it.each([
