@@ -2,7 +2,7 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { LoadingPanel, PlaySurface, type SharedCharacterView, type SharedChoiceFeedbackView, type SharedEventView } from "./App";
+import { LoadingPanel, PlaySurface, RecordCardShell, type SharedCharacterView, type SharedChoiceFeedbackView, type SharedEventView } from "./App";
 
 const character: SharedCharacterView = {
   name: "한서윤",
@@ -55,6 +55,13 @@ afterEach(() => {
 });
 
 describe("game-ui shared play surfaces", () => {
+  it("exposes a restored record title as a heading", () => {
+    render(<RecordCardShell expanded={false} id="record-1" title="한서윤의 새로운 결말" />);
+
+    const heading = container.querySelector("h3");
+    expect(heading?.textContent).toBe("한서윤의 새로운 결말");
+  });
+
   it("announces the loading state through a live region with the approved Korean copy", () => {
     render(<LoadingPanel />);
 

@@ -636,6 +636,22 @@ describe("stateful JSON/SSE event authority", () => {
     expect(event).toMatchObject({ title: expect.stringContaining("80세의 대안"), body: expect.stringContaining("dorm 생활"), source: "FALLBACK" });
   });
 
+  it("uses the non-production fixture flag to commit a real fallback without calling a provider", async () => {
+    fixture.aiEnabled = true;
+    fixture.hiddenFlags = { testForceProviderFailure: true };
+
+    const response = await nextJson(
+      new Request("http://localhost/api/characters/run-1/events/next", { method: "POST" }),
+      { params: Promise.resolve({ id: "run-1" }) },
+    );
+    const event = (await response.json()).event;
+
+    expect(response.status).toBe(200);
+    expect(event.source).toBe("FALLBACK");
+    expect(aiMocks.generateAiEvent).not.toHaveBeenCalled();
+    expect(fixture.events.get(event.id)).toMatchObject({ source: "FALLBACK", status: "ACTIVE" });
+  });
+
   it.each(["JSON", "SSE"] as const)("takes over an expired persisted lease through %s, commits, and cleans up", async (kind) => {
     fixture.generationToken = "crashed-owner";
     fixture.generationStartedAt = new Date(Date.now() - 70_000);

@@ -37,7 +37,11 @@
     "vitest.config.ts",
     ".next/dev/types/**/*.ts",
     ".next-playwright-retry4-host/types/**/*.ts",
-    ".next-playwright-retry4-host/dev/types/**/*.ts"
+    ".next-playwright-retry4-host/dev/types/**/*.ts",
+    ".next-playwright-retry5-host/types/**/*.ts",
+    ".next-playwright-retry5-host/dev/types/**/*.ts",
+    ".next-build-webpack-retry6/types/**/*.ts",
+    ".next-build-webpack-retry6/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

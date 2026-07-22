@@ -268,7 +268,7 @@ describe("Toss entry refresh", () => {
     const stack = container.querySelector(".screen-stack");
     expect(stack?.querySelector(":scope > .action-grid")).toBeTruthy();
     const record = stack?.querySelector("article.record-panel");
-    expect(record?.querySelector("strong")?.textContent).toBe(careerRecord.title);
+    expect(record?.querySelector("h3")?.textContent).toBe(careerRecord.title);
     expect(record?.querySelector("p")?.textContent).toBe(careerRecord.summary);
     expect([...record!.querySelectorAll("span")].map((node) => node.textContent)).toContain("만족도 74");
     expect(button("진행으로")).toBeTruthy();

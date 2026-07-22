@@ -37,20 +37,36 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
-  const characters = await prisma.characterRun.findMany({
-    where: { userId },
-    include: {
-      stats: true,
-      hiddenState: true,
-      relationships: true,
-      events: {
-        where: { status: "ACTIVE" },
-        orderBy: { createdAt: "desc" },
-        take: 1,
+  let characters;
+  try {
+    characters = await prisma.characterRun.findMany({
+      where: { userId },
+      include: {
+        stats: true,
+        hiddenState: true,
+        relationships: true,
+        eventHistory: {
+          orderBy: { createdAt: "desc" },
+          take: 8,
+        },
+        events: {
+          where: { status: "ACTIVE" },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
       },
-    },
-    orderBy: { updatedAt: "desc" },
-  });
+      orderBy: { updatedAt: "desc" },
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("does not exist")) {
+      logger.withRequestId(requestId).warn("캐릭터 목록 조회 실패, 빈 목록으로 대체", {
+        userId,
+        reason: "schema_mismatch",
+      });
+      return NextResponse.json({ characters: [] });
+    }
+    throw error;
+  }
 
   logger.withRequestId(requestId).info("캐릭터 목록 조회", { userId, count: characters.length });
 

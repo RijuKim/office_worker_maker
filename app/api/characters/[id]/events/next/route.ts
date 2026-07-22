@@ -236,7 +236,30 @@ export async function POST(request: Request, context: RouteContext) {
       providerFailures: Array<{ providerId: null; providerLabel: null; providerElapsedMs: number; reason: "api_error"; stage: "provider" }>;
     };
     try {
-      aiResult = await generateAiEvent(aiState, { skipPrimary: !limit.allowed });
+      // Integration coverage needs to exercise the same provider-failure fallback
+      // branch deterministically. The fixture flag is both written and honored
+      // only outside production, so deployed traffic can never activate it.
+      if (process.env.NODE_ENV !== "production" && currentFlags.testForceProviderFailure === true) {
+        aiResult = {
+          success: false,
+          reason: "api_error",
+          providerId: null,
+          providerLabel: null,
+          providerElapsedMs: 0,
+          totalElapsedMs: 0,
+          slow: false,
+          retryUsed: false,
+          providerFailures: [{
+            providerId: null,
+            providerLabel: null,
+            providerElapsedMs: 0,
+            reason: "api_error",
+            stage: "provider",
+          }],
+        };
+      } else {
+        aiResult = await generateAiEvent(aiState, { skipPrimary: !limit.allowed });
+      }
     } catch {
       const elapsed = Math.max(0, Date.now() - providerStartedAt);
       aiResult = {

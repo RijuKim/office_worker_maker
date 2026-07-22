@@ -18,8 +18,18 @@ export async function POST(request: Request) {
   if (!character) return NextResponse.json({ error: "캐릭터를 찾을 수 없습니다." }, { status: 404 });
 
   if (body?.action === "next-event-precursor") {
-    await prisma.event.updateMany({ where: { characterRunId: character.id, status: "ACTIVE" }, data: { status: "DISCARDED" } });
-    await prisma.characterRun.update({ where: { id: character.id }, data: { currentEventId: null } });
+    const hiddenState = await prisma.hiddenState.findUnique({ where: { characterRunId: character.id } });
+    const eventFlags = typeof hiddenState?.eventFlags === "object" && hiddenState.eventFlags !== null && !Array.isArray(hiddenState.eventFlags)
+      ? hiddenState.eventFlags as Record<string, unknown>
+      : {};
+    await prisma.$transaction([
+      prisma.event.updateMany({ where: { characterRunId: character.id, status: "ACTIVE" }, data: { status: "DISCARDED" } }),
+      prisma.characterRun.update({ where: { id: character.id }, data: { currentEventId: null } }),
+      prisma.hiddenState.update({
+        where: { characterRunId: character.id },
+        data: { eventFlags: { ...eventFlags, testForceProviderFailure: true } },
+      }),
+    ]);
     return NextResponse.json({ prepared: true });
   }
 

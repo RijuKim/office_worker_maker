@@ -543,8 +543,8 @@ export default function AppPage() {
     }
   }, [ensureAudio, playFeedbackCue, startMusic, stopMusic]);
 
-  async function doFetch(url: string, method = "GET", body?: unknown) {
-    const opts: RequestInit = { method, headers: { "Content-Type": "application/json" } };
+  async function doFetch(url: string, method = "GET", body?: unknown, options: { keepalive?: boolean } = {}) {
+    const opts: RequestInit = { method, headers: { "Content-Type": "application/json" }, keepalive: options.keepalive };
     if (body !== undefined) opts.body = JSON.stringify(body);
     const requestUrl = typeof window === "undefined" ? url : new URL(url, window.location.origin).toString();
     const res = await fetch(requestUrl, opts);
@@ -860,7 +860,7 @@ export default function AppPage() {
     try {
       const { ok, data } = await doFetch(`/api/characters/${currentChar.id}/choices`, "POST", {
         choiceIndex,
-      });
+      }, { keepalive: true });
       if (!ok) return;
       if (data.result?.stats) {
         setCurrentChar((char) => char ? { ...char, stats: data.result.stats } : char);
@@ -1269,26 +1269,6 @@ export default function AppPage() {
                 ))}
               </dl>
             </section>
-            {specs.length > 0 && (
-              <section className={`sidebar-stats mt-3.5 rounded-lg border border-[#4d3d2f] bg-[#1b1612] p-3.5 ${mobileStatsOpen ? "sidebar-stats-open" : ""}`} data-testid="spec-panel">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-base font-bold">스펙</h2>
-                  <span className="text-xs font-bold text-[#f7d08b]" data-testid="spec-score">총점 {currentChar.specScore}</span>
-                </div>
-                <div className="mt-2 space-y-1">
-                  {specs.filter(s => s.status === "COMPLETED" || s.status === "IN_PROGRESS").map((spec, i) => (
-                    <div className="rounded-md bg-[#2c231b] px-2.5 py-2 text-[12px]" key={i}>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[#c4b39c]">{spec.specName}</span>
-                        <span className={`text-[11px] font-bold ${spec.status === "COMPLETED" ? "text-[#4a9f70]" : spec.status === "FAILED" ? "text-[#b3423c]" : "text-[#f7d08b]"}`}>
-                          {spec.status === "COMPLETED" ? spec.score ?? "완료" : spec.status === "FAILED" ? "실패" : "진행중"}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
           </>
         )}
         <section className="sidebar-notice mt-3.5 rounded-lg border border-[#4d3d2f] bg-[#1b1612] p-3.5">
@@ -1341,7 +1321,10 @@ export default function AppPage() {
           </div>
         </section>
         <section className="pixel-panel-dark mt-3.5 p-3.5" data-testid="spec-panel">
-          <h3 className="font-bold">스펙</h3>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="font-bold">스펙</h3>
+            <span className="text-xs font-bold text-[#f7d08b]" data-testid="spec-score">총점 {currentChar?.specScore ?? 0}</span>
+          </div>
           <div className="mt-2 space-y-2">
             {specs.map((spec, i) => (
               <div key={i} className="flex items-center justify-between text-[13px]">
