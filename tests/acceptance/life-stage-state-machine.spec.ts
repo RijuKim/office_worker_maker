@@ -38,8 +38,14 @@ test("low health transition persists the leave state after reload", async ({ pag
       }>;
     };
   };
+  const matchingHistory = recoveredBody.character.eventHistory.filter((entry) => (
+    entry.eventId === forced.body.event.id &&
+    entry.choiceId === forced.body.event.choices[0].id &&
+    entry.summary === forced.body.event.choices[0].summary
+  ));
   expect(recoveredBody.character.eventHistory).toHaveLength(1);
-  expect(recoveredBody.character.eventHistory[0]).toMatchObject({
+  expect(matchingHistory).toHaveLength(1);
+  expect(matchingHistory[0]).toMatchObject({
     eventId: forced.body.event.id,
     choiceId: forced.body.event.choices[0].id,
     summary: forced.body.event.choices[0].summary,
@@ -54,7 +60,7 @@ test("forced events return agency without direct pass or fail commands", async (
   await expect(page.getByRole("button", { name: /통과한다|합격한다|탈락한다|떨어진다|다음 회차/ })).toHaveCount(0);
   expect(forced.event.choices.length).toBeGreaterThan(1);
   for (const choice of forced.event.choices) {
-    await expect(page.getByRole("button", { name: choice.label })).toBeVisible();
+    await expect(page.locator(".choice-stack button").filter({ hasText: choice.label })).toBeVisible();
   }
 });
 
