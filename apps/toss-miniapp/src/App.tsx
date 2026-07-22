@@ -98,6 +98,7 @@ export function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [audioSettings, setAudioSettings] = useState<AudioSettings>(readAudioSettings);
   const [loading, setLoading] = useState(false);
+  const [generatingNextEvent, setGeneratingNextEvent] = useState(false);
   const [error, setError] = useState("");
   const [characters, setCharacters] = useState<CharacterData[]>([]);
   const [currentCharacter, setCurrentCharacter] = useState<CharacterData | null>(null);
@@ -112,6 +113,7 @@ export function App() {
 
   const startNewSimulation = useCallback(() => {
     setLoading(false);
+    setGeneratingNextEvent(false);
     setError("");
     setCreateStep("intro");
     setName("");
@@ -209,14 +211,18 @@ export function App() {
         cue("ending");
         return;
       }
-      const next = await api.nextEvent(currentCharacter.id);
+      setCurrentEvent(null);
+      setGeneratingNextEvent(true);
+      const next = await api.nextEventStream(currentCharacter.id);
       if (next.ok && next.data.event) {
         setCurrentEvent(next.data.event);
         cue("success");
       } else {
         await openCharacter(currentCharacter);
+        if (!next.ok && next.data.error) setError(next.data.error);
       }
     } finally {
+      setGeneratingNextEvent(false);
       setLoading(false);
     }
   }, [cue, currentCharacter, currentEvent, openCharacter]);
@@ -385,7 +391,22 @@ export function App() {
               <p>{feedback.summary}</p>
             </div>
           )}
-          {currentEvent ? (
+          {generatingNextEvent && !currentEvent ? (
+            <div className="event-loading-panel" aria-busy="true" aria-live="polite">
+              <div className="event-loading-scene" aria-hidden="true">
+                <i className="loading-cloud loading-cloud-a" />
+                <i className="loading-cloud loading-cloud-b" />
+                <span className="loading-building"><i /><i /><i /></span>
+                <span className="loading-lamp"><i /></span>
+              </div>
+              <div className="event-loading-copy">
+                <span className="event-loading-badge">새 장면</span>
+                <p>당신이 모르는 곳에서,</p>
+                <p>다음 일이 시작되고 있습니다<span className="loading-dots"><i>.</i><i>.</i><i>.</i></span></p>
+                <small>선택의 시간이 곧 찾아옵니다.</small>
+              </div>
+            </div>
+          ) : currentEvent ? (
             <article className="event-panel">
               <h2>{currentEvent.title}</h2>
               <p>{currentEvent.body}</p>

@@ -78,6 +78,41 @@ export const api = {
       method: "POST",
     });
   },
+  async nextEventStream(characterId: string) {
+    const headers = new Headers({ Accept: "text/event-stream" });
+    if (tossSessionToken) headers.set("Authorization", `Bearer ${tossSessionToken}`);
+    const response = await fetch(apiUrl(`/api/characters/${characterId}/events/next/stream`), {
+      method: "POST",
+      headers,
+      credentials: "omit",
+    });
+    if (!response.ok || !response.body) {
+      const data = await response.json().catch(() => ({})) as { error?: string };
+      return { ok: false, status: response.status, data } as ApiResult<{ event?: EventData; error?: string }>;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let event: EventData | undefined;
+    let error: string | undefined;
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const messages = buffer.split("\n\n");
+      buffer = messages.pop() ?? "";
+      for (const message of messages) {
+        const eventName = message.split("\n").find((line) => line.startsWith("event:"))?.slice(6).trim();
+        const dataLine = message.split("\n").find((line) => line.startsWith("data:"));
+        if (!eventName || !dataLine) continue;
+        const payload = JSON.parse(dataLine.slice(5).trim()) as { event?: EventData; error?: string };
+        if (eventName === "event" && payload.event) event = payload.event;
+        if (eventName === "error") error = payload.error ?? "다음 사건을 생성하지 못했습니다.";
+      }
+    }
+    return { ok: Boolean(event), status: event ? 200 : 502, data: { event, error } } as ApiResult<{ event?: EventData; error?: string }>;
+  },
   async records() {
     return request<{ records?: CareerRecord[]; error?: string }>("/api/records");
   },

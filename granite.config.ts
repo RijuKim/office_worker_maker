@@ -1,7 +1,7 @@
 import { defineConfig } from "@apps-in-toss/web-framework/config";
 
 export default defineConfig({
-  appName: "sano-officeworker",
+  appName: "sano-job-seeker",
   brand: {
     displayName: "일어나보니 대한민국 취준생",
     primaryColor: "#FF6655",

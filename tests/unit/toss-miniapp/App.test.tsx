@@ -16,7 +16,7 @@ const apiMocks = vi.hoisted(() => ({
 const authMocks = vi.hoisted(() => ({ getTossAnonymousKey: vi.fn(async () => "anonymous") }));
 
 vi.mock("../../../apps/toss-miniapp/src/api", () => ({
-  api: { ...apiMocks, choose: vi.fn(), nextEvent: vi.fn() },
+  api: { ...apiMocks, choose: vi.fn(), nextEvent: vi.fn(), nextEventStream: vi.fn() },
 }));
 vi.mock("../../../apps/toss-miniapp/src/toss-auth", () => authMocks);
 

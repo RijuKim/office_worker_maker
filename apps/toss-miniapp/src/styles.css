@@ -386,6 +386,98 @@ button:disabled {
   opacity: 0.55;
 }
 
+.event-loading-panel {
+  overflow: hidden;
+  border: 2px solid #4d3d2f;
+  border-radius: 10px;
+  background: #f7efe2;
+  color: #2a2018;
+}
+
+.event-loading-scene {
+  position: relative;
+  height: 170px;
+  overflow: hidden;
+  border-bottom: 2px solid #4d3d2f;
+  background: linear-gradient(#516b91 0 48%, #d98f83 48% 62%, #443b4b 62%);
+}
+
+.loading-cloud {
+  position: absolute;
+  width: 42px;
+  height: 10px;
+  background: #dbe4ef;
+  box-shadow: 10px -8px 0 #dbe4ef, 22px 0 0 #dbe4ef;
+  opacity: .8;
+  animation: toss-cloud-drift 8s linear infinite;
+}
+
+.loading-cloud-a { top: 38px; left: -70px; }
+.loading-cloud-b { top: 72px; left: -110px; animation-delay: -4s; animation-duration: 11s; }
+
+.loading-building {
+  position: absolute;
+  left: 28px;
+  bottom: 0;
+  width: 105px;
+  height: 82px;
+  border: 3px solid #2a2018;
+  background: #343844;
+}
+
+.loading-building i {
+  display: inline-block;
+  width: 15px;
+  height: 20px;
+  margin: 14px 0 0 13px;
+  background: #f7d08b;
+  animation: toss-window-light 2.8s steps(2, end) infinite;
+}
+
+.loading-building i:nth-child(2) { animation-delay: .7s; }
+.loading-building i:nth-child(3) { animation-delay: 1.4s; }
+
+.loading-lamp {
+  position: absolute;
+  right: 38px;
+  bottom: 0;
+  width: 6px;
+  height: 72px;
+  border: 2px solid #2a2018;
+  background: #3f4653;
+}
+
+.loading-lamp i {
+  position: absolute;
+  left: -11px;
+  top: -15px;
+  width: 22px;
+  height: 16px;
+  border: 3px solid #2a2018;
+  background: #f7d08b;
+  box-shadow: 0 0 0 7px rgba(247, 208, 139, .2);
+  animation: toss-lamp-flicker 2.4s steps(2, end) infinite;
+}
+
+.event-loading-copy { padding: 22px; }
+.event-loading-badge { display: inline-block; border: 2px solid #2a2018; padding: 3px 7px; background: #f7d08b; font-size: 12px; font-weight: 900; }
+.event-loading-copy p { margin: 14px 0 0; font-size: 19px; font-weight: 900; line-height: 1.35; animation: toss-line-in .5s steps(4, end) both; }
+.event-loading-copy p + p { margin-top: 3px; animation-delay: .3s; }
+.event-loading-copy small { display: block; margin-top: 18px; color: #8a4f2d; font-weight: 800; animation: toss-line-in .4s .6s steps(3, end) both; }
+.loading-dots i { font-style: normal; animation: toss-dot 1.2s steps(2, end) infinite; }
+.loading-dots i:nth-child(2) { animation-delay: .18s; }
+.loading-dots i:nth-child(3) { animation-delay: .36s; }
+
+@keyframes toss-cloud-drift { to { transform: translateX(500px); } }
+@keyframes toss-window-light { 0%, 42%, 100% { opacity: 1; } 48%, 70% { opacity: .4; } }
+@keyframes toss-lamp-flicker { 0%, 8%, 14%, 100% { opacity: 1; } 10%, 16% { opacity: .35; } }
+@keyframes toss-line-in { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes toss-dot { 0%, 30% { opacity: .2; } 55%, 100% { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-cloud, .loading-building i, .loading-lamp i, .event-loading-copy p, .event-loading-copy small, .loading-dots i { animation: none; opacity: 1; }
+}
+
 @media (min-width: 680px) {
   .app-shell {
     padding-left: 28px;
