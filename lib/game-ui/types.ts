@@ -149,7 +149,9 @@ export function createEmptyPublicEndingDto(): PublicEndingDto {
 }
 
 function asNonEmptyString(value: unknown): string | null {
-  return typeof value === "string" ? value : null;
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
 }
 
 function asString(value: unknown): string {
@@ -224,6 +226,10 @@ export function normalizePublicEndingDto(value: unknown): PublicEndingDto {
 }
 
 export function parseRouteIntent(value: string | URL): RouteIntent {
+  if (typeof value !== "string" && !(value instanceof URL)) {
+    return { kind: "play" };
+  }
+
   const raw = typeof value === "string" ? value : value.pathname;
   const path = raw.includes("://") ? safePathnameFromUrl(raw) : raw;
   const normalized = path.replace(/^\/+/, "");

@@ -130,6 +130,18 @@ describe("game-ui contracts", () => {
     });
   });
 
+  it("maps blank optional public-ending strings to null", () => {
+    const normalized = normalizePublicEndingDto({
+      jobRole: "   ",
+      destinationName: "",
+      salaryBand: "연봉",
+    });
+
+    expect(normalized.jobRole).toBeNull();
+    expect(normalized.destinationName).toBeNull();
+    expect(normalized.salaryBand).toBe("연봉");
+  });
+
   it("creates typed Korean-facing host failures", () => {
     expect(createHostFailure("clipboard-failed", "링크를 만들지 못했습니다. 다시 시도해 주세요.")).toEqual({
       code: "clipboard-failed",

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GET } from "@/app/api/share/[id]/route";
 
@@ -15,6 +15,10 @@ vi.mock("@/lib/server/prisma", () => ({
 }));
 
 describe("public ending share route", () => {
+  beforeEach(() => {
+    findUnique.mockReset();
+  });
+
   it("returns an allowlisted ending dto and strips private fields", async () => {
     findUnique.mockResolvedValueOnce({
       id: "ending-1",
@@ -42,28 +46,49 @@ describe("public ending share route", () => {
     const response = await GET(new Request("http://localhost/api/share/ending-1"), { params: Promise.resolve({ id: "ending-1" }) });
     const body = await response.json();
 
+    expect(findUnique).toHaveBeenCalledWith({
+      where: { id: "ending-1" },
+      select: {
+        id: true,
+        title: true,
+        summary: true,
+        longNarrative: true,
+        careerPath: true,
+        jobRole: true,
+        destinationName: true,
+        salaryBand: true,
+        workplaceTone: true,
+        satisfaction: true,
+        growthPotential: true,
+        workLifeBalance: true,
+        healthState: true,
+        relationshipState: true,
+        tags: true,
+        statSnapshot: true,
+        keyRelationships: true,
+        majorEvents: true,
+      },
+    });
     expect(response.status).toBe(200);
     expect(body).toEqual({
-      record: {
-        id: "ending-1",
-        title: "첫 기록",
-        summary: "요약",
-        longNarrative: "긴 서사",
-        careerPath: "기획",
-        jobRole: "서비스 기획자",
-        destinationName: null,
-        salaryBand: "4,500만원",
-        workplaceTone: ["차분함"],
-        satisfaction: 84,
-        growthPotential: 91,
-        workLifeBalance: 73,
-        healthState: "양호",
-        relationshipState: "안정",
-        tags: ["태그"],
-        statSnapshot: { academic: 8 },
-        keyRelationships: [{ name: "민준", role: "동기", trust: 80 }],
-        majorEvents: [{ summary: "첫 입사" }],
-      },
+      id: "ending-1",
+      title: "첫 기록",
+      summary: "요약",
+      longNarrative: "긴 서사",
+      careerPath: "기획",
+      jobRole: "서비스 기획자",
+      destinationName: null,
+      salaryBand: "4,500만원",
+      workplaceTone: ["차분함"],
+      satisfaction: 84,
+      growthPotential: 91,
+      workLifeBalance: 73,
+      healthState: "양호",
+      relationshipState: "안정",
+      tags: ["태그"],
+      statSnapshot: { academic: 8 },
+      keyRelationships: [{ name: "민준", role: "동기", trust: 80 }],
+      majorEvents: [{ summary: "첫 입사" }],
     });
     expect(JSON.stringify(body)).not.toContain("private-user");
     expect(JSON.stringify(body)).not.toContain("private-run");
