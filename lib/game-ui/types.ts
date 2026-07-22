@@ -230,8 +230,32 @@ export function parseRouteIntent(value: string | URL): RouteIntent {
     return { kind: "play" };
   }
 
-  const raw = typeof value === "string" ? value : value.pathname;
-  const path = raw.includes("://") ? safePathnameFromUrl(raw) : raw;
+  if (value instanceof URL) {
+    if (value.protocol === "intoss:") {
+      if (value.hostname !== "sano-job-seeker") {
+        return { kind: "play" };
+      }
+
+      return parseSharePath(value.pathname);
+    }
+
+    return parseSharePath(value.pathname);
+  }
+
+  const parsed = value.includes("://") ? safeParseUrl(value) : null;
+  if (parsed?.protocol === "intoss:") {
+    if (parsed.hostname !== "sano-job-seeker") {
+      return { kind: "play" };
+    }
+
+    return parseSharePath(parsed.pathname);
+  }
+
+  const path = parsed?.pathname ?? value;
+  return parseSharePath(path);
+}
+
+function parseSharePath(path: string): RouteIntent {
   const normalized = path.replace(/^\/+/, "");
   const match = normalized.match(/^share\/([^/?#]+)$/);
   if (!match) return { kind: "play" };
@@ -244,11 +268,11 @@ export function parseRouteIntent(value: string | URL): RouteIntent {
   return { kind: "share", recordId };
 }
 
-function safePathnameFromUrl(value: string): string {
+function safeParseUrl(value: string): URL | null {
   try {
-    return new URL(value).pathname;
+    return new URL(value);
   } catch {
-    return value;
+    return null;
   }
 }
 

@@ -53,6 +53,10 @@ describe("game-ui contracts", () => {
       kind: "share",
       recordId: "record 42",
     });
+    expect(parseRouteIntent("intoss://sano-job-seeker/share/record-42?from=copy")).toEqual({
+      kind: "share",
+      recordId: "record-42",
+    });
     expect(parseRouteIntent("/play")).toEqual({ kind: "play" });
     expect(parseRouteIntent("https://example.com/nope")).toEqual({ kind: "play" });
   });
@@ -69,6 +73,7 @@ describe("game-ui contracts", () => {
     expect(parseRouteIntent("/share/record%5C123")).toEqual({ kind: "play" });
     expect(parseRouteIntent("/share/record%3F123")).toEqual({ kind: "play" });
     expect(parseRouteIntent("intoss://sano-job-seeker/share/record%23abc")).toEqual({ kind: "play" });
+    expect(parseRouteIntent("intoss://other-app/share/record-123")).toEqual({ kind: "play" });
     expect(parseRouteIntent("/share/%E0%A4%A")).toEqual({ kind: "play" });
     expect(parseRouteIntent(new URL("https://example.com/share/record%2F123"))).toEqual({ kind: "play" });
   });
