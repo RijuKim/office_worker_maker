@@ -57,6 +57,15 @@ describe("game-ui contracts", () => {
     expect(parseRouteIntent("https://example.com/nope")).toEqual({ kind: "play" });
   });
 
+  it("rejects malformed share IDs and encoded separators as play routes", () => {
+    expect(parseRouteIntent("/share/record%2F123")).toEqual({ kind: "play" });
+    expect(parseRouteIntent("/share/record%5C123")).toEqual({ kind: "play" });
+    expect(parseRouteIntent("/share/record%3F123")).toEqual({ kind: "play" });
+    expect(parseRouteIntent("intoss://sano-job-seeker/share/record%23abc")).toEqual({ kind: "play" });
+    expect(parseRouteIntent("/share/%E0%A4%A")).toEqual({ kind: "play" });
+    expect(parseRouteIntent(new URL("https://example.com/share/record%2F123"))).toEqual({ kind: "play" });
+  });
+
   it("normalizes public ending payloads to the exact allowlist and drops extra data", () => {
     const normalized = normalizePublicEndingDto({
       id: "ending-1",

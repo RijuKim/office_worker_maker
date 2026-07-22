@@ -230,10 +230,12 @@ export function parseRouteIntent(value: string | URL): RouteIntent {
   const match = normalized.match(/^share\/([^/?#]+)$/);
   if (!match) return { kind: "play" };
 
-  return {
-    kind: "share",
-    recordId: safeDecodeURIComponent(match[1]),
-  };
+  const recordId = safeDecodeURIComponent(match[1]);
+  if (!recordId || /[\/?#\\]/.test(recordId)) {
+    return { kind: "play" };
+  }
+
+  return { kind: "share", recordId };
 }
 
 function safePathnameFromUrl(value: string): string {
@@ -248,6 +250,6 @@ function safeDecodeURIComponent(value: string): string {
   try {
     return decodeURIComponent(value);
   } catch {
-    return value;
+    return "";
   }
 }
