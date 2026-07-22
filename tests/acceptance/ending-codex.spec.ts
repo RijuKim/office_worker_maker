@@ -15,12 +15,35 @@ test("empty ending collection shows 0/N locked slots and hides ending titles", a
   await expect(page.getByRole("heading", { name: CODEX_CATALOG[0].title, exact: true })).toHaveCount(0);
 });
 
-test("partial ending collection survives reload and opens and closes its detail dialog", async ({ page }, testInfo) => {
+test("production-generated endings persist, group near-duplicates, and restore the collection after reload", async ({ page }, testInfo) => {
   const { character } = await completeRealOnboarding(page);
-  await seedFixture(page, "records-partial", character.id);
+  await seedFixture(page, "ending-record-precursor", character.id);
+
+  const firstResponse = await page.request.post(`/api/characters/${character.id}/records`);
+  const secondResponse = await page.request.post(`/api/characters/${character.id}/records`);
+  expect(firstResponse.status()).toBe(201);
+  expect(secondResponse.status()).toBe(201);
+  const first = (await firstResponse.json()).record;
+  const second = (await secondResponse.json()).record;
+  expect(first.id).not.toBe(second.id);
+  expect(first.destinationName).toBe(second.destinationName);
+  expect(first.similarityKey).toBe(second.similarityKey);
+  expect(first.majorEvents).toEqual(expect.arrayContaining([
+    expect.objectContaining({ eventTitle: "휴학 뒤의 진로 분기" }),
+  ]));
+
+  const accountResponse = await page.request.get("/api/records");
+  expect(accountResponse.status()).toBe(200);
+  const account = await accountResponse.json();
+  expect(account.records.map((record: { id: string }) => record.id)).toEqual(expect.arrayContaining([first.id, second.id]));
+  expect(account.grouped).toEqual(expect.arrayContaining([
+    expect.objectContaining({ key: first.similarityKey, recordIds: expect.arrayContaining([first.id, second.id]) }),
+  ]));
+
   await page.reload();
   await openRecords(page);
-  await expect(page.getByText("삼슨전자", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: first.title, exact: true }).first()).toBeVisible();
+  await expect(page.locator("article.record-panel")).toHaveCount(2);
   await page.getByRole("tab", { name: "결말 모음" }).click();
 
   const progress = page.getByRole("heading", { name: /\d+\s*\/\s*\d+\s*달성/ });

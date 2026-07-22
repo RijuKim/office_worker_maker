@@ -34,5 +34,38 @@ export async function POST(request: Request) {
     return NextResponse.json({ prepared: true });
   }
 
+  if (body?.action === "ending-record-precursor") {
+    const precursorEvent = await prisma.event.create({
+      data: {
+        characterRunId: character.id,
+        source: "FORCED",
+        status: "RESOLVED",
+        title: "휴학 뒤의 진로 분기",
+        body: "충분한 경험을 쌓은 뒤 다음 진로를 정리합니다.",
+        choices: [],
+        tags: ["career", "leave"],
+        safetyChecked: true,
+      },
+    });
+    await prisma.$transaction([
+      prisma.eventHistory.create({
+        data: {
+          characterRunId: character.id,
+          eventId: precursorEvent.id,
+          choiceId: "take-leave",
+          summary: "휴학 기간의 경험을 바탕으로 진로를 정리했습니다.",
+          statDelta: {},
+          relationshipDelta: [],
+          flagDelta: { careerGate: { status: "passed", path: "company" } },
+        },
+      }),
+      prisma.characterRun.update({
+        where: { id: character.id },
+        data: { academicStatus: "LEAVE", coreEventCount: 5 },
+      }),
+    ]);
+    return NextResponse.json({ prepared: true, historyEventId: precursorEvent.id });
+  }
+
   return NextResponse.json({ error: "알 수 없는 fixture action입니다." }, { status: 400 });
 }

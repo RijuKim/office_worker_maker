@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 const runId = process.env.PLAYWRIGHT_RUN_ID || `${process.pid}`;
 const nextDistDir = `.next-playwright-${runId}`;
+const evidenceDir = `.tenet/runs/2026-07-22-toss-ui-unification/evidence/${runId}`;
 
 export default defineConfig({
   testDir: './tests/acceptance',
@@ -15,7 +16,10 @@ export default defineConfig({
   // auxiliary Vite ports. Give both browser projects enough time to finish;
   // the previous ten-minute cap interrupted the suite before cleanup/reporting.
   globalTimeout: 30 * 60_000,
-  reporter: 'line',
+  reporter: [
+    ['list'],
+    ['json', { outputFile: `${evidenceDir}/playwright-report.json` }],
+  ],
   timeout: 30_000,
   expect: {
     timeout: 10_000,
@@ -36,7 +40,7 @@ export default defineConfig({
     reuseExistingServer: false,
     timeout: 120_000,
   },
-  outputDir: `.tenet/runs/2026-07-22-toss-ui-unification/evidence/playwright-${runId}`,
+  outputDir: `${evidenceDir}/screenshots-and-traces`,
   projects: [
     {
       name: 'desktop',
