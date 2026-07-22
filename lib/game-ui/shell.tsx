@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 
 import {
   CharacterSheet,
@@ -51,11 +51,16 @@ export function SharedGameChrome({
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLElement | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!menuOpen) return;
     const firstAction = menuRef.current?.querySelector<HTMLButtonElement>("button");
     firstAction?.focus();
   }, [menuOpen]);
+
+  const closeMenu = useCallback(() => {
+    onMenuOpenChange(false);
+    menuButtonRef.current?.focus();
+  }, [onMenuOpenChange]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -63,16 +68,15 @@ export function SharedGameChrome({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
-      onMenuOpenChange(false);
-      queueMicrotask(() => menuButtonRef.current?.focus());
+      closeMenu();
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [menuOpen, onMenuOpenChange]);
+  }, [menuOpen, closeMenu]);
 
   return (
-    <section className="hero-panel">
+    <section className="hero-panel" data-audio-ready={audioReady ? "true" : "false"}>
       <div className="title-row">
         <h1 className="app-title">
           <span>일어나보니</span>
@@ -95,19 +99,19 @@ export function SharedGameChrome({
                 type="button"
                 onClick={() => {
                   onOpenProgress();
-                  onMenuOpenChange(false);
+                  closeMenu();
                 }}
               >
                 진행
               </button>
             )}
-            <button type="button" onClick={onOpenRecords}>기록</button>
-            <button type="button" onClick={onStartNewSimulation}>새 시뮬레이션</button>
-            {showAccountAction && onOpenAccount && <button type="button" onClick={onOpenAccount}>{accountLabel ?? "계정"}</button>}
-            {onOpenPrivacy && <button type="button" onClick={onOpenPrivacy}>개인정보처리방침</button>}
+            <button type="button" onClick={() => { onOpenRecords(); closeMenu(); }}>기록</button>
+            <button type="button" onClick={() => { onStartNewSimulation(); closeMenu(); }}>새 시뮬레이션</button>
+            {showAccountAction && onOpenAccount && <button type="button" onClick={() => { onOpenAccount(); closeMenu(); }}>{accountLabel ?? "계정"}</button>}
+            {onOpenPrivacy && <button type="button" onClick={() => { onOpenPrivacy(); closeMenu(); }}>개인정보처리방침</button>}
             <div className="menu-settings">
               {([["music", "배경음"], ["sfx", "효과음"], ["haptics", "햅틱"]] as const).map(([key, label]) => (
-                <label className="menu-row" key={key}>
+                <label className="audio-toggle menu-row" key={key}>
                   <span>{label}</span>
                   <input aria-label={label} type="checkbox" checked={audioSettings[key]} onChange={(event) => onAudioSettingChange(key, event.target.checked)} />
                 </label>
@@ -184,10 +188,12 @@ export function SharedOnboardingFlow(props: SharedOnboardingFlowProps) {
             </div>
           </div>
           <h2>낯선 아침이 시작됩니다.</h2>
-          <p>눈을 뜨니 오전 6시 07분입니다. 휴대폰에는 읽지 않은 카톡 알림이 수북하게 쌓여 있습니다.</p>
-          <p>학과 단체방 공지, 새로 올라온 동아리 모집 글, 아르바이트 연락, 그리고 아직 열어보지 않은 메시지 하나가 화면 위에 겹쳐 있습니다. 마지막 메시지에는 짧은 문장만 남아 있습니다. “이번에는 어떤 사람이 될 수 있을까요?”</p>
-          <p>오늘은 평범한 학기의 첫날일 수도, 오래 미뤄둔 변화를 시작하는 날일 수도 있습니다. 지금 고르는 작은 선택들은 수업과 관계, 생활과 진로를 조금씩 다른 방향으로 이끌게 될 것입니다.</p>
-          <p className="disclaimer">이 이야기는 실제 진로 예측이 아닌 재미를 위한 허구의 시뮬레이션입니다.</p>
+          <div className="space-y-3">
+            <p>눈을 뜨니 오전 6시 07분입니다. 휴대폰에는 읽지 않은 카톡 알림이 수북하게 쌓여 있습니다.</p>
+            <p>학과 단체방 공지, 새로 올라온 동아리 모집 글, 아르바이트 연락, 그리고 아직 열어보지 않은 메시지 하나가 화면 위에 겹쳐 있습니다. 마지막 메시지에는 짧은 문장만 남아 있습니다. “이번에는 어떤 사람이 될 수 있을까요?”</p>
+            <p>오늘은 평범한 학기의 첫날일 수도, 오래 미뤄둔 변화를 시작하는 날일 수도 있습니다. 지금 고르는 작은 선택들은 수업과 관계, 생활과 진로를 조금씩 다른 방향으로 이끌게 될 것입니다.</p>
+            <p className="disclaimer">이 이야기는 실제 진로 예측이 아닌 재미를 위한 허구의 시뮬레이션입니다.</p>
+          </div>
           <button className="primary-button" type="button" onClick={() => props.onStepChange("name")}>시작하기</button>
         </section>
       )}
@@ -195,7 +201,7 @@ export function SharedOnboardingFlow(props: SharedOnboardingFlowProps) {
       {props.step === "name" && (
         <section className="create-step">
           <h2>당신의 이름은 무엇인가요?</h2>
-          <input aria-label="당신의 이름은 무엇인가요?" className="text-input" maxLength={24} value={props.name} onChange={(event) => props.onNameChange(event.target.value)} />
+          <input aria-label="당신의 이름은 무엇인가요?" className="text-input" type="text" maxLength={24} value={props.name} onChange={(event) => props.onNameChange(event.target.value)} />
           <div className="onboarding-actions">
             <button onClick={() => props.onStepChange("intro")}>이전</button>
             <button disabled={!props.name.trim()} onClick={() => props.onStepChange("age")}>다음</button>

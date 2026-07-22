@@ -1125,6 +1125,7 @@ export default function AppPage() {
                     className={`record-card record-card-${getRecordTone(r)} pixel-panel overflow-hidden`}
                     expanded={isExpanded}
                     id={`record-card-${r.id as string}`}
+                    key={r.id as string}
                     onToggle={() => setExpandedRecord(isExpanded ? null : r.id as string)}
                     poster={<RecordPoster record={r} />}
                     preview={narrativePreview}

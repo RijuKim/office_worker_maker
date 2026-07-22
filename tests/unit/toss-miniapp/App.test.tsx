@@ -122,8 +122,8 @@ describe("Toss entry refresh", () => {
     renderApp();
     expect([...container.querySelectorAll(".app-title > span")].map((node) => node.textContent)).toEqual(["일어나보니", "대한민국 취준생"]);
     expect(container.querySelector(".status-row")?.textContent).not.toMatch(/same-origin|provider|source/i);
-    expect([...container.querySelectorAll(".create-step > p")].map((node) => node.textContent)).toEqual(approvedCopy);
     expect(container.querySelector("h2")?.textContent).toBe("낯선 아침이 시작됩니다.");
+    expect([...container.querySelectorAll(".create-step > .space-y-3 > p")].map((node) => node.textContent)).toEqual(approvedCopy);
     expect(container.textContent).not.toContain("취준 생활 시뮬레이션");
     expect(container.textContent).not.toContain("취준 /");
     expect(container.querySelector('[aria-label="설정"]')).toBeNull();
@@ -256,7 +256,7 @@ describe("Toss entry refresh", () => {
     expect(stats?.querySelectorAll(":scope > span")).toHaveLength(2);
     expect(event?.querySelector("h2")?.textContent).toBe("첫 수업으로 향합니다");
     expect(event?.querySelector("p")?.textContent).toBe("캠퍼스의 아침입니다.");
-    expect(event?.querySelector(".choice-stack")).toBeTruthy();
+    expect(container.querySelector(".choice-stack")).toBeTruthy();
     expect(event?.querySelector(".source-pill")).toBeNull();
     expect(container.textContent).not.toMatch(/AI 사건|FALLBACK|provider|source/i);
   });
@@ -270,7 +270,7 @@ describe("Toss entry refresh", () => {
     const record = stack?.querySelector("article.record-panel");
     expect(record?.querySelector("strong")?.textContent).toBe(careerRecord.title);
     expect(record?.querySelector("p")?.textContent).toBe(careerRecord.summary);
-    expect(record?.querySelector("span")?.textContent).toBe("만족도 74");
+    expect([...record!.querySelectorAll("span")].map((node) => node.textContent)).toContain("만족도 74");
     expect(button("진행으로")).toBeTruthy();
     expect(container.querySelector(".event-panel")).toBeNull();
   });

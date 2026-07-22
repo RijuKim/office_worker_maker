@@ -1,7 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createSafeAreaInsets } from "@/lib/game-ui/types";
-import { bootstrapTossSession, createTossFeedbackPort, createTossSafeAreaPort } from "../../../apps/toss-miniapp/src/toss-host";
+import {
+  bootstrapTossSession,
+  createTossEndingShareLink,
+  createTossFeedbackPort,
+  createTossSafeAreaPort,
+  TOSS_SHARE_ICON_URL,
+} from "../../../apps/toss-miniapp/src/toss-host";
+
+const { tossShareLink } = vi.hoisted(() => ({
+  tossShareLink: vi.fn(),
+}));
+
+vi.mock("@apps-in-toss/web-framework", async () => {
+  const actual = await vi.importActual<typeof import("@apps-in-toss/web-framework")>("@apps-in-toss/web-framework");
+  return {
+    ...actual,
+    getTossShareLink: tossShareLink,
+  };
+});
 
 describe("Toss host adapter", () => {
   beforeEach(() => {
@@ -10,6 +28,7 @@ describe("Toss host adapter", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -181,5 +200,25 @@ describe("Toss host adapter", () => {
     } finally {
       Reflect.deleteProperty(navigator, "vibrate");
     }
+  });
+
+  it("creates an exact Toss share link with the production icon and times out cleanly", async () => {
+    tossShareLink.mockResolvedValueOnce("https://share.example/link");
+
+    await expect(createTossEndingShareLink("record-42")).resolves.toBe("https://share.example/link");
+    expect(tossShareLink).toHaveBeenCalledWith(
+      "intoss://sano-job-seeker/share/record-42",
+      TOSS_SHARE_ICON_URL,
+    );
+  });
+
+  it("rejects after five seconds when Toss share-link generation stalls", async () => {
+    vi.useFakeTimers();
+    tossShareLink.mockImplementationOnce(() => new Promise(() => undefined));
+
+    const pending = createTossEndingShareLink("record-42");
+    const assertion = expect(pending).rejects.toThrow("링크를 만들지 못했습니다. 다시 시도해 주세요.");
+    await vi.advanceTimersByTimeAsync(5_000);
+    await assertion;
   });
 });

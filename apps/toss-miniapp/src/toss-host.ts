@@ -1,4 +1,4 @@
-import { getAnonymousKey } from "@apps-in-toss/web-framework";
+import { getAnonymousKey, getTossShareLink } from "@apps-in-toss/web-framework";
 
 import { api } from "./api";
 import { createSafeAreaInsets, type HostFailure, type HostRequestCredential, type SafeAreaInsets, type SessionBootstrapResult } from "@/lib/game-ui/types";
@@ -27,11 +27,14 @@ export interface TossFeedbackPort {
   vibrate(pattern?: number | number[]): void;
 }
 
+export const TOSS_SHARE_ICON_URL = "https://sano-officeworker.vercel.app/toss-app-icon.png";
+
 const ANONYMOUS_KEY_MISSING_MESSAGE = "토스 앱을 최신 버전으로 업데이트해 주세요.";
 const ANONYMOUS_KEY_INVALID_CATEGORY_MESSAGE = "비게임 미니앱 설정을 확인해 주세요.";
 const ANONYMOUS_KEY_ERROR_MESSAGE = "토스 사용자 정보를 불러오지 못했습니다.";
 const ANONYMOUS_KEY_UNKNOWN_MESSAGE = "토스 사용자 정보를 확인하지 못했습니다.";
 const SESSION_EXCHANGE_FAILED_MESSAGE = "사용자 정보를 연결하지 못했습니다. 다시 시도해 주세요.";
+const SHARE_LINK_TIMEOUT_MESSAGE = "링크를 만들지 못했습니다. 다시 시도해 주세요.";
 
 function createFailure(code: HostFailure["code"], message: string, retryable = true): HostFailure {
   return { code, message, retryable };
@@ -69,6 +72,28 @@ function createBearerCredential(token: string): HostRequestCredential {
       Authorization: `Bearer ${token}`,
     },
   };
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, onTimeout: () => Error): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeout = globalThis.setTimeout(() => reject(onTimeout()), timeoutMs);
+    promise.then((value) => {
+      globalThis.clearTimeout(timeout);
+      resolve(value);
+    }).catch((error) => {
+      globalThis.clearTimeout(timeout);
+      reject(error);
+    });
+  });
+}
+
+export async function createTossEndingShareLink(recordId: string): Promise<string> {
+  const path = `intoss://sano-job-seeker/share/${encodeURIComponent(recordId)}`;
+  return await withTimeout(
+    getTossShareLink(path, TOSS_SHARE_ICON_URL),
+    5_000,
+    () => new Error(SHARE_LINK_TIMEOUT_MESSAGE),
+  );
 }
 
 export async function bootstrapTossSession(

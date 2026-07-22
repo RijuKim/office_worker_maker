@@ -102,9 +102,9 @@ describe("Home page scaffold", () => {
     expect(container.textContent).not.toContain("취준 생활 시뮬레이션");
     expect(container.textContent).not.toContain("새 이야기");
     const intro = container.querySelector("section.create-step")!;
+    expect(intro.querySelector("h2")?.textContent).toBe("낯선 아침이 시작됩니다.");
     const copy = intro.querySelector(".space-y-3")!;
     expect(Array.from(copy.children, (node) => node.textContent)).toEqual([
-      "낯선 아침이 시작됩니다.",
       "눈을 뜨니 오전 6시 07분입니다. 휴대폰에는 읽지 않은 카톡 알림이 수북하게 쌓여 있습니다.",
       "학과 단체방 공지, 새로 올라온 동아리 모집 글, 아르바이트 연락, 그리고 아직 열어보지 않은 메시지 하나가 화면 위에 겹쳐 있습니다. 마지막 메시지에는 짧은 문장만 남아 있습니다. “이번에는 어떤 사람이 될 수 있을까요?”",
       "오늘은 평범한 학기의 첫날일 수도, 오래 미뤄둔 변화를 시작하는 날일 수도 있습니다. 지금 고르는 작은 선택들은 수업과 관계, 생활과 진로를 조금씩 다른 방향으로 이끌게 될 것입니다.",
@@ -289,13 +289,10 @@ describe("Home page scaffold", () => {
 
     act(() => menu.click());
     act(() => findButton(container, "새 시뮬레이션").click());
-    expect(container.querySelector("[data-testid='onboarding-intro'] h2")?.textContent).toBe("낯선 아침이 시작됩니다.");
+    expect(container.querySelector("section.create-step h2")?.textContent).toBe("낯선 아침이 시작됩니다.");
 
     act(() => menu.click());
-    const privacy = container.querySelector("a[href='/privacy']") as HTMLAnchorElement;
-    expect(privacy.pathname).toBe("/privacy");
-    privacy.addEventListener("click", (event) => event.preventDefault(), { once: true });
-    act(() => privacy.click());
+    act(() => findButton(container, "개인정보처리방침").click());
     expect(container.querySelector(".app-menu-popover")).toBeNull();
 
     act(() => root.unmount());

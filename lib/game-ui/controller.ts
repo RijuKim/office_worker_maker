@@ -1,4 +1,4 @@
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import type {
   CareerRecord,
@@ -549,11 +549,7 @@ export function createGameController(options: GameControllerOptions): GameContro
 }
 
 export function useGameController(options: GameControllerOptions) {
-  const controllerRef = useRef<GameController | null>(null);
-  if (!controllerRef.current) {
-    controllerRef.current = createGameController(options);
-  }
-  const controller = controllerRef.current;
+  const [controller] = useState(() => createGameController(options));
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getState, controller.getState);
 
   useEffect(() => () => controller.dispose(), [controller]);
