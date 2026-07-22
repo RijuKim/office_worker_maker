@@ -1,4 +1,8 @@
+import { fileURLToPath } from "node:url";
+
 import { defineConfig, loadEnv } from "vite";
+
+const projectRoot = fileURLToPath(new URL("../..", import.meta.url));
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -7,6 +11,11 @@ export default defineConfig(({ mode }) => {
   return {
     root: "apps/toss-miniapp",
     envDir: "../..",
+    resolve: {
+      alias: {
+        "@": projectRoot,
+      },
+    },
     build: {
       outDir: "../../dist/toss-miniapp",
       emptyOutDir: true,
