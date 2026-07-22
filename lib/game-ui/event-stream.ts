@@ -332,9 +332,17 @@ export function createGameApiClient(options: GameApiClientOptions = {}) {
     };
   }
 
+  function readNextEventStream<TEvent>(
+    response: Response,
+    onFrame?: (frame: ParsedSseBlock) => void,
+  ) {
+    return readNextEventFromStream<TEvent>(response, onFrame);
+  }
+
   return {
     requestJson,
     nextEventStream,
+    readNextEventStream,
     parseSseBlocks,
   };
 }

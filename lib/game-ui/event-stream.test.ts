@@ -4,7 +4,6 @@ import {
   NEXT_EVENT_STREAM_RETRY_MESSAGE,
   createGameApiClient,
   parseSseBlocks,
-  readNextEventFromStream,
 } from "./event-stream";
 
 function jsonResponse(body: unknown, status = 200) {
@@ -168,7 +167,7 @@ describe("game-ui event transport", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("flushes an incomplete UTF-8 code point inside the final SSE payload at EOF", async () => {
+  it("preserves an incomplete UTF-8 code point through the public stream client at EOF", async () => {
     const encoder = new TextEncoder();
     const responseText = "event: status\ndata: 마지막🙂";
     const encoded = encoder.encode(responseText);
@@ -176,10 +175,13 @@ describe("game-ui event transport", () => {
     const splitAt = findByteSequence(encoded, emojiBytes);
     expect(splitAt).toBeGreaterThanOrEqual(0);
 
+    const client = createGameApiClient({
+      baseUrl: "https://api.example.com",
+    });
     const response = byteStreamResponse([encoded.slice(0, splitAt + emojiBytes.length - 1)]);
     const frames: Array<{ event: string; data: string; fields: Record<string, string[]> }> = [];
 
-    await expect(readNextEventFromStream(response, (frame) => frames.push(frame))).resolves.toEqual({
+    await expect(client.readNextEventStream(response, (frame) => frames.push(frame))).resolves.toEqual({
       event: null,
       failed: true,
     });
