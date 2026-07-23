@@ -259,7 +259,10 @@ export async function POST(request: Request | NextRequest, context: RouteContext
           }],
         };
       } else {
-        aiResult = await generateAiEvent(aiState, { skipPrimary: !limit.allowed });
+        aiResult = await generateAiEvent(aiState, {
+          skipPrimary: !limit.allowed,
+          trace: { requestId, characterRunId: id },
+        });
       }
     } catch {
       const elapsed = Math.max(0, Date.now() - providerStartedAt);
