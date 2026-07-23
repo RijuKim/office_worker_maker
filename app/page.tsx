@@ -1,14 +1,14 @@
 "use client";
 
 import { signIn, signOut, useSession } from "next-auth/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import type { CareerEndingRecord } from "@prisma/client";
 import { EndingArt, getEndingArtType } from "@/lib/game/ending-art";
 import { CharacterSheet, PlaySurface, RelationshipsSheet } from "@/lib/game-ui/App";
 import { CODEX_CATALOG, type CodexSlot } from "@/lib/game/codex-catalog";
 import { deriveCodexState, type CodexState } from "@/lib/game/derive-codex-state";
-import { SharedGameChrome, SharedOnboardingFlow } from "@/lib/game-ui/shell";
+import { SharedOnboardingFlow } from "@/lib/game-ui/shell";
 import { CodexGrid } from "@/app/components/codex/CodexGrid";
 import { CodexDetailModal } from "@/app/components/codex/CodexDetailModal";
 import { RecordCardShell, RecordShareActions, copyEndingShareLink } from "@/lib/game-ui/App";
@@ -972,47 +972,54 @@ export default function AppPage() {
 
   const academicProgressLabel = getAcademicProgressLabel(currentChar);
   const runCompleted = Boolean(endingNotice);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    if (!menuOpen) return;
+    menuRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+  }, [menuOpen]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setMenuOpen(false);
+      menuButtonRef.current?.focus();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [menuOpen]);
   const topChrome = (
-    <>
-      <SharedGameChrome
-        variant="web"
-        menuOpen={menuOpen}
-        onMenuOpenChange={setMenuOpen}
-        onOpenProgress={currentChar ? () => setScreen("play") : undefined}
-        onOpenRecords={() => {
-          navigationVersionRef.current += 1;
-          setExpandedRecord(null);
-          setScreen("records");
-          void loadRecords();
-        }}
-        onStartNewSimulation={startNewCharacter}
-        accountLabel={status === "authenticated" ? "계정" : "로그인/저장"}
-        showAccountAction
-        onOpenAccount={() => setScreen("auth")}
-        onOpenPrivacy={() => {
-          window.location.href = "/privacy";
-        }}
-        audioSettings={audioSettings}
-        onAudioSettingChange={updateAudioSetting}
-        audioReady={audioReady}
-        currentCharacterName={currentChar?.name ?? null}
-      />
-      {status !== "authenticated" && (
-        <div className="pixel-shell flex justify-end px-4 pb-2">
-          <a
-            className="text-xs font-bold text-[#8a4f2d] underline"
-            href="#auth"
-            onClick={(event) => {
-              event.preventDefault();
-              setAuthMode("signup");
-              setScreen("auth");
-            }}
-          >
-            회원가입/로그인
-          </a>
+    <header className="app-title-header">
+      <h1 className="app-title"><span>일어나보니</span><span>대한민국 취준생</span></h1>
+      <button
+        ref={menuButtonRef}
+        aria-expanded={menuOpen}
+        aria-label="메뉴"
+        className="chrome-icon-button chrome-menu-button"
+        onClick={() => setMenuOpen((open) => !open)}
+        type="button"
+      >
+        <span /><span /><span />
+      </button>
+      {menuOpen && (
+        <div ref={menuRef} className="app-popover app-menu-popover">
+          {currentChar && <button onClick={() => { setScreen("play"); setMenuOpen(false); }} type="button">진행</button>}
+          <button onClick={() => { navigationVersionRef.current += 1; setExpandedRecord(null); setScreen("records"); setMenuOpen(false); void loadRecords(); }} type="button">기록</button>
+          <button onClick={() => { startNewCharacter(); setMenuOpen(false); }} type="button">새 시뮬레이션</button>
+          <button onClick={() => { setScreen("auth"); setMenuOpen(false); }} type="button">{status === "authenticated" ? "계정" : "로그인/저장"}</button>
+          <button onClick={() => { window.location.href = "/privacy"; setMenuOpen(false); }} type="button">개인정보처리방침</button>
+          <div className="menu-settings" data-audio-ready={audioReady}>
+            {([['music', '배경음'], ['sfx', '효과음'], ['haptics', '햅틱']] as const).map(([key, label]) => (
+              <label className="audio-toggle menu-row" key={key}>
+                <span>{label}</span>
+                <input checked={audioSettings[key]} onChange={(event) => updateAudioSetting(key, event.target.checked)} type="checkbox" />
+              </label>
+            ))}
+          </div>
         </div>
       )}
-    </>
+    </header>
   );
 
   if (activeScreen === "auth") {
