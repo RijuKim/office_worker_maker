@@ -11,3 +11,29 @@ body,
   min-height: 100%;
   margin: 0;
 }
+
+body {
+  background: #17263f;
+  color: #2a241e;
+  font-family: "Courier New", "DungGeunMo", "Apple SD Gothic Neo", "Noto Sans KR", monospace;
+}
+
+.toss-production-app {
+  min-height: 100dvh;
+  padding: max(0px, var(--safe-area-top)) max(0px, var(--safe-area-right)) max(22px, var(--safe-area-bottom)) max(0px, var(--safe-area-left));
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(180deg, #17263f 0%, #243754 46%, #18243a 100%);
+  background-size: 18px 18px;
+}
+
+.toss-production-app > .screen-stack,
+.toss-production-app > .error-banner {
+  width: min(calc(100% - 24px), 720px);
+}
+
+.toss-production-app > .hero-panel {
+  width: min(calc(100% - 24px), 720px);
+  margin-inline: auto;
+}

@@ -222,6 +222,7 @@ button {
 }
 
 .app-shell {
+  box-sizing: border-box;
   min-height: 100dvh;
   overflow-x: hidden;
   padding:
@@ -232,6 +233,56 @@ button {
   background:
     linear-gradient(180deg, rgba(247, 208, 139, 0.08), transparent 36%),
     #17130f;
+}
+
+.shared-game-workspace {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) 300px;
+  padding-top: 14px;
+}
+
+.shared-game-workspace .sidebar-nav button {
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #d9c9b5;
+  background: transparent;
+  text-align: left;
+  font-size: 14px;
+}
+
+.shared-game-workspace .sidebar-nav button.active,
+.shared-game-workspace .sidebar-nav button:hover {
+  border: 1px solid #7d6146;
+  background: #3a2d21;
+  color: #fff3d7;
+}
+
+@media (max-width: 1120px) {
+  .shared-game-workspace { grid-template-columns: 220px minmax(0, 1fr); }
+  .shared-game-workspace .right-sidebar { display: none; }
+}
+
+@media (max-width: 820px) {
+  .shared-game-workspace { display: block; padding-top: 0; }
+  .shared-game-workspace .sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    border-right: 0;
+    border-bottom: 2px solid #0f0b08;
+    padding: 8px 10px;
+    box-shadow: 0 3px 0 #0d0b09;
+  }
+  .shared-game-workspace .sidebar-profile { display: block; }
+  .shared-game-workspace .sidebar-profile h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
+  .shared-game-workspace .sidebar-nav { display: flex; gap: 6px; margin: 8px -10px 0; overflow-x: auto; padding: 0 10px 2px; }
+  .shared-game-workspace .sidebar-nav button { flex: 0 0 auto; min-height: 34px; min-width: 58px; padding: 7px 10px; text-align: center; white-space: nowrap; }
+  .shared-game-workspace .sidebar-stats { display: none; margin-top: 8px; padding: 8px; }
+  .shared-game-workspace .sidebar-stats.sidebar-stats-open { display: block; }
+  .shared-game-workspace .sidebar-stats h2 { display: none; }
+  .shared-game-workspace .sidebar-stats dl { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 0; }
+  .shared-game-workspace .play-main { padding: 14px 12px 22px; }
 }
 
 .title-row {

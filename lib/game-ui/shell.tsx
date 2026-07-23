@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 
 import {
@@ -7,8 +8,88 @@ import {
   PlaySurface,
   RelationshipsSheet,
 } from "./App";
+import type { SharedCharacterView } from "./App";
 
 export { CharacterSheet, PlaySurface, RelationshipsSheet };
+
+export interface SharedGameWorkspaceProps {
+  mode?: "web" | "mobile";
+  character: SharedCharacterView | null;
+  activeTab: "play" | "character" | "relationships";
+  onTabChange(tab: "play" | "character" | "relationships"): void;
+  onOpenRecords(): void;
+  onOpenAccount?(): void;
+  accountLabel?: string;
+  mobileStatsOpen?: boolean;
+  onMobileStatsChange?(open: boolean): void;
+  children: ReactNode;
+  rightContent?: ReactNode;
+}
+
+const WORKSPACE_STATS = [
+  ["academic", "학업", "BK"], ["practical", "실무", "TL"], ["health", "건강", "HP"],
+  ["mental", "멘탈", "MP"], ["wealth", "자산", "CO"], ["charm", "매력", "CH"], ["reputation", "평판", "RP"],
+] as const;
+
+function workspaceStatLevel(value: number) { return Math.max(1, Math.min(10, Math.round(value))); }
+function workspaceTrustHearts(trust: number) {
+  const count = Math.max(1, Math.min(5, Math.ceil(Math.abs(trust) / 20)));
+  return trust >= 0 ? "♥".repeat(count) : "💀".repeat(count);
+}
+
+/** The Production web workspace shared by the Next app and the Toss bundle. */
+export function SharedGameWorkspace({
+  mode = "web", character, activeTab, onTabChange, onOpenRecords, onOpenAccount, accountLabel = "로그인/저장",
+  mobileStatsOpen = false, onMobileStatsChange, children, rightContent,
+}: SharedGameWorkspaceProps) {
+  if (mode === "mobile") {
+    return <main className="shared-game-workspace-mobile">{children}</main>;
+  }
+
+  return (
+    <div className="shared-game-workspace app-layout pixel-shell min-h-screen text-[#2a241e]">
+      <aside className="sidebar border-r border-[#3b3025] bg-[#231d17] p-[22px] text-[#f7efe2]">
+        <div className="sidebar-profile min-w-0">
+          <h1 className="text-[22px] font-bold leading-tight">{character?.name ?? "..."}</h1>
+          {character && <p className="sidebar-major text-xs text-[#d9c9b5]">{character.major}</p>}
+        </div>
+        <nav className="sidebar-nav mt-[22px] grid gap-2">
+          <button className={activeTab === "play" ? "active" : ""} onClick={() => onTabChange("play")} type="button">진행</button>
+          <button className={activeTab === "character" ? "active" : ""} onClick={() => onTabChange("character")} type="button">캐릭터</button>
+          <button className={activeTab === "relationships" ? "active" : ""} onClick={() => onTabChange("relationships")} type="button">관계</button>
+          <button onClick={onOpenRecords} type="button">기록</button>
+          {onMobileStatsChange && <button aria-expanded={mobileStatsOpen} onClick={() => onMobileStatsChange(!mobileStatsOpen)} type="button">능력치</button>}
+          {onOpenAccount && <button onClick={onOpenAccount} type="button">{accountLabel}</button>}
+        </nav>
+        {character && <section className={`sidebar-stats mt-3.5 rounded-lg border border-[#4d3d2f] bg-[#1b1612] p-3.5 ${mobileStatsOpen ? "sidebar-stats-open" : ""}`}>
+          <h2 className="text-base font-bold">능력치</h2>
+          <dl className="mt-2 grid gap-2">
+            {WORKSPACE_STATS.map(([key, label, icon]) => {
+              const level = workspaceStatLevel(character.stats[key] ?? 0);
+              return <div className="rounded-md bg-[#2c231b] px-2.5 py-2 text-[13px]" key={key}>
+                <dt className="flex items-center justify-between gap-2"><span><span className="mr-1.5 text-[11px] text-[#d79b52]">{icon}</span>{label}</span><span className="text-[#c4b39c]">{key === "wealth" ? `${character.stats[key] ?? 0}만원` : `${level}/10`}</span></dt>
+                {key !== "wealth" && <dd className="mt-1.5 flex gap-1">{Array.from({ length: 10 }, (_, index) => <span className={`h-1.5 flex-1 rounded-full ${index < level ? "bg-[#d79b52]" : "bg-[#4c4035]"}`} key={index} />)}</dd>}
+              </div>;
+            })}
+          </dl>
+        </section>}
+      </aside>
+      <main className="play-main bg-[#f7efe2] px-11 py-[34px]">{children}</main>
+      <aside className="right-sidebar border-l border-[#3b3025] bg-[#241b15] p-[22px] text-[#fff3d7]">
+        <h2 className="text-[22px] font-black leading-tight">기억과 관계</h2>
+        <section className="pixel-panel-dark mt-3.5 p-3.5"><h3 className="font-bold">주요 인물</h3><div className="mt-2 space-y-1">
+          {character?.relationships?.slice(0, 3).map((rel) => <p className="text-[13px] leading-relaxed text-[#d9c9b5]" key={rel.name}>{rel.name} · {rel.role}<br /><span className="text-[11px]">{workspaceTrustHearts(rel.trust)}</span></p>)}
+          {(!character?.relationships || character.relationships.length === 0) && <p className="text-[13px] text-[#d9c9b5]">정보 없음</p>}
+        </div></section>
+        <section className="pixel-panel-dark mt-3.5 p-3.5"><h3 className="font-bold">최근 기억</h3><div className="mt-2 flex flex-wrap gap-1">
+          {character?.eventHistory?.slice(0, 5).map((entry, index) => <span className="border-2 border-[#0f0b08] bg-[#35261c] px-2 py-1 text-xs text-[#f7d08b]" key={index}>{entry.summary.slice(0, 15)}</span>)}
+          {(!character?.eventHistory || character.eventHistory.length === 0) && <span className="text-xs text-[#d9c9b5]">아직 기록 없음</span>}
+        </div></section>
+        {rightContent}
+      </aside>
+    </div>
+  );
+}
 
 export type AudioSettings = {
   music: boolean;
