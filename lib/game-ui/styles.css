@@ -129,6 +129,8 @@ button {
 
 .novel-text {
   word-break: keep-all;
+  line-break: strict;
+  text-wrap: pretty;
   line-height: 1.9;
 }
 
