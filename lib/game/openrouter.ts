@@ -38,10 +38,11 @@ const fallbackProvider = (): AiProvider => ({
 const aiProviders = (options: AiProviderOptions = {}) =>
   options.skipPrimary ? [fallbackProvider()] : [primaryProvider(), fallbackProvider()];
 
-// Keep the interactive generation attempt below the browser's 30 second action
-// budget. Both configured providers share this total window, after which the
-// route commits the validated static fallback.
-const DEFAULT_AI_TIMEOUT_MS = 8_000;
+// Give the configured providers enough time to finish a complete structured
+// event. Both providers share this total window, after which the route commits
+// the validated static fallback. The value remains configurable for deploys
+// with a tighter or looser request budget.
+const DEFAULT_AI_TIMEOUT_MS = 60_000;
 const MIN_AI_TIMEOUT_MS = 5_000;
 const MAX_AI_TIMEOUT_MS = 120_000;
 export const SLOW_AI_GENERATION_MS = 10_000;

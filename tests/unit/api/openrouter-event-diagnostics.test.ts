@@ -29,10 +29,10 @@ describe("AI event diagnostics", () => {
   });
 
   it.each([
-    [undefined, 12_000],
-    ["abc", 12_000],
-    ["4999", 12_000],
-    ["120001", 12_000],
+    [undefined, 60_000],
+    ["abc", 60_000],
+    ["4999", 60_000],
+    ["120001", 60_000],
     ["60000", 60_000],
     ["5000", 5_000],
     ["120000", 120_000],
@@ -41,13 +41,13 @@ describe("AI event diagnostics", () => {
   });
 
   it.each([
-    [undefined, 4_000],
-    ["abc", 4_000],
-    ["399", 4_000],
+    [undefined, 2_000],
+    ["abc", 2_000],
+    ["399", 2_000],
     ["400", 400],
     ["1800", 1_800],
     ["4000", 4_000],
-    ["4001", 4_000],
+    ["4001", 2_000],
   ])("parses max tokens %s as %i", (raw, expected) => {
     expect(getOpenRouterMaxTokens(raw)).toBe(expected);
   });

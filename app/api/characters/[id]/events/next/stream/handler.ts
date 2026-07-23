@@ -606,7 +606,7 @@ function buildDiversityGuidance(eventHistory: Array<{
     ...new Set([
       ...lastTwoCategories,
       ...Object.entries(tagCounts)
-        .filter(([, count]) => count >= 1)
+        .filter(([, count]) => count >= 2)
         .map(([category]) => category),
     ]),
   ];
