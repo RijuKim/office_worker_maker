@@ -1399,6 +1399,26 @@ button {
   min-height: 56px;
 }
 
+/* The shared PlaySurface is also used by Toss. Keep the Vercel workspace on
+   its original paper-and-ink pixel controls. */
+.app-layout .choice-stack button {
+  min-height: 56px;
+  border: 3px solid #2a2018;
+  border-radius: 6px;
+  color: #2a241e;
+  background: #fff8e8;
+  box-shadow: 4px 4px 0 #2a2018;
+}
+
+.app-layout .choice-stack button:hover:not(:disabled) {
+  background: #ffe0a2;
+}
+
+.app-layout .event-panel p,
+.app-layout .feedback-panel p {
+  color: #3a332d;
+}
+
 .audio-controls {
   box-shadow: 3px 3px 0 #0a0705;
 }
