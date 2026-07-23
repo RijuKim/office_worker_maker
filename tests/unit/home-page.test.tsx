@@ -242,6 +242,8 @@ describe("Home page scaffold", () => {
 
     act(() => (container.querySelector("button[aria-label='메뉴']") as HTMLButtonElement).click());
     act(() => findButton(container, "새 시뮬레이션").click());
+    expect(container.querySelector("[role='dialog'][aria-label='새 시뮬레이션 확인']")).toBeTruthy();
+    act(() => (container.querySelector("[aria-label='새 시뮬레이션 확인'] button:last-child") as HTMLButtonElement).click());
     expect(container.textContent).toContain("낯선 아침이 시작됩니다.");
     act(() => findButton(container, "시작하기").click());
     expect((container.querySelector("input") as HTMLInputElement).value).toBe("");
@@ -293,6 +295,7 @@ describe("Home page scaffold", () => {
 
     act(() => menu.click());
     act(() => findButton(container, "새 시뮬레이션").click());
+    act(() => (container.querySelector("[aria-label='새 시뮬레이션 확인'] button:last-child") as HTMLButtonElement).click());
     expect(container.querySelector("section.create-step h2")?.textContent).toBe("낯선 아침이 시작됩니다.");
 
     act(() => menu.click());
@@ -499,10 +502,13 @@ describe("Home page scaffold", () => {
       root.render(<Home />);
     });
 
-    await waitForAssertion(() => expect(findButton(container, "기록")).toBeTruthy());
+    await waitForAssertion(() => expect(container.querySelector("button[aria-label='메뉴']")).toBeTruthy());
 
     await act(async () => {
-      findButton(container, "기록").click();
+      (container.querySelector("button[aria-label='메뉴']") as HTMLButtonElement).click();
+    });
+    await act(async () => {
+      (container.querySelector(".app-menu-popover button:nth-of-type(2)") as HTMLButtonElement).click();
     });
 
     await waitForAssertion(() => expect(container.textContent).toContain("개발자"));

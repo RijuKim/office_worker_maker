@@ -8,7 +8,6 @@ import { EndingArt, getEndingArtType } from "@/lib/game/ending-art";
 import { CharacterSheet, PlaySurface, RelationshipsSheet } from "@/lib/game-ui/App";
 import { CODEX_CATALOG, type CodexSlot } from "@/lib/game/codex-catalog";
 import { deriveCodexState, type CodexState } from "@/lib/game/derive-codex-state";
-import { SharedOnboardingFlow } from "@/lib/game-ui/shell";
 import { CodexGrid } from "@/app/components/codex/CodexGrid";
 import { CodexDetailModal } from "@/app/components/codex/CodexDetailModal";
 import { RecordCardShell, RecordShareActions, copyEndingShareLink } from "@/lib/game-ui/App";
@@ -383,6 +382,7 @@ export default function AppPage() {
   const [audioSettings, setAudioSettings] = useState<AudioSettings>({ music: false, sfx: true, haptics: true });
   const [audioReady, setAudioReady] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showNewSimulationConfirm, setShowNewSimulationConfirm] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
@@ -853,6 +853,11 @@ export default function AppPage() {
     setScreen("create");
   }, [playFeedbackCue]);
 
+  const requestNewSimulation = useCallback(() => {
+    setMenuOpen(false);
+    setShowNewSimulationConfirm(true);
+  }, []);
+
   const makeChoice = useCallback(async (choiceIndex: number) => {
     if (!currentChar || !currentEvent) return;
     playFeedbackCue("tap");
@@ -1006,7 +1011,7 @@ export default function AppPage() {
         <div ref={menuRef} className="app-popover app-menu-popover">
           {currentChar && <button onClick={() => { setScreen("play"); setMenuOpen(false); }} type="button">진행</button>}
           <button onClick={() => { navigationVersionRef.current += 1; setExpandedRecord(null); setScreen("records"); setMenuOpen(false); void loadRecords(); }} type="button">기록</button>
-          <button onClick={() => { startNewCharacter(); setMenuOpen(false); }} type="button">새 시뮬레이션</button>
+          <button onClick={requestNewSimulation} type="button">새 시뮬레이션</button>
           <button onClick={() => { setScreen("auth"); setMenuOpen(false); }} type="button">{status === "authenticated" ? "계정" : "로그인/저장"}</button>
           <button onClick={() => { window.location.href = "/privacy"; setMenuOpen(false); }} type="button">개인정보처리방침</button>
           <div className="menu-settings" data-audio-ready={audioReady}>
@@ -1016,6 +1021,18 @@ export default function AppPage() {
                 <input checked={audioSettings[key]} onChange={(event) => updateAudioSetting(key, event.target.checked)} type="checkbox" />
               </label>
             ))}
+          </div>
+        </div>
+      )}
+      {showNewSimulationConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setShowNewSimulationConfirm(false)} role="dialog" aria-modal="true" aria-label="새 시뮬레이션 확인">
+          <div className="pixel-panel relative flex w-full max-w-sm flex-col items-center gap-5 bg-[#fffaf0] p-7 text-center shadow-xl" onClick={(event) => event.stopPropagation()}>
+            <p className="text-lg font-black text-[#2a241e]">새 시뮬레이션을 시작할까요?</p>
+            <p className="text-sm leading-relaxed text-[#706b62]">현재 진행 중인 시뮬레이션은 삭제되고 되돌릴 수 없습니다.</p>
+            <div className="flex w-full gap-3">
+              <button className="pixel-button flex-1 px-4 py-3 text-sm font-bold" onClick={() => setShowNewSimulationConfirm(false)} type="button">취소</button>
+              <button className="pixel-button-dark flex-1 px-4 py-3 text-sm font-bold" onClick={() => { setShowNewSimulationConfirm(false); startNewCharacter(); }} type="button">새로 시작</button>
+            </div>
           </div>
         </div>
       )}
@@ -1037,7 +1054,7 @@ export default function AppPage() {
             <div className="space-y-3">
               <p className="text-center text-sm leading-6 text-[#3a332d]">현재 진행은 계정에 저장됩니다.</p>
               <button className="pixel-button-dark w-full px-4 py-3 text-sm font-bold" onClick={() => setScreen(currentChar ? "play" : "create")}>돌아가기</button>
-              <button className="pixel-button w-full px-4 py-3 text-sm font-bold" onClick={startNewCharacter}>새 시뮬레이션</button>
+              <button className="pixel-button w-full px-4 py-3 text-sm font-bold" onClick={requestNewSimulation}>새 시뮬레이션</button>
               <button className="pixel-button w-full px-4 py-3 text-sm font-bold" onClick={showLatestRecord}>기록 보기</button>
               <button className="pixel-button w-full px-4 py-3 text-sm font-bold" onClick={() => signOut()}>로그아웃</button>
             </div>
@@ -1077,25 +1094,46 @@ export default function AppPage() {
         <main className="pixel-shell app-screen flex min-h-screen items-start justify-center p-4">
           <div className="w-full max-w-[560px]">
           {error && <p className="mb-4 border-2 border-[#b3423c] bg-[#ffe1db] p-2 text-sm font-bold text-[#8d2f2a]">{error}</p>}
-          <SharedOnboardingFlow
-            variant="web"
-            step={createStep}
-            name={charName}
-            age={Number(charAge)}
-            residence={charResidence}
-            selectedStats={preferredStats}
-            loading={loading}
-            onStepChange={setCreateStep}
-            onNameChange={setCharName}
-            onAgeChange={(value: number) => setCharAge(String(value))}
-            onResidenceChange={(value: string) => {
-              playFeedbackCue("tap");
-              setCharResidence(value);
-            }}
-            onToggleStat={togglePreferredStat}
-            onSubmit={createCharacter}
-            submitDisabled={loading || preferredStats.length !== 2}
-          />
+          <div className="pixel-panel create-panel p-6">
+            {createStep === "intro" && <section className="create-step" data-testid="onboarding-intro">
+              <div className="create-hero-art overflow-hidden border-4 border-[#2a2018]" data-testid="intro-dawn-art">
+                <PixelScene scene="intro" label="오전 6시 07분의 밝은 새벽 방 픽셀아트" />
+              </div>
+              <h2 className="create-question mt-5">낯선 아침이 시작됩니다.</h2>
+              <div className="space-y-3 text-[15px] leading-7 text-[#3a332d]">
+                <p>눈을 뜨니 오전 6시 07분입니다. 휴대폰에는 읽지 않은 카톡 알림이 수북하게 쌓여 있습니다.</p>
+                <p>학과 단체방 공지, 새로 올라온 동아리 모집 글, 아르바이트 연락, 그리고 아직 열어보지 않은 메시지 하나가 화면 위에 겹쳐 있습니다. 마지막 메시지에는 짧은 문장만 남아 있습니다. “이번에는 어떤 사람이 될 수 있을까요?”</p>
+                <p>오늘은 평범한 학기의 첫날일 수도, 오래 미뤄둔 변화를 시작하는 날일 수도 있습니다. 지금 고르는 작은 선택들은 수업과 관계, 생활과 진로를 조금씩 다른 방향으로 이끌게 될 것입니다.</p>
+                <p className="text-xs text-[#706b62]">이 이야기는 실제 진로 예측이 아닌 재미를 위한 허구의 시뮬레이션입니다.</p>
+              </div>
+              <button className="pixel-button-dark mt-5 w-full px-4 py-3 text-sm font-bold" onClick={() => setCreateStep("name")} type="button">시작하기</button>
+            </section>}
+            {createStep === "name" && <section className="create-step">
+              <h2 className="create-question">당신의 이름은 무엇인가요?</h2>
+              <input aria-label="당신의 이름은 무엇인가요?" autoFocus className="pixel-input w-full px-4 py-3 text-sm" maxLength={24} placeholder="한서윤" value={charName} onChange={(event) => setCharName(event.target.value)} />
+              <div className="onboarding-actions"><button onClick={() => setCreateStep("intro")} type="button">이전</button><button disabled={!charName.trim()} onClick={() => setCreateStep("age")} type="button">다음</button></div>
+            </section>}
+            {createStep === "age" && <section className="create-step">
+              <h2 className="create-question">당신의 나이는 몇 살인가요?</h2>
+              <select aria-label="당신의 나이는 몇 살인가요?" className="pixel-input w-full px-4 py-3 text-sm" value={charAge} onChange={(event) => setCharAge(event.target.value)}>{Array.from({ length: 63 }, (_, index) => index + 18).map((age) => <option key={age} value={age}>{age}세</option>)}</select>
+              <div className="onboarding-actions"><button onClick={() => setCreateStep("name")} type="button">이전</button><button onClick={() => setCreateStep("residence")} type="button">다음</button></div>
+            </section>}
+            {createStep === "residence" && <section className="create-step">
+              <h2 className="create-question">당신은 어디에서 깨어났나요?</h2>
+              <div className="grid gap-2">{[
+                ["family_home", "본가", "가족의 규칙과 지원 사이에서 하루가 시작됩니다."],
+                ["studio", "자취방", "혼자 버티는 자유와 생활비의 압박이 함께 옵니다."],
+                ["dorm", "기숙사", "타인의 생활 리듬과 우연한 관계가 가까이 있습니다."],
+              ].map(([id, label, description]) => <button aria-pressed={charResidence === id} className={`pixel-button px-4 py-3 text-left text-sm ${charResidence === id ? "is-selected" : ""}`} key={id} onClick={() => { playFeedbackCue("tap"); setCharResidence(id); }} type="button"><span className="block font-bold">{label}</span><span className="mt-1 block text-xs leading-5 text-[#706b62]">{description}</span></button>)}</div>
+              <div className="onboarding-actions"><button onClick={() => setCreateStep("age")} type="button">이전</button><button disabled={!charResidence} onClick={() => setCreateStep("abilities")} type="button">다음</button></div>
+            </section>}
+            {createStep === "abilities" && <section className="create-step">
+              <h2 className="create-question">당신이 믿고 싶은 능력 두 가지는 무엇인가요? ({preferredStats.length}/2)</h2>
+              <div className="grid grid-cols-2 gap-2">{Object.entries(statLabels).map(([key, label]) => <button aria-pressed={preferredStats.includes(key)} className={`pixel-button px-3 py-3 text-left text-sm ${preferredStats.includes(key) ? "bg-[#ffe0a2]" : ""}`} key={key} onClick={() => togglePreferredStat(key)} type="button"><span className="mr-2 text-xs text-[#8a4f2d]">{preferredStats.includes(key) ? "●" : "○"} {statIcons[key]}</span><span className="font-bold">{label}</span></button>)}</div>
+              <p className="mt-2 text-xs text-[#706b62]">선택한 두 능력은 첫 능력치에 조금 더 높게 반영됩니다.</p>
+              <div className="onboarding-actions"><button onClick={() => setCreateStep("residence")} type="button">이전</button><button disabled={loading || preferredStats.length !== 2} onClick={createCharacter} type="button">눈을 뜬다</button></div>
+            </section>}
+          </div>
           </div>
         </main>
       </>
@@ -1116,7 +1154,7 @@ export default function AppPage() {
             </div>
             <div className="record-actions flex items-center gap-4 max-[720px]:mt-4">
               <button className="record-action" onClick={loadRecords} type="button">새로고침</button>
-              <button className="record-action" onClick={runCompleted ? startNewCharacter : () => { setScreen("play"); }} type="button">
+              <button className="record-action" onClick={runCompleted ? requestNewSimulation : () => { setScreen("play"); }} type="button">
                 {runCompleted ? "새로 시작" : "이어가기"}
               </button>
             </div>
@@ -1234,7 +1272,6 @@ export default function AppPage() {
           <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "play" ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`} onClick={() => setScreen("play")}>진행</button>
           <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "character_detail" ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`} onClick={() => setScreen("character_detail")}>캐릭터</button>
           <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "relationships" ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`} onClick={() => setScreen("relationships")}>관계</button>
-          <button className="rounded-lg px-2.5 py-2 text-left text-sm text-[#d9c9b5]" onClick={() => { navigationVersionRef.current += 1; setExpandedRecord(null); setScreen("records"); loadRecords(); }}>기록</button>
           <button
             aria-expanded={mobileStatsOpen}
             className={`mobile-stats-toggle rounded-lg px-2.5 py-2 text-left text-sm ${mobileStatsOpen ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`}
@@ -1296,7 +1333,7 @@ export default function AppPage() {
             onChoose={(choiceIndex) => void makeChoice(choiceIndex)}
             onContinueToNextEvent={() => void continueToNextEvent()}
             onShowLatestRecord={() => void showLatestRecord()}
-            onStartNewCharacter={startNewCharacter}
+            onStartNewCharacter={requestNewSimulation}
             endingActions={latestRecordId ? (
               <RecordShareActions
                 onCopyLink={shareRecord}
@@ -1396,7 +1433,7 @@ export default function AppPage() {
           .play-main { padding: 26px 24px; }
         }
         @media (max-width: 820px) {
-          .app-layout { display: block; }
+          .app-layout { display: block; padding-top: 0 !important; }
           .sidebar {
             position: sticky;
             top: 0;
