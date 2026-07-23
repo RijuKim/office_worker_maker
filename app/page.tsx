@@ -390,6 +390,7 @@ export default function AppPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showNewSimulationConfirm, setShowNewSimulationConfirm] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const audioContextRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const musicGainRef = useRef<GainNode | null>(null);
@@ -571,6 +572,7 @@ export default function AppPage() {
       }
     } finally {
       setLoading(false);
+      setInitialLoading(false);
     }
   }
 
@@ -1092,6 +1094,17 @@ export default function AppPage() {
           </div>
         </main>
       </>
+    );
+  }
+
+  if (initialLoading) {
+    return (
+      <div className="pixel-shell flex min-h-screen items-center justify-center bg-[#17263f]">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[#f7efe2] border-t-transparent" />
+          <p className="text-sm font-bold text-[#f7efe2]">눈을 뜨고 있습니다...</p>
+        </div>
+      </div>
     );
   }
 
