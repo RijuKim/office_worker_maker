@@ -1328,6 +1328,9 @@ export default function AppPage() {
             currentEvent={currentEvent}
             feedback={choiceFeedback}
             loading={streamingNextEvent || loading}
+            variant="web"
+            feedbackArt={choiceFeedback ? <ChoiceResultArt tone={getChoiceFeedbackTone(choiceFeedback)} /> : undefined}
+            endingArt={<EndingArt type="default" size={160} />}
             pendingNext={pendingNext}
             endingNotice={endingNotice}
             onChoose={(choiceIndex) => void makeChoice(choiceIndex)}

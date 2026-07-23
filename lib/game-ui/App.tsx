@@ -273,6 +273,9 @@ export function PlaySurface({
   currentEvent,
   feedback,
   loading,
+  variant = "toss",
+  feedbackArt,
+  endingArt,
   pendingNext = false,
   endingNotice = "",
   onChoose,
@@ -285,6 +288,9 @@ export function PlaySurface({
   currentEvent: SharedEventView | null;
   feedback: SharedChoiceFeedbackView | null;
   loading: boolean;
+  variant?: "web" | "toss";
+  feedbackArt?: ReactNode;
+  endingArt?: ReactNode;
   pendingNext?: boolean;
   endingNotice?: string;
   onChoose(choiceIndex: number): void;
@@ -305,41 +311,44 @@ export function PlaySurface({
         </>
       )}
       {feedback && (
-        <div className="feedback-panel">
-          <strong>{statDeltaText(feedback.statDelta)}</strong>
-          <p>{feedback.summary}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {Object.entries(feedback.statDelta).map(([key, delta]) => (
-              <span
-                className={`border-2 px-2 py-1 text-xs font-bold ${delta > 0 ? "border-[#305d73] bg-[#d5edf6] text-[#244c5e]" : "border-[#b3423c] bg-[#ffe1db] text-[#7b2d29]"}`}
-                key={key}
-              >
-                {STAT_LABELS[key] ?? key} {key === "wealth" ? `${delta > 0 ? "+" : ""}${delta}만원` : `${delta > 0 ? "+" : ""}${delta}`}
-              </span>
-            ))}
-            {feedback.relationshipDelta.map((rel) => (
-              <span
-                className={`border-2 px-2 py-1 text-xs font-bold ${rel.trust > 0 ? "border-[#a53f66] bg-[#ffe1ec] text-[#842b50]" : "border-[#2b3348] bg-[#dce2f5] text-[#26304a]"}`}
-                key={`${rel.name}-${rel.trust}`}
-              >
-                {rel.name} {rel.trust > 0 ? "♥+" : "💀"}{rel.trust}
-              </span>
-            ))}
+        variant === "web" ? (
+          <div className="feedback-pop pixel-panel mb-5 p-4">
+            <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-4 max-[520px]:grid-cols-1">
+              {feedbackArt}
+              <div className="min-w-0">
+                <p className="text-sm font-black text-[#6d4a2f]">선택의 결과</p>
+                {feedback.summary && <p className="mt-2 text-sm leading-6">{feedback.summary}</p>}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {Object.entries(feedback.statDelta).map(([key, delta]) => (
+                    <span className={`border-2 px-2 py-1 text-xs font-bold ${delta > 0 ? "border-[#305d73] bg-[#d5edf6] text-[#244c5e]" : "border-[#b3423c] bg-[#ffe1db] text-[#7b2d29]"}`} key={key}>
+                      {STAT_LABELS[key] ?? key} {key === "wealth" ? `${delta > 0 ? "+" : ""}${delta}만원` : `${delta > 0 ? "+" : ""}${delta}`}
+                    </span>
+                  ))}
+                  {feedback.relationshipDelta.map((rel) => (
+                    <span className={`border-2 px-2 py-1 text-xs font-bold ${rel.trust > 0 ? "border-[#a53f66] bg-[#ffe1ec] text-[#842b50]" : "border-[#2b3348] bg-[#dce2f5] text-[#26304a]"}`} key={`${rel.name}-${rel.trust}`}>
+                      {rel.name} {rel.trust > 0 ? "♥+" : "💀"}{rel.trust}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="feedback-panel">
+            <strong>{statDeltaText(feedback.statDelta)}</strong>
+            <p>{feedback.summary}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {Object.entries(feedback.statDelta).map(([key, delta]) => <span className={`border-2 px-2 py-1 text-xs font-bold ${delta > 0 ? "border-[#305d73] bg-[#d5edf6] text-[#244c5e]" : "border-[#b3423c] bg-[#ffe1db] text-[#7b2d29]"}`} key={key}>{STAT_LABELS[key] ?? key} {key === "wealth" ? `${delta > 0 ? "+" : ""}${delta}만원` : `${delta > 0 ? "+" : ""}${delta}`}</span>)}
+            </div>
+          </div>
+        )
       )}
 
       {endingNotice && (
         <div className="ending-splash pixel-panel mb-5 overflow-hidden border-[#b3423c] bg-[#ffe1db] text-[#6f211d]">
           <div className="grid grid-cols-[180px_minmax(0,1fr)] gap-5 p-5 max-[640px]:grid-cols-1">
             <div className="ending-splash-art">
-              <div className="record-poster poster-red">
-                <div className="poster-rays" />
-                <div className="poster-art">
-                  <PixelPortrait name="선택의 결과" large />
-                </div>
-                <div className="poster-road" />
-              </div>
+                {endingArt ?? <div className="record-poster poster-red"><div className="poster-rays" /><div className="poster-art"><PixelPortrait name="선택의 결과" large /></div><div className="poster-road" /></div>}
             </div>
             <div>
               <p className="text-xs font-black text-[#8a4f2d]">RESULT UNLOCKED</p>

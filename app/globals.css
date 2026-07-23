@@ -1414,8 +1414,25 @@ button {
   background: #ffe0a2;
 }
 
+.app-layout,
+.app-layout button,
+.app-layout input,
+.app-layout select {
+  font-family: "Courier New", "DungGeunMo", "Apple SD Gothic Neo", "Noto Sans KR", monospace;
+  letter-spacing: 0;
+}
+
+.app-layout .feedback-pop,
+.app-layout .ending-splash {
+  border: 3px solid #2a2018;
+  border-radius: 6px;
+  box-shadow: 8px 8px 0 #0d0b09;
+}
+
 .app-layout .event-panel p,
-.app-layout .feedback-panel p {
+.app-layout .feedback-panel p,
+.app-layout .feedback-pop p,
+.app-layout .ending-splash p {
   color: #3a332d;
 }
 
