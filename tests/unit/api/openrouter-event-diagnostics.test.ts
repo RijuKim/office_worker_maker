@@ -238,6 +238,23 @@ describe("AI event diagnostics", () => {
     expect(JSON.stringify(request)).not.toContain("choice-only");
   });
 
+  it("ignores Ollama reasoning tokens before the structured JSON content", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    const stream = [
+      `data: ${JSON.stringify({ choices: [{ delta: { reasoning: "We need to reason first." } }] })}`,
+      `data: ${JSON.stringify({ choices: [{ delta: { content: JSON.stringify(validEvent) } }] })}`,
+      "data: [DONE]",
+    ].join("\n\n");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(stream, { status: 200 }));
+
+    const result = await generateAiEventStream({
+      name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4,
+      recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {},
+    }, () => {}, { skipPrimary: true });
+
+    expect(result).toMatchObject({ success: true, providerId: "openrouter" });
+  });
+
   it("retains safe primary failure telemetry when the secondary provider succeeds", async () => {
     process.env.OLLAMA_API_KEY = "primary-secret";
     process.env.OPENROUTER_API_KEY = "secondary-secret";

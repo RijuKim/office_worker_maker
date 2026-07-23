@@ -488,15 +488,6 @@ async function generateAiEventWithProvider(
     const firstChoice = Array.isArray(choices) ? choices[0] : null;
     const message = firstChoice && typeof firstChoice === "object" ? (firstChoice as Record<string, unknown>).message : null;
     let content: string | undefined = message && typeof message === "object" ? (message as Record<string, unknown>).content as string | undefined : undefined;
-    // deepseek-v4-flash:cloud on Ollama Cloud has thinking mode enabled by default,
-    // which puts the actual response in "reasoning" and leaves "content" empty.
-    if (!content && message && typeof message === "object") {
-      const reasoning = (message as Record<string, unknown>).reasoning;
-      if (typeof reasoning === "string" && reasoning.length > 0) {
-        content = reasoning;
-      }
-    }
-
     if (!content) {
       logAiAttempt({
         kind: "json",
@@ -1163,15 +1154,13 @@ function extractChatToken(payload: unknown) {
   const delta = readRecord(choice?.delta);
   const deltaContent = delta?.content;
   if (typeof deltaContent === "string" && deltaContent.length > 0) return deltaContent;
-  // deepseek-v4-flash:cloud thinking mode puts tokens in delta.reasoning
-  const deltaReasoning = delta?.reasoning;
-  if (typeof deltaReasoning === "string" && deltaReasoning.length > 0) return deltaReasoning;
   const message = readRecord(choice?.message);
   const messageContent = message?.content;
   if (typeof messageContent === "string" && messageContent.length > 0) return messageContent;
-  // deepseek-v4-flash:cloud thinking mode puts tokens in message.reasoning
-  const messageReasoning = message?.reasoning;
-  return typeof messageReasoning === "string" && messageReasoning.length > 0 ? messageReasoning : null;
+  // Reasoning is not part of the structured event document. Never append it
+  // to content: thinking text before the JSON would make the final document
+  // look malformed even when the provider later emits valid JSON content.
+  return null;
 }
 
 function normalizeAiEvent(raw: unknown) {
