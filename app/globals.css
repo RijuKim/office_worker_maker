@@ -130,7 +130,30 @@ button {
 
 .novel-text {
   word-break: keep-all;
+  line-break: strict;
+  text-wrap: pretty;
   line-height: 1.9;
+}
+
+.create-panel,
+.create-panel h2,
+.create-panel p,
+.create-panel button,
+.create-panel input,
+.create-panel select {
+  font-family: "Courier New", "DungGeunMo", "Apple SD Gothic Neo", "Noto Sans KR", monospace;
+  letter-spacing: 0;
+}
+
+.create-panel {
+  color: #2a241e;
+}
+
+.create-panel .create-question {
+  color: #2a2018;
+  word-break: keep-all;
+  line-break: strict;
+  text-wrap: pretty;
 }
 
 .feedback-pop {
