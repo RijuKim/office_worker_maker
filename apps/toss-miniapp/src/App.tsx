@@ -338,6 +338,7 @@ export function App() {
 
       {screen === "play" && (
         <PlaySurface
+          variant="web"
           currentCharacter={currentCharacter}
           currentEvent={currentEvent}
           feedback={feedback}

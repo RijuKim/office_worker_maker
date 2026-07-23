@@ -243,7 +243,7 @@ const STAT_LABELS: Record<string, string> = {
 
 export function SharedOnboardingFlow(props: SharedOnboardingFlowProps) {
   return (
-    <section className="screen-stack onboarding-panel">
+    <section className={`screen-stack onboarding-panel ${props.variant === "web" ? "onboarding-panel-web" : ""}`}>
       {props.step === "intro" && (
         <section className="create-step">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-[#8a4f2d]">캐릭터 생성</p>
