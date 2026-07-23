@@ -228,7 +228,7 @@ describe("AI event diagnostics", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(request.max_tokens).toBeLessThanOrEqual(4_000);
-    expect(request.response_format).toBeUndefined();
+    expect(request.response_format).toEqual({ type: "json_object" });
     const instructions = request.messages.map((message: { content: string }) => message.content).join("\n");
     for (const required of ["title", "body", "tags", "choices", "id", "label", "summary", "statDelta", "relationshipDelta"]) {
       expect(instructions).toContain(`\"${required}\"`);

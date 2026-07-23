@@ -738,6 +738,7 @@ function buildAiEventRequestBody(state: AiEventPromptState, provider: AiProvider
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: buildUserPrompt(state) },
     ],
+    response_format: { type: "json_object" },
     max_tokens: getOpenRouterMaxTokens(),
     temperature: 0.85,
   };
@@ -755,6 +756,7 @@ For streaming responsiveness, output the JSON object in this field order exactly
       },
       { role: "user", content: buildUserPrompt(state) },
     ],
+    response_format: { type: "json_object" },
     max_tokens: getOpenRouterMaxTokens(),
     temperature: 0.85,
     stream: true,
