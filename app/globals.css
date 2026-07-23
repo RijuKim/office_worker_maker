@@ -132,8 +132,7 @@ button {
   word-break: keep-all;
   line-break: strict;
   text-wrap: pretty;
-  text-align: justify;
-  text-justify: inter-character;
+  text-align: left;
   line-height: 1.9;
 }
 
@@ -158,10 +157,6 @@ button {
   text-wrap: pretty;
 }
 
-.create-panel .create-question + div p {
-  text-align: justify;
-  text-justify: inter-character;
-}
 
 .feedback-pop {
   animation: feedback-pop 720ms steps(4, end);
