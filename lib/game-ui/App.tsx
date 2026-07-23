@@ -43,6 +43,7 @@ export interface SharedEventView {
 }
 
 export interface SharedChoiceFeedbackView {
+  choiceLabel?: string;
   statDelta: SharedStats;
   relationshipDelta: Array<{ name: string; trust: number }>;
   summary: string;
@@ -77,6 +78,22 @@ function characterProgressLabel(character: SharedCharacterView | null) {
   if (character.progressLabel) return character.progressLabel;
   if (character.lifeStage?.term?.label) return character.lifeStage.term.label;
   return `${character.currentGradeYear ?? character.startGradeYear ?? 1}학년`;
+}
+
+function formatAcademicStatus(status: string) {
+  const labels: Record<string, string> = {
+    ENROLLED: "재학",
+    LEAVE: "휴학",
+    DROPPED_OUT: "자퇴",
+    GRADUATED: "졸업",
+  };
+  return labels[status] ?? status;
+}
+
+function displayedAge(character: SharedCharacterView) {
+  const startGrade = character.startGradeYear ?? character.currentGradeYear ?? 1;
+  const currentGrade = character.currentGradeYear ?? startGrade;
+  return character.age + Math.max(0, currentGrade - startGrade);
 }
 
 function formatWealth(value: number) {
@@ -317,6 +334,7 @@ export function PlaySurface({
               {feedbackArt}
               <div className="min-w-0">
                 <p className="text-sm font-black text-[#6d4a2f]">선택의 결과</p>
+                {feedback.choiceLabel && <p className="mt-1 text-base font-black leading-6 text-[#2a241e]">“{feedback.choiceLabel}”</p>}
                 {feedback.summary && <p className="mt-2 text-sm leading-6">{feedback.summary}</p>}
                 <div className="mt-3 flex flex-wrap gap-2">
                   {Object.entries(feedback.statDelta).map(([key, delta]) => (
@@ -446,11 +464,11 @@ export function CharacterSheet({ character }: { character: SharedCharacterView }
             <p className="profile-chip"><strong>이름:</strong> {character.name}</p>
             <p className="profile-chip"><strong>전공:</strong> {character.major}</p>
             <p className="profile-chip"><strong>학사 진행:</strong> {character.progressLabel ?? character.lifeStage?.term?.label ?? `${character.currentGradeYear ?? character.startGradeYear ?? 1}학년 1학기`}</p>
-            <p className="profile-chip"><strong>나이:</strong> {character.age}세</p>
-            <p className="profile-chip"><strong>학적:</strong> {character.academicStatus}</p>
+            <p className="profile-chip"><strong>나이:</strong> {displayedAge(character)}세</p>
+            <p className="profile-chip"><strong>학적:</strong> {formatAcademicStatus(character.academicStatus)}</p>
           </div>
           <div className="mt-5 grid grid-cols-2 gap-2 max-[520px]:grid-cols-1">
-            {Object.entries(STAT_LABELS).map(([key, label]) => (
+            {Object.entries(STAT_LABELS).sort(([a], [b]) => (a === "wealth" ? -1 : b === "wealth" ? 1 : 0)).map(([key, label]) => (
               <div className="stat-card" key={key}>
                 <div className="flex items-center justify-between gap-2">
                   <span><span className="mr-1 text-xs text-[#8a4f2d]">{STAT_ICONS[key]}</span>{label}</span>

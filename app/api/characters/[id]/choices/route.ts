@@ -87,6 +87,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
 
   const choices = eventChoices as {
     id: string;
+    label: string;
     summary: string;
     statDelta: Record<string, number>;
     relationshipDelta: { name: string; trust: number }[];
@@ -100,6 +101,10 @@ export async function POST(request: Request | NextRequest, context: RouteContext
     Object.entries(normalizeStatDeltas(choice.statDelta))
       .filter((entry): entry is [string, number] => typeof entry[1] === "number"),
   );
+  const wealthDelta = typeof statDelta.wealth === "number" ? statDelta.wealth : 0;
+  if (wealthDelta < 0 && character.stats.wealth + wealthDelta < 0) {
+    return NextResponse.json({ error: "이 선택을 하려면 자산이 더 필요합니다." }, { status: 400 });
+  }
 
   const updatedStats = applyStatDeltas(
     {
@@ -214,6 +219,9 @@ export async function POST(request: Request | NextRequest, context: RouteContext
   );
   const parentingEndingType = getParentingEndingType(relationshipLife.parenting);
   const coreEventCount = character.coreEventCount + 1;
+  const previousGradeYear = character.currentGradeYear ?? character.startGradeYear;
+  const nextGradeYear = lifeStageTransition.state.term.gradeYear;
+  const nextAge = character.age + Math.max(0, nextGradeYear - previousGradeYear);
   const shouldCreateFinalEnding = !endingType && (
     (lifeStageTransition.state.lifeStage === "post_graduation" &&
      lifeStageTransition.state.graduation === "graduated" &&
@@ -224,7 +232,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
     userId,
     characterRunId: id,
     characterName: character.name,
-    age: character.age,
+    age: nextAge,
     major: character.major,
     endingType,
     stats: updatedStats,
@@ -238,7 +246,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
     userId,
     characterRunId: id,
     characterName: character.name,
-    age: character.age,
+    age: nextAge,
     major: character.major,
     stats: updatedStats,
     hiddenState: hiddenStateAfterTransition,
@@ -308,6 +316,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
             where: { id },
             data: {
               coreEventCount: { increment: 1 },
+              age: nextAge,
               currentGradeYear: lifeStageTransition.state.term.gradeYear,
               academicStatus: endingType ? "DROPPED_OUT" : "GRADUATED",
             },
@@ -317,6 +326,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
             where: { id },
             data: {
               coreEventCount: { increment: 1 },
+              age: nextAge,
               currentGradeYear: lifeStageTransition.state.term.gradeYear,
               academicStatus: getAcademicStatusForLifeStage(lifeStageTransition.state.lifeStage, character.academicStatus),
               majorEventCount: Math.min(5, Math.floor((character.coreEventCount + 1) / 3) + 1),
@@ -354,6 +364,8 @@ export async function POST(request: Request | NextRequest, context: RouteContext
   return NextResponse.json({
     result: {
       choiceId: choice.id,
+      choiceLabel: choice.label,
+      summary: resolvedSummary,
       stats: updatedStats,
       statDelta: diffPublicStats(previousStats, updatedStats),
       relationships: [...updatedRelationships, ...newRelationships.map((rel) => ({ name: rel.name, trust: rel.trust }))],

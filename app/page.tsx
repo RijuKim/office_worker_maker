@@ -47,6 +47,7 @@ interface EventData {
 }
 
 interface ChoiceFeedback {
+  choiceLabel?: string;
   statDelta: Record<string, number>;
   relationshipDelta: { name: string; trust: number }[];
   summary: string;
@@ -201,6 +202,12 @@ function formatAcademicStatus(status: string) {
   if (status === "DROPPED_OUT") return "자퇴";
   if (status === "GRADUATED") return "졸업";
   return status;
+}
+
+function displayedAge(character: CharacterData) {
+  const startGrade = character.startGradeYear || character.currentGradeYear || 1;
+  const currentGrade = character.currentGradeYear || startGrade;
+  return character.age + Math.max(0, currentGrade - startGrade);
 }
 
 function isCompletedRun(character: CharacterData | null) {
@@ -378,7 +385,6 @@ export default function AppPage() {
   const [endingNotice, setEndingNotice] = useState("");
   const [latestRecordId, setLatestRecordId] = useState<string | null>(null);
   const [choiceFeedback, setChoiceFeedback] = useState<ChoiceFeedback | null>(null);
-  const [mobileStatsOpen, setMobileStatsOpen] = useState(false);
   const [audioSettings, setAudioSettings] = useState<AudioSettings>({ music: false, sfx: true, haptics: true });
   const [audioReady, setAudioReady] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -860,6 +866,7 @@ export default function AppPage() {
 
   const makeChoice = useCallback(async (choiceIndex: number) => {
     if (!currentChar || !currentEvent) return;
+    const selectedChoiceLabel = currentEvent.choices[choiceIndex]?.label ?? "";
     playFeedbackCue("tap");
     setLoading(true);
     try {
@@ -873,6 +880,7 @@ export default function AppPage() {
       await loadCharacterEvent(currentChar.id);
       await loadSpecData(currentChar.id);
       const feedback = {
+        choiceLabel: data.result?.choiceLabel ?? selectedChoiceLabel,
         statDelta: data.result?.statDelta ?? {},
         relationshipDelta: data.result?.relationshipDelta ?? [],
         summary: data.result?.summary ?? "",
@@ -1272,21 +1280,13 @@ export default function AppPage() {
           <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "play" ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`} onClick={() => setScreen("play")}>진행</button>
           <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "character_detail" ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`} onClick={() => setScreen("character_detail")}>캐릭터</button>
           <button className={`rounded-lg px-2.5 py-2 text-left text-sm ${activeScreen === "relationships" ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`} onClick={() => setScreen("relationships")}>관계</button>
-          <button
-            aria-expanded={mobileStatsOpen}
-            className={`mobile-stats-toggle rounded-lg px-2.5 py-2 text-left text-sm ${mobileStatsOpen ? "border border-[#7d6146] bg-[#3a2d21]" : "text-[#d9c9b5]"}`}
-            onClick={() => setMobileStatsOpen((open) => !open)}
-            type="button"
-          >
-            능력치
-          </button>
           <button className="rounded-lg px-2.5 py-2 text-left text-sm text-[#a9967d]" onClick={() => setScreen("auth")}>
             {status === "authenticated" ? "계정" : "로그인/저장"}
           </button>
         </nav>
         {currentChar?.stats && (
           <>
-            <section className={`sidebar-stats mt-3.5 rounded-lg border border-[#4d3d2f] bg-[#1b1612] p-3.5 ${mobileStatsOpen ? "sidebar-stats-open" : ""}`}>
+            <section className="sidebar-stats mt-3.5 rounded-lg border border-[#4d3d2f] bg-[#1b1612] p-3.5">
               <h2 className="text-base font-bold">자산</h2>
               <div className="mt-2 rounded-md bg-[#2c231b] px-2.5 py-2 text-[13px]">
                 <dt className="flex items-center justify-between gap-2">
@@ -1294,24 +1294,6 @@ export default function AppPage() {
                   <span className="text-[#c4b39c]">{formatWealth(currentChar.stats?.wealth ?? 0)}</span>
                 </dt>
               </div>
-            </section>
-            <section className={`sidebar-stats mt-3.5 rounded-lg border border-[#4d3d2f] bg-[#1b1612] p-3.5 ${mobileStatsOpen ? "sidebar-stats-open" : ""}`}>
-              <h2 className="text-base font-bold">능력치</h2>
-              <dl className="mt-2 grid gap-2">
-                {Object.entries(statLabels).filter(([key]) => key !== "wealth").map(([key, label]) => (
-                  <div className="rounded-md bg-[#2c231b] px-2.5 py-2 text-[13px]" key={key}>
-                    <dt className="flex items-center justify-between gap-2">
-                      <span><span className="mr-1.5 text-[11px] text-[#d79b52]">{statIcons[key]}</span>{label}</span>
-                      <span className="text-[#c4b39c]">{statLevel(currentChar.stats?.[key] ?? 0)}/10</span>
-                    </dt>
-                    <dd className="mt-1.5 flex gap-1" aria-label={`${label} ${statLevel(currentChar.stats?.[key] ?? 0)}`}>
-                      {Array.from({ length: 10 }, (_, i) => (
-                        <span className={`h-1.5 flex-1 rounded-full ${i < statLevel(currentChar.stats?.[key] ?? 0) ? "bg-[#d79b52]" : "bg-[#4c4035]"}`} key={i} />
-                      ))}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
             </section>
           </>
         )}

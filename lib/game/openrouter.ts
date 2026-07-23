@@ -13,6 +13,10 @@ type AiProvider = {
 
 type AiProviderOptions = {
   skipPrimary?: boolean;
+  trace?: {
+    requestId?: string;
+    characterRunId?: string;
+  };
 };
 
 const primaryProvider = (): AiProvider => ({
@@ -352,9 +356,36 @@ export async function generateAiEvent(
     const providerStartedAt = Date.now();
     const remainingMs = getOpenRouterTimeoutMs() - (providerStartedAt - totalStartedAt);
     if (remainingMs <= 0) break;
+    const attemptId = crypto.randomUUID();
+    logAiAttempt({
+      phase: "start",
+      kind: "json",
+      attemptId,
+      providerId: provider.id,
+      providerLabel: provider.label,
+      model: provider.model,
+      timeoutMs: remainingMs,
+      maxTokens: getOpenRouterMaxTokens(),
+      promptChars: buildUserPrompt(state).length,
+      ...options.trace,
+    });
     const result = await generateAiEventWithProvider(provider, state, remainingMs, providerStartedAt);
     const totalElapsedMs = Date.now() - totalStartedAt;
     const measured = { ...result, totalElapsedMs, slow: totalElapsedMs > SLOW_AI_GENERATION_MS };
+    logAiAttempt({
+      phase: "result",
+      kind: "json",
+      attemptId,
+      providerId: provider.id,
+      providerLabel: provider.label,
+      model: provider.model,
+      success: measured.success,
+      reason: measured.success ? null : measured.reason,
+      providerElapsedMs: measured.providerElapsedMs ?? 0,
+      totalElapsedMs,
+      failureReasons: measured.success ? [] : (measured.providerFailures ?? []).map((failure) => failure.reason),
+      ...options.trace,
+    });
     if (measured.success) return { ...measured, retryUsed: providerFailures.length > 0, providerFailures };
     lastFailure = measured;
     providerFailures.push(toProviderFailureTelemetry(provider, measured));
@@ -552,6 +583,19 @@ export async function generateAiEventStream(
     const providerStartedAt = Date.now();
     const remainingMs = getOpenRouterTimeoutMs() - (providerStartedAt - totalStartedAt);
     if (remainingMs <= 0) break;
+    const attemptId = crypto.randomUUID();
+    logAiAttempt({
+      phase: "start",
+      kind: "stream",
+      attemptId,
+      providerId: provider.id,
+      providerLabel: provider.label,
+      model: provider.model,
+      timeoutMs: remainingMs,
+      maxTokens: getOpenRouterMaxTokens(),
+      promptChars: buildUserPrompt(state).length,
+      ...options.trace,
+    });
     let providerSentBody = false;
     const result = await generateAiEventStreamWithProvider(provider, state, (delta) => {
       providerSentBody = true;
@@ -559,11 +603,28 @@ export async function generateAiEventStream(
     }, remainingMs, providerStartedAt);
     const totalElapsedMs = Date.now() - totalStartedAt;
     const measured = { ...result, totalElapsedMs, slow: totalElapsedMs > SLOW_AI_GENERATION_MS };
+    logAiAttempt({
+      phase: "result",
+      kind: "stream",
+      attemptId,
+      providerId: provider.id,
+      providerLabel: provider.label,
+      model: provider.model,
+      success: measured.success,
+      reason: measured.success ? null : measured.reason,
+      providerElapsedMs: measured.providerElapsedMs ?? 0,
+      totalElapsedMs,
+      failureReasons: measured.success ? [] : (measured.providerFailures ?? []).map((failure) => failure.reason),
+      providerSentBody,
+      ...options.trace,
+    });
     if (measured.success) return { ...measured, retryUsed: providerFailures.length > 0, providerFailures };
     lastFailure = measured;
     providerFailures.push(toProviderFailureTelemetry(provider, measured));
     console.warn("AI event stream provider failed", { provider: provider.label, reason: measured.reason });
-    if (providerSentBody) break;
+    // A provider can stream a partial JSON body and still fail final parsing or
+    // schema validation. The body is only used for timing here (the handler
+    // buffers the event), so continue to the fallback provider in that case.
   }
 
   return { ...lastFailure, retryUsed: providerFailures.length > 1, providerFailures };
