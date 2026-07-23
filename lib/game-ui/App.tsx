@@ -383,17 +383,29 @@ export function PlaySurface({
                     <p className="mt-3 first:mt-0" key={index}>{paragraph}</p>
                   ))}
                 </div>
-                <div className="choice-stack mt-7 grid gap-3">
-                  {currentEvent.choices.map((choice, index) => (
-                    <button className="choice-button pixel-button grid min-h-12 grid-cols-[32px_minmax(0,1fr)] items-center gap-3 px-4 py-3.5 text-left text-[15px] disabled:opacity-50" disabled={loading} key={choice.id} onClick={() => onChoose(index)}>
-                      <span className="choice-index">{index + 1}</span>
-                      <span>{choice.label}</span>
-                    </button>
-                  ))}
-                </div>
+                {variant !== "web" && (
+                  <div className="choice-stack mt-7 grid gap-3">
+                    {currentEvent.choices.map((choice, index) => (
+                      <button className="choice-button pixel-button grid min-h-12 grid-cols-[32px_minmax(0,1fr)] items-center gap-3 px-4 py-3.5 text-left text-[15px] disabled:opacity-50" disabled={loading} key={choice.id} onClick={() => onChoose(index)}>
+                        <span className="choice-index">{index + 1}</span>
+                        <span>{choice.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </article>
+          {variant === "web" && (
+            <div className="choice-stack mt-7 grid gap-3">
+              {currentEvent.choices.map((choice, index) => (
+                <button className="choice-button pixel-button grid min-h-12 grid-cols-[32px_minmax(0,1fr)] items-center gap-3 px-5 py-4 text-left text-[16px] disabled:opacity-50" disabled={loading} key={choice.id} onClick={() => onChoose(index)}>
+                  <span className="choice-index">{index + 1}</span>
+                  <span>{choice.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </>
       )}
 
