@@ -131,6 +131,8 @@ button {
   word-break: keep-all;
   line-break: strict;
   text-wrap: pretty;
+  text-align: justify;
+  text-justify: inter-character;
   line-height: 1.9;
 }
 
@@ -510,6 +512,8 @@ button {
   word-break: keep-all;
   line-break: strict;
   text-wrap: pretty;
+  text-align: justify;
+  text-justify: inter-character;
 }
 
 .onboarding-panel-web .create-step .disclaimer {
