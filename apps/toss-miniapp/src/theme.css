@@ -28,6 +28,120 @@ body {
   background-size: 18px 18px;
 }
 
+/* The Toss bundle must use the same production pixel palette as the web app. */
+.toss-production-app .onboarding-panel-web {
+  border: 3px solid #2a2018;
+  border-radius: 6px;
+  background: #fff8e8;
+  box-shadow: 8px 8px 0 #0d0b09;
+  color: #2a241e;
+}
+
+.toss-production-app .onboarding-panel-web .create-copy,
+.toss-production-app .onboarding-panel-web .create-copy p {
+  color: #3a332d;
+}
+
+.toss-production-app .onboarding-panel-web .create-copy .disclaimer {
+  color: #706b62;
+}
+
+.toss-production-app .onboarding-panel-web .create-question {
+  color: #2a2018;
+}
+
+.toss-production-app .onboarding-panel-web .pixel-button-dark {
+  border-color: #2a2018;
+  background: #2a2018;
+  color: #fff8e8;
+}
+
+/* Match the production web chrome: navy grid, cream title, pixel hamburger. */
+.toss-production-app > .app-title-header {
+  position: relative;
+  z-index: 80;
+  display: flex;
+  width: min(560px, calc(100% - 32px));
+  margin: max(18px, var(--safe-area-top)) auto 18px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #fff3d7;
+}
+
+.toss-production-app > .app-title-header .title-row {
+  width: 100%;
+}
+
+.toss-production-app > .app-title-header .app-title {
+  color: #fff3d7;
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.toss-production-app > .app-title-header .chrome-icon-button {
+  display: grid;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 3px solid #2a2018;
+  border-radius: 0;
+  padding: 0;
+  background: #fff8e8;
+  box-shadow: 4px 4px 0 #2a2018;
+  color: #2a2018;
+}
+
+.toss-production-app > .app-title-header .chrome-menu-button {
+  gap: 4px;
+}
+
+.toss-production-app > .app-title-header .chrome-menu-button span {
+  display: block;
+  width: 18px;
+  height: 3px;
+  background: #2a2018;
+}
+
+.toss-production-app > .app-title-header .chrome-menu-button .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.toss-production-app > .app-title-header .status-row {
+  display: none;
+}
+
+.toss-production-app > .app-title-header .app-menu-popover {
+  position: absolute;
+  top: 52px;
+  right: 0;
+  z-index: 81;
+  width: min(260px, calc(100vw - 24px));
+  border: 3px solid #2a2018;
+  border-radius: 0;
+  background: #fff8e8;
+  box-shadow: 6px 6px 0 #2a2018;
+}
+
+.toss-production-app > .app-title-header .app-menu-popover button,
+.toss-production-app > .app-title-header .app-menu-popover .menu-row {
+  border: 0;
+  border-bottom: 2px solid #eadfce;
+  border-radius: 0;
+  background: transparent;
+  color: #2a241e;
+}
+
 .toss-production-app > .screen-stack,
 .toss-production-app > .error-banner {
   width: min(calc(100% - 24px), 720px);

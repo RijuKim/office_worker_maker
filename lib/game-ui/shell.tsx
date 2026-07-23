@@ -116,6 +116,7 @@ export interface SharedGameChromeProps {
 }
 
 export function SharedGameChrome({
+  variant,
   menuOpen,
   onMenuOpenChange,
   onOpenProgress,
@@ -130,6 +131,7 @@ export function SharedGameChrome({
   audioReady = true,
   currentCharacterName,
 }: SharedGameChromeProps) {
+  const productionWeb = variant === "web";
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLElement | null>(null);
 
@@ -158,7 +160,7 @@ export function SharedGameChrome({
   }, [menuOpen, closeMenu]);
 
   return (
-    <section className="hero-panel" data-audio-ready={audioReady ? "true" : "false"}>
+    <section className={`hero-panel${productionWeb ? " app-title-header" : ""}`} data-audio-ready={audioReady ? "true" : "false"}>
       <div className="title-row">
         <h1 className="app-title">
           <span>일어나보니</span>
@@ -166,13 +168,13 @@ export function SharedGameChrome({
         </h1>
         <button
           ref={menuButtonRef}
-          className="menu-button"
+          className={`menu-button${productionWeb ? " chrome-icon-button chrome-menu-button" : ""}`}
           type="button"
           aria-label="메뉴"
           aria-expanded={menuOpen}
           onClick={() => onMenuOpenChange(!menuOpen)}
         >
-          메뉴
+          {productionWeb ? <><span /><span /><span /><span className="visually-hidden">메뉴</span></> : "메뉴"}
         </button>
         {menuOpen && (
           <nav ref={menuRef} className="app-menu-popover menu-popover" aria-label="메뉴">
