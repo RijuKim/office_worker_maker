@@ -14,7 +14,7 @@ import type {
   RouteIntent,
   SessionBootstrapResult,
 } from "./types";
-import { NEXT_EVENT_STREAM_RETRY_MESSAGE, createGameApiClient, type JsonApiResult } from "./event-stream";
+import { createGameApiClient, type JsonApiResult } from "./event-stream";
 
 export type CreateStep = "intro" | "name" | "age" | "residence" | "abilities";
 
@@ -46,7 +46,9 @@ export interface GameControllerApi {
     };
     error?: string;
   }>>;
-  nextEventStream(characterId: string): Promise<JsonApiResult<{ event?: EventData; error?: string }>>;
+  nextEvent?(characterId: string): Promise<JsonApiResult<{ event?: EventData; error?: string }>>;
+  /** @deprecated Legacy test/host adapter compatibility; production uses nextEvent. */
+  nextEventStream?(characterId: string): Promise<JsonApiResult<{ event?: EventData; error?: string }>>;
   records(): Promise<JsonApiResult<{ records?: CareerRecord[]; error?: string }>>;
 }
 
@@ -184,8 +186,10 @@ function createDefaultGameApi(host: GameHost, credential: HostRequestCredential,
         body: { choiceIndex },
       });
     },
-    nextEventStream(characterId: string) {
-      return transport.nextEventStream<EventData>(characterId);
+    nextEvent(characterId: string) {
+      return transport.requestJson<{ event?: EventData; error?: string }>(`/api/characters/${characterId}/events/next`, {
+        method: "POST",
+      });
     },
     records() {
       return transport.requestJson<{ records?: CareerRecord[]; error?: string }>("/api/records");
@@ -383,7 +387,12 @@ export function createGameController(options: GameControllerOptions): GameContro
       return;
     }
 
-    const next = await currentApi.nextEventStream(currentRun.id);
+    const nextEventRequest = currentApi.nextEvent ?? currentApi.nextEventStream;
+    if (!nextEventRequest) {
+      update({ loadingTask: null, error: "다음 사건 API를 사용할 수 없습니다." });
+      return;
+    }
+    const next = await nextEventRequest(currentRun.id);
     if (next.ok && next.data.event) {
       update({
         loadingTask: null,
@@ -395,7 +404,7 @@ export function createGameController(options: GameControllerOptions): GameContro
 
     update({
       loadingTask: null,
-      error: resolveApiError(next, NEXT_EVENT_STREAM_RETRY_MESSAGE) ?? NEXT_EVENT_STREAM_RETRY_MESSAGE,
+      error: resolveApiError(next, "다음 사건을 생성하지 못했습니다.") ?? "다음 사건을 생성하지 못했습니다.",
     });
   }
 

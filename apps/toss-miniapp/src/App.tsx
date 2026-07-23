@@ -198,7 +198,7 @@ export function App() {
       }
       setCurrentEvent(null);
       setGeneratingNextEvent(true);
-      const next = await api.nextEventStream(currentCharacter.id);
+      const next = await api.nextEvent(currentCharacter.id);
       if (next.ok && next.data.event) {
         setCurrentEvent(next.data.event);
         cue("success");
@@ -293,9 +293,9 @@ export function App() {
   }, [refreshCharacters]);
 
   return (
-    <main className="app-shell">
+    <main className="app-shell toss-production-app">
       <SharedGameChrome
-        variant="toss"
+        variant="web"
         menuOpen={menuOpen}
         onMenuOpenChange={setMenuOpen}
         onOpenProgress={currentCharacter ? () => { cue(); setScreen("play"); } : undefined}
@@ -311,30 +311,9 @@ export function App() {
 
       {error && <p className="error-banner">{error}</p>}
 
-      {screen === "home" && (
-        <section className="screen-stack">
-          <div className="action-grid">
-            <button className="primary-button" type="button" disabled={loading} onClick={() => currentCharacter ? void openCharacter(currentCharacter) : setScreen("create")}>
-              {currentCharacter ? "이어하기" : "시작하기"}
-            </button>
-            <button className="secondary-button" type="button" disabled={loading} onClick={() => void refreshCharacters()}>새로고침</button>
-          </div>
-          <div className="list-panel">
-            {characters.length === 0 ? (
-              <p className="muted">저장된 진행이 없습니다.</p>
-            ) : characters.map((character) => (
-              <button className="run-row" type="button" key={character.id} onClick={() => void openCharacter(character)}>
-                <strong>{character.name}</strong>
-                <span>{character.major} · {progressLabel(character)}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
       {screen === "create" && (
         <SharedOnboardingFlow
-          variant="toss"
+          variant="web"
           step={createStep}
           name={name}
           age={age}
@@ -372,7 +351,7 @@ export function App() {
         <section className="screen-stack">
           <div className="action-grid">
             <button className="secondary-button" type="button" onClick={() => void loadRecords()}>새로고침</button>
-            <button className="secondary-button" type="button" onClick={() => setScreen(currentCharacter ? "play" : "home")}>진행으로</button>
+          <button className="secondary-button" type="button" onClick={() => setScreen(currentCharacter ? "play" : "create")}>진행으로</button>
           </div>
           {records.length === 0 && <div className="list-panel"><p className="muted">아직 남겨진 기록이 없습니다.</p></div>}
           {records.map((record) => (

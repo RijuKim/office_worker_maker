@@ -1,5 +1,4 @@
 import type { CareerRecord, CharacterData, EventData } from "./types";
-import { createGameApiClient } from "@/lib/game-ui/event-stream";
 
 type ApiResult<T> = {
   ok: boolean;
@@ -11,14 +10,6 @@ const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 const TOSS_SESSION_STORAGE_KEY = "sano-toss-session";
 
 let tossSessionToken = sessionStorage.getItem(TOSS_SESSION_STORAGE_KEY) ?? "";
-const gameTransport = createGameApiClient({
-  baseUrl: apiBaseUrl,
-  headers: (): Record<string, string> => {
-    if (!tossSessionToken) return {};
-    return { Authorization: `Bearer ${tossSessionToken}` };
-  },
-});
-
 function apiUrl(path: string) {
   if (!apiBaseUrl) return path;
   return `${apiBaseUrl}${path}`;
@@ -85,9 +76,6 @@ export const api = {
     return request<{ event?: EventData; error?: string }>(`/api/characters/${characterId}/events/next`, {
       method: "POST",
     });
-  },
-  async nextEventStream(characterId: string) {
-    return gameTransport.nextEventStream<EventData>(characterId);
   },
   async records() {
     return request<{ records?: CareerRecord[]; error?: string }>("/api/records");

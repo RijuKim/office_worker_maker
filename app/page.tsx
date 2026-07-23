@@ -374,7 +374,6 @@ export default function AppPage() {
   const [screen, setScreen] = useState<Screen>("create");
   const [currentChar, setCurrentChar] = useState<CharacterData | null>(null);
   const [currentEvent, setCurrentEvent] = useState<EventData | null>(null);
-  const [streamingNextEvent, setStreamingNextEvent] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState<Record<string, unknown>[]>([]);
@@ -390,7 +389,7 @@ export default function AppPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showNewSimulationConfirm, setShowNewSimulationConfirm] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(status !== "unauthenticated");
   const audioContextRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const musicGainRef = useRef<GainNode | null>(null);
@@ -599,63 +598,20 @@ export default function AppPage() {
     if (!options.preserveFeedback) {
       setChoiceFeedback(null);
     }
-    setStreamingNextEvent(true);
     setLoading(true);
     try {
-      const streamed = await fetchNextEventStream(charId);
-      if (!streamed) {
-        const recovered = await waitForCommittedNextEvent(charId, 12_000);
-        if (!recovered) {
-          setError("다음 사건이 아직 확정되지 않았습니다. 잠시 후 다시 시도해 주세요.");
-        }
+      const response = await doFetch(`/api/characters/${charId}/events/next`, "POST");
+      if (response.ok && response.data.event) {
+        setCurrentEvent(response.data.event);
+      } else {
+        setError(response.data.error ?? "다음 상황을 생성하지 못했습니다.");
       }
       await loadCharacterEvent(charId);
       await loadSpecData(charId);
       setPendingNext(false);
     } finally {
-      setStreamingNextEvent(false);
       setLoading(false);
     }
-  }
-
-  async function fetchNextEventStream(charId: string) {
-    const response = await fetch(`/api/characters/${charId}/events/next/stream`, {
-      method: "POST",
-      headers: { Accept: "text/event-stream" },
-    }).catch(() => null);
-    if (!response?.ok || !response.body) return false;
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let receivedFinalEvent = false;
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const messages = buffer.split("\n\n");
-      buffer = messages.pop() ?? "";
-
-      for (const message of messages) {
-        const eventName = message.split("\n").find((line) => line.startsWith("event:"))?.slice(6).trim();
-        const dataLine = message.split("\n").find((line) => line.startsWith("data:"));
-        if (!eventName || !dataLine) continue;
-        const payload = JSON.parse(dataLine.slice(5).trim());
-        if (eventName === "status") {
-          setStreamingNextEvent(true);
-        }
-        if (eventName === "event" && payload.event) {
-          setCurrentEvent(payload.event);
-          receivedFinalEvent = true;
-        }
-        if (eventName === "error") {
-          setError(payload.error ?? "다음 상황을 생성하지 못했습니다.");
-        }
-      }
-    }
-
-    return receivedFinalEvent;
   }
 
   async function waitForCommittedNextEvent(charId: string, timeoutMs: number) {
@@ -820,7 +776,6 @@ export default function AppPage() {
   const resumeCharacter = useCallback(async (char: CharacterData, navigationVersion = navigationVersionRef.current) => {
     setCurrentChar(char);
     setCurrentEvent(null);
-    setStreamingNextEvent(false);
     setPendingNext(false);
     setEndingNotice("");
     if (char.currentEventId) {
@@ -843,7 +798,6 @@ export default function AppPage() {
     // user starts a new run from the menu. Do not let that stale request keep
     // the final onboarding action disabled.
     setLoading(false);
-    setStreamingNextEvent(false);
     setCurrentChar(null);
     setCurrentEvent(null);
     setChoiceFeedback(null);
@@ -1322,7 +1276,7 @@ export default function AppPage() {
             currentCharacter={currentChar}
             currentEvent={currentEvent}
             feedback={choiceFeedback}
-            loading={streamingNextEvent || loading}
+            loading={loading}
             variant="web"
             feedbackArt={choiceFeedback ? <ChoiceResultArt tone={getChoiceFeedbackTone(choiceFeedback)} /> : undefined}
             endingArt={<EndingArt type="default" size={160} />}
