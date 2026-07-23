@@ -130,9 +130,6 @@ button {
 
 .novel-text {
   word-break: keep-all;
-  line-break: strict;
-  text-wrap: pretty;
-  text-align: left;
   line-height: 1.9;
 }
 
@@ -153,8 +150,6 @@ button {
 .create-panel .create-question {
   color: #2a2018;
   word-break: keep-all;
-  line-break: strict;
-  text-wrap: pretty;
 }
 
 

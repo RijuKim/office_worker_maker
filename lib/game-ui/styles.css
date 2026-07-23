@@ -129,9 +129,6 @@ button {
 
 .novel-text {
   word-break: keep-all;
-  line-break: strict;
-  text-wrap: pretty;
-  text-align: left;
   line-height: 1.9;
 }
 
@@ -509,9 +506,6 @@ button {
   color: #3a332d;
   line-height: 1.75;
   word-break: keep-all;
-  line-break: strict;
-  text-wrap: pretty;
-  text-align: left;
 }
 
 .onboarding-panel-web .create-step h2 {
