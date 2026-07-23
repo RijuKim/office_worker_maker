@@ -38,6 +38,7 @@ html {
 body {
   min-height: 100%;
   margin: 0;
+  overflow-x: hidden;
   background: var(--background);
   color: var(--foreground);
   font-family: "Courier New", "DungGeunMo", "Apple SD Gothic Neo", "Noto Sans KR", monospace;

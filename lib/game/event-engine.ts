@@ -1269,15 +1269,10 @@ export function selectNextEvent(
   currentHiddenState: EventSelectionContext,
   recentEventTitles: string[],
 ): { type: "forced" | "normal"; event: StaticEvent } {
-  const result = pickBaseEvent(currentHiddenState, recentEventTitles);
-  const summary = currentHiddenState.previousChoiceSummary?.trim();
-
-  if (summary) {
-    const bridgedBody = `지난 선택의 결과, ${summary}. 그리고 이어지는 이야기...\n\n${result.event.body}`;
-    return { type: result.type, event: { ...result.event, body: bridgedBody } };
-  }
-
-  return result;
+  // The previous choice is already shown in the choice-result panel. It is
+  // still available in the selection context for continuity decisions, but
+  // must not be prepended to the next story body or it is rendered twice.
+  return pickBaseEvent(currentHiddenState, recentEventTitles);
 }
 
 function pickBaseEvent(
@@ -1315,7 +1310,6 @@ function buildContextualCareerGateEvent(
   const activeSpec = context.specs?.find((spec) => spec.status === "IN_PROGRESS");
   const activePath = context.careerPaths?.find((path) => path.status !== "COMPLETED" && path.status !== "FAILED");
   const trustedPerson = [...(context.relationships ?? [])].sort((a, b) => b.trust - a.trust)[0];
-  const lastSummary = context.previousChoiceSummary?.trim();
   const lowStat = Object.entries(context.stats ?? {})
     .filter(([key]) => ["health", "mental", "wealth", "reputation"].includes(key))
     .sort((a, b) => a[1] - b[1])[0]?.[0];
@@ -1338,9 +1332,7 @@ function buildContextualCareerGateEvent(
 
   if (recentEventTitles.includes(title)) return null;
 
-  const continuity = lastSummary
-    ? `지난 선택의 여파는 아직 남아 있다. ${lastSummary}`
-    : "지나온 선택들은 성적표보다 더 복잡한 모양으로 당신의 책상 위에 쌓여 있다.";
+  const continuity = "지나온 선택들은 성적표보다 더 복잡한 모양으로 당신의 책상 위에 쌓여 있다.";
   const relationshipLine = trustedPerson
     ? `${trustedPerson.name}에게 연락하면 도움은 받을 수 있겠지만, 그 관계에도 부담이 생길 것이다.`
     : "이번에는 대신 결정해 줄 사람이 없다.";

@@ -135,6 +135,7 @@ describe("pickRandomStaticEvent", () => {
 
     expect(result.event.source).toBe("STATIC");
     expect(result.event.tags).toContain("진로");
+    expect(result.event.body).not.toContain("지난 선택의 결과,");
   });
 
   it("does not repeat a proposal after it was accepted or declined", () => {

@@ -13,6 +13,7 @@ type AiProvider = {
 
 type AiProviderOptions = {
   skipPrimary?: boolean;
+  primaryOnly?: boolean;
   trace?: {
     requestId?: string;
     characterRunId?: string;
@@ -20,27 +21,28 @@ type AiProviderOptions = {
 };
 
 const primaryProvider = (): AiProvider => ({
-  id: "ollama",
-  label: "Ollama GPT-OSS",
-  baseUrl: "https://ollama.com/v1",
-  key: process.env.OLLAMA_API_KEY ?? null,
-  model: "gpt-oss:20b",
-});
-
-const fallbackProvider = (): AiProvider => ({
   id: "openrouter",
-  label: "OpenRouter",
+  label: "OpenRouter DeepSeek V4 Flash",
   baseUrl: "https://openrouter.ai/api/v1",
   key: process.env.OPENROUTER_API_KEY ?? null,
-  model: process.env.OPENROUTER_MODEL ?? "openrouter/free",
+  model: process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-v4-flash",
   headers: {
     "HTTP-Referer": process.env.NEXTAUTH_URL ?? "https://sano-officeworker.vercel.app",
     "X-Title": "Sano Officeworker",
   },
 });
 
+const fallbackProvider = (): AiProvider => ({
+  id: "ollama",
+  label: "Ollama GPT-OSS",
+  baseUrl: "https://ollama.com/v1",
+  key: process.env.OLLAMA_API_KEY ?? null,
+  model: process.env.OLLAMA_MODEL ?? "gpt-oss:20b",
+});
+
 const aiProviders = (options: AiProviderOptions = {}) =>
-  options.skipPrimary ? [fallbackProvider()] : [primaryProvider(), fallbackProvider()];
+  options.primaryOnly ? [primaryProvider()] :
+    options.skipPrimary ? [fallbackProvider()] : [primaryProvider(), fallbackProvider()];
 
 // Give the configured providers enough time to finish a complete structured
 // event. Both providers share this total window, after which the route commits
@@ -791,7 +793,11 @@ function buildAiEventRequestBody(state: AiEventPromptState, provider: AiProvider
       { role: "user", content: buildUserPrompt(state) },
     ],
     response_format: { type: "json_object" },
-    max_tokens: getOpenRouterMaxTokens(),
+    // DeepSeek V4 Flash supports reasoning, but event generation only needs a
+    // short, deterministic JSON document. Disable reasoning to preserve the
+    // output budget for the actual event.
+    ...(provider.id === "openrouter" ? { reasoning: { effort: "none" } } : { think: "low" }),
+    max_tokens: provider.id === "ollama" ? Math.max(getOpenRouterMaxTokens(), 4_000) : getOpenRouterMaxTokens(),
     temperature: 0.85,
   };
 }

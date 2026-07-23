@@ -930,8 +930,8 @@ describe("stateful JSON/SSE event authority", () => {
     const prompt = "PRIMARY_PROMPT_STATE_SENTINEL_14bd";
     const raw = "PRIMARY_RAW_PROVIDER_SENTINEL_826a";
     const providerError = "PRIMARY_PROVIDER_ERROR_SENTINEL_3e71";
-    process.env.OLLAMA_API_KEY = secret;
-    delete process.env.OPENROUTER_API_KEY;
+    process.env.OPENROUTER_API_KEY = secret;
+    delete process.env.OLLAMA_API_KEY;
     fixture.characterName = prompt;
     const aiEvent = {
       title: "느리지만 한 번에 도착한 제안",
@@ -968,7 +968,7 @@ describe("stateful JSON/SSE event authority", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(aiMocks.generateAiEvent).toHaveBeenCalledTimes(1);
     expect(info).toHaveBeenCalledWith(expect.stringContaining("이벤트 생성 완료"), expect.objectContaining({
-      eventId: fixture.pointer, providerId: "ollama", providerElapsedMs: 12_000,
+      eventId: fixture.pointer, providerId: "openrouter", providerElapsedMs: 12_000,
       totalElapsedMs: 12_000, retryUsed: false, fallbackUsed: false, slow: true,
       providerFailures: [],
     }));
@@ -980,7 +980,7 @@ describe("stateful JSON/SSE event authority", () => {
       expect(serializedResponse).not.toContain(sentinel);
       expect(serializedLogs).not.toContain(sentinel);
     }
-    delete process.env.OLLAMA_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
     vi.useRealTimers();
   });
 
@@ -1039,10 +1039,10 @@ describe("stateful JSON/SSE event authority", () => {
     expect(fixture.events.get(fixture.pointer!)).toMatchObject({ id: fixture.pointer, source: "AI", status: "ACTIVE" });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(info).toHaveBeenCalledWith(expect.stringContaining("이벤트 생성 완료"), expect.objectContaining({
-      eventId: fixture.pointer, providerId: "openrouter", providerElapsedMs: 7_000,
+      eventId: fixture.pointer, providerId: "ollama", providerElapsedMs: 7_000,
       totalElapsedMs: 12_000, retryUsed: true, fallbackUsed: false, slow: true,
       providerFailures: [expect.objectContaining({
-        providerId: "ollama", stage: "provider", reason: "rate_limited", providerElapsedMs: 5_000,
+        providerId: "openrouter", stage: "provider", reason: "rate_limited", providerElapsedMs: 5_000,
       })],
     }));
     for (const sentinel of [primarySecret, secondarySecret, prompt]) {
@@ -1088,7 +1088,7 @@ describe("stateful JSON/SSE event authority", () => {
     vi.useFakeTimers();
     fixture.aiEnabled = true;
     aiMocks.checkDailyAiLimit.mockResolvedValue({ allowed: false });
-    process.env.OPENROUTER_API_KEY = "ROUTE_TIMEOUT_SECRET_SENTINEL";
+    process.env.OLLAMA_API_KEY = "ROUTE_TIMEOUT_SECRET_SENTINEL";
     process.env.OPENROUTER_TIMEOUT_MS = "5000";
     const rawSentinel = "ROUTE_RAW_RESPONSE_SENTINEL";
     const actual = await vi.importActual<typeof import("@/lib/game/openrouter")>("@/lib/game/openrouter");
@@ -1112,16 +1112,16 @@ describe("stateful JSON/SSE event authority", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
     expect(info).toHaveBeenCalledWith(expect.stringContaining("이벤트 생성 완료"), expect.objectContaining({
-      eventId: fixture.pointer, source: "FALLBACK", providerId: "openrouter",
+      eventId: fixture.pointer, source: "FALLBACK", providerId: "ollama",
       providerElapsedMs: 5_000, totalElapsedMs: 5_000, generationStage: "provider",
       generationReason: "timeout", retryUsed: false, fallbackUsed: true, slow: false,
-      providerFailures: [expect.objectContaining({ providerId: "openrouter", reason: "timeout", providerElapsedMs: 5_000 })],
+      providerFailures: [expect.objectContaining({ providerId: "ollama", reason: "timeout", providerElapsedMs: 5_000 })],
     }));
-    for (const sentinel of [process.env.OPENROUTER_API_KEY!, "FULL_PROMPT_SENTINEL", rawSentinel]) {
+    for (const sentinel of [process.env.OLLAMA_API_KEY!, "FULL_PROMPT_SENTINEL", rawSentinel]) {
       expect(responseText).not.toContain(sentinel);
       expect(serializedLogs).not.toContain(sentinel);
     }
-    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.OLLAMA_API_KEY;
     delete process.env.OPENROUTER_TIMEOUT_MS;
     vi.useRealTimers();
   });

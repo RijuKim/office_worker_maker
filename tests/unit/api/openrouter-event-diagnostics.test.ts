@@ -132,7 +132,7 @@ describe("AI event diagnostics", () => {
     const result = await generateAiEvent({
       name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4,
       recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {},
-    }, { skipPrimary: true });
+    });
 
     expect(result).toMatchObject({ success: true, slow: true, totalElapsedMs: 12_001, providerElapsedMs: 12_001, providerFailures: [] });
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -149,7 +149,7 @@ describe("AI event diagnostics", () => {
     const pending = generateAiEvent({
       name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4,
       recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {},
-    }, { skipPrimary: true });
+    });
     await vi.advanceTimersByTimeAsync(5_000);
     const result = await pending;
 
@@ -189,8 +189,8 @@ describe("AI event diagnostics", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(result).toMatchObject({ success: false, reason: "timeout", totalElapsedMs: 5_000 });
     expect(result.providerFailures).toEqual([
-      expect.objectContaining({ providerId: "ollama", reason: "rate_limited", providerElapsedMs: 4_000 }),
-      expect.objectContaining({ providerId: "openrouter", reason: "timeout", providerElapsedMs: 1_000 }),
+      expect.objectContaining({ providerId: "openrouter", reason: "rate_limited", providerElapsedMs: 4_000 }),
+      expect.objectContaining({ providerId: "ollama", reason: "timeout", providerElapsedMs: 1_000 }),
     ]);
   });
 
@@ -210,7 +210,7 @@ describe("AI event diagnostics", () => {
     await vi.advanceTimersByTimeAsync(5_000);
     const result = await pending;
 
-    expect(result).toMatchObject({ success: false, reason: "timeout", providerId: "ollama", totalElapsedMs: 5_000 });
+    expect(result).toMatchObject({ success: false, reason: "timeout", providerId: "openrouter", totalElapsedMs: 5_000 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -223,7 +223,7 @@ describe("AI event diagnostics", () => {
     await generateAiEvent({
       name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4,
       recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {},
-    }, { skipPrimary: true });
+    });
     const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -250,7 +250,7 @@ describe("AI event diagnostics", () => {
     const result = await generateAiEventStream({
       name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4,
       recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {},
-    }, () => {}, { skipPrimary: true });
+    }, () => {});
 
     expect(result).toMatchObject({ success: true, providerId: "openrouter" });
   });
@@ -267,7 +267,7 @@ describe("AI event diagnostics", () => {
       recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {},
     });
 
-    expect(result).toMatchObject({ success: true, providerId: "openrouter", retryUsed: true, providerFailures: [{ providerId: "ollama", stage: "provider", reason: "rate_limited" }] });
+    expect(result).toMatchObject({ success: true, providerId: "ollama", retryUsed: true, providerFailures: [{ providerId: "openrouter", stage: "provider", reason: "rate_limited" }] });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(JSON.stringify(result)).not.toContain("primary-secret");
     expect(JSON.stringify(result)).not.toContain("secondary-secret");
@@ -276,7 +276,7 @@ describe("AI event diagnostics", () => {
 
   it("classifies a missing provider key without making a request", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
-    const result = await generateAiEvent({ name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4, recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {} }, { skipPrimary: true });
+    const result = await generateAiEvent({ name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4, recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {} }, { primaryOnly: true });
     expect(result).toMatchObject({ success: false, reason: "no_key", providerId: "openrouter", providerElapsedMs: 0 });
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -284,7 +284,7 @@ describe("AI event diagnostics", () => {
   it.each([[429, "rate_limited"], [500, "api_error"]] as const)("classifies HTTP %i as %s", async (status, reason) => {
     process.env.OPENROUTER_API_KEY = "test-key";
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("upstream failure", { status }));
-    const result = await generateAiEvent({ name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4, recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {} }, { skipPrimary: true });
+    const result = await generateAiEvent({ name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4, recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {} }, { primaryOnly: true });
     expect(result).toMatchObject({ success: false, reason, providerId: "openrouter" });
   });
 
@@ -294,7 +294,7 @@ describe("AI event diagnostics", () => {
   ])("classifies %s responses", async (_label, payload, reason) => {
     process.env.OPENROUTER_API_KEY = "test-key";
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(payload), { status: 200 }));
-    const result = await generateAiEvent({ name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4, recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {} }, { skipPrimary: true });
+    const result = await generateAiEvent({ name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4, recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {} }, { primaryOnly: true });
     expect(result).toMatchObject({ success: false, reason });
   });
 
@@ -310,7 +310,7 @@ describe("AI event diagnostics", () => {
     const result = await generateAiEvent({
       name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4,
       recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {},
-    }, { skipPrimary: true });
+    }, { primaryOnly: true });
     expect(result).toMatchObject({ success: false, reason, providerFailures: [expect.objectContaining({ reason, stage: "parse" })] });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -319,7 +319,7 @@ describe("AI event diagnostics", () => {
     process.env.OPENROUTER_API_KEY = "test-key";
     const suffix = atEof ? "" : "\n\n";
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(`data: {"error":{"message":"upstream failed"}}${suffix}`, { status: 200 }));
-    const result = await generateAiEventStream({ name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4, recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {} }, () => {}, { skipPrimary: true });
+    const result = await generateAiEventStream({ name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4, recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {} }, () => {}, { primaryOnly: true });
     expect(result).toMatchObject({ success: false, reason: "api_error" });
   });
 });
