@@ -144,7 +144,7 @@ function getEventScene(event: SharedEventView) {
   return "campus";
 }
 
-function PixelScene({ scene, label }: { scene: string; label?: string }) {
+export function PixelScene({ scene, label }: { scene: string; label?: string }) {
   if (scene === "intro") {
     return (
       <div

@@ -5,12 +5,13 @@ import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 
 import {
   CharacterSheet,
+  PixelScene,
   PlaySurface,
   RelationshipsSheet,
 } from "./App";
 import type { SharedCharacterView } from "./App";
 
-export { CharacterSheet, PlaySurface, RelationshipsSheet };
+export { CharacterSheet, PixelScene, PlaySurface, RelationshipsSheet };
 
 export interface SharedGameWorkspaceProps {
   mode?: "web" | "mobile";
@@ -246,37 +247,17 @@ export function SharedOnboardingFlow(props: SharedOnboardingFlowProps) {
     <section className={`screen-stack onboarding-panel ${props.variant === "web" ? "onboarding-panel-web" : ""}`}>
       {props.step === "intro" && (
         <section className="create-step">
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-[#8a4f2d]">캐릭터 생성</p>
-          <div className="intro-dawn-art" data-testid="intro-dawn-art">
-            <div className="pixel-scene-intro" aria-label="오전 6시 07분의 밝은 새벽 방 픽셀아트" data-palette="blue-lilac-apricot-cream" data-testid="pixel-scene-intro">
-              <svg aria-hidden="true" data-testid="intro-scene-svg" shapeRendering="crispEdges" viewBox="0 0 320 180">
-                <rect data-part="room-blue" width="320" height="180" fill="#536f9b" />
-                <rect data-part="lilac-wall" y="55" width="320" height="60" fill="#d98f83" />
-                <rect data-part="apricot-dawn" y="82" width="320" height="33" fill="#f3b477" />
-                <rect data-part="room-shadow" y="115" width="320" height="65" fill="#51404a" />
-                <rect data-part="window-cream" x="16" y="17" width="136" height="100" fill="#f5d7a0" />
-                <rect data-part="window-blue" x="23" y="24" width="122" height="86" fill="#718fbb" />
-                <rect data-part="window-apricot" x="23" y="70" width="122" height="40" fill="#f0a06f" />
-                <rect data-part="window-cream-light" x="23" y="91" width="122" height="19" fill="#ffd58f" />
-                <rect data-part="computer-desk" x="197" y="106" width="94" height="13" fill="#352b31" />
-                <rect data-part="computer" x="207" y="70" width="62" height="37" fill="#2f3542" />
-                <rect data-part="computer-screen" x="214" y="77" width="48" height="24" fill="#bdeee6" />
-                <rect data-part="computer-line-primary" x="222" y="82" width="31" height="4" fill="#ffffff" />
-                <rect data-part="computer-line-secondary" x="222" y="90" width="24" height="3" fill="#6fa3aa" />
-                <rect data-part="bed" x="164" y="120" width="132" height="45" fill="#72566b" />
-                <rect data-part="phone" x="176" y="111" width="72" height="20" fill="#96788d" />
-                <rect data-part="floor" y="154" width="320" height="26" fill="#302931" />
-              </svg>
-            </div>
+          <div className="create-hero-art intro-dawn-art" data-testid="intro-dawn-art">
+            <PixelScene scene="intro" label="오전 6시 07분의 밝은 새벽 방 픽셀아트" />
           </div>
-          <h2>낯선 아침이 시작됩니다.</h2>
-          <div className="space-y-3">
+          <h2 className="create-question">낯선 아침이 시작됩니다.</h2>
+          <div className="create-copy space-y-3">
             <p>눈을 뜨니 오전 6시 07분입니다. 휴대폰에는 읽지 않은 카톡 알림이 수북하게 쌓여 있습니다.</p>
             <p>학과 단체방 공지, 새로 올라온 동아리 모집 글, 아르바이트 연락, 그리고 아직 열어보지 않은 메시지 하나가 화면 위에 겹쳐 있습니다. 마지막 메시지에는 짧은 문장만 남아 있습니다. “이번에는 어떤 사람이 될 수 있을까요?”</p>
             <p>오늘은 평범한 학기의 첫날일 수도, 오래 미뤄둔 변화를 시작하는 날일 수도 있습니다. 지금 고르는 작은 선택들은 수업과 관계, 생활과 진로를 조금씩 다른 방향으로 이끌게 될 것입니다.</p>
             <p className="disclaimer">이 이야기는 실제 진로 예측이 아닌 재미를 위한 허구의 시뮬레이션입니다.</p>
           </div>
-          <button className="primary-button" type="button" onClick={() => props.onStepChange("name")}>시작하기</button>
+          <button className="pixel-button-dark" type="button" onClick={() => props.onStepChange("name")}>시작하기</button>
         </section>
       )}
 
