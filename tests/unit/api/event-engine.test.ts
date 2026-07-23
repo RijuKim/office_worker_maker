@@ -117,7 +117,24 @@ describe("pickRandomStaticEvent", () => {
       "공공안전 직무 체력·면접 전형",
       "졸업 전 마지막 지원서",
     ]).toContain(event.title);
+    expect(event.source).toBe("STATIC");
     expect(event.choices.map((choice) => choice.label).join(" ")).not.toMatch(/합격한다|떨어진다|통과한다|탈락한다/);
+  });
+
+  it("returns contextual career gates as static events", () => {
+    const result = selectNextEvent({
+      burnoutRisk: 0,
+      coreEventCount: 14,
+      lifeStage: "college_late",
+      graduation: "gate_ready",
+      eventFlags: {},
+      stats: { academic: 7, practical: 7, health: 7, mental: 7, wealth: 5, reputation: 6 },
+      relationships: [],
+      previousChoiceSummary: "지원 준비를 계속했다.",
+    }, []);
+
+    expect(result.event.source).toBe("STATIC");
+    expect(result.event.tags).toContain("진로");
   });
 
   it("does not repeat a proposal after it was accepted or declined", () => {

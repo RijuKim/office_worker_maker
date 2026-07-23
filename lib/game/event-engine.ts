@@ -1348,6 +1348,7 @@ function buildContextualCareerGateEvent(
     ? `${formatStatName(lowStat)}이 부족하다는 감각도 계속 발목을 잡는다.`
     : "능력치는 충분해 보여도, 마지막 문턱 앞에서는 작은 빈틈이 크게 보인다.";
 
+  // This contextual career gate is authored locally and must remain STATIC.
   return {
     title,
     body: `${continuity}

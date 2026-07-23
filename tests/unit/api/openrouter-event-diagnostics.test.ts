@@ -34,9 +34,10 @@ describe("AI event diagnostics", () => {
     ["4999", 60_000],
     ["120001", 60_000],
     ["60000", 60_000],
+    [" 60000 ", 60_000],
     ["5000", 5_000],
     ["120000", 120_000],
-  ])("parses timeout %s as %i ms", (raw, expected) => {
+  ])("uses a 60000 ms default while preserving configured timeout bounds (%s -> %i ms)", (raw, expected) => {
     expect(getOpenRouterTimeoutMs(raw)).toBe(expected);
   });
 

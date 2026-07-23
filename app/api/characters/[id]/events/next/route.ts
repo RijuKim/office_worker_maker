@@ -4,6 +4,7 @@ import type { EventSource } from "@prisma/client";
 import { getStoryArc, isEventAllowedForLifeStage, selectNextEvent, type StaticEvent } from "@/lib/game/event-engine";
 import { evaluateCandidateEvent, findValidatedStaticFallback } from "@/lib/game/event-quality-policy";
 import { deriveLifeStageState } from "@/lib/game/life-stage";
+import { buildDiversityCategoryGuidance } from "@/lib/game/event-diversity";
 import { checkDailyAiLimit, generateAiEvent, getOpenRouterTimeoutMs, incrementAiUsage } from "@/lib/game/openrouter";
 import { recordEventQualityLog } from "@/lib/server/event-quality-log";
 import { acquireAuthoritativeEvent, createPrismaEventAuthorityStore, EventAuthorityLostError, resolveEventGenerationRole, startEventGenerationHeartbeat, toPublicEvent } from "@/lib/server/event-authority";
@@ -482,29 +483,16 @@ function buildDiversityGuidance(eventHistory: Array<{
     Array.isArray(history.event?.tags) ? history.event.tags.filter((tag) => typeof tag === "string") : [],
   );
   const recentPeople = recent.flatMap((history) => readRelationshipNames(history.relationshipDelta));
-  const tagCounts = countItems(recentTags.map(normalizeCategory).filter(Boolean));
   const peopleCounts = countItems(recentPeople);
-
-  const lastTwoTags = eventHistory.slice(0, 2).flatMap((history) =>
-    Array.isArray(history.event?.tags) ? history.event.tags.filter((tag) => typeof tag === "string") : [],
+  const categoryGuidance = buildDiversityCategoryGuidance(
+    recentTags.map(normalizeCategory).filter(Boolean),
+    ["돈", "가족", "연애", "건강", "알바", "동아리/학생회", "해외/여행", "위험", "진로", "생활", "SNS/디지털", "취미/문화", "스펙/경쟁", "주거", "멘탈"],
   );
-  const lastTwoCategories = [...new Set(lastTwoTags.map(normalizeCategory).filter(Boolean))];
-
-  const avoidCategories = [
-    ...new Set([
-      ...lastTwoCategories,
-      ...Object.entries(tagCounts)
-        .filter(([, count]) => count >= 2)
-        .map(([category]) => category),
-    ]),
-  ];
+  const avoidCategories = categoryGuidance.avoidCategories;
   const avoidPeople = Object.entries(peopleCounts)
     .filter(([, count]) => count >= 2)
     .map(([name]) => name);
-  const allCategories = ["돈", "가족", "연애", "건강", "알바", "동아리/학생회", "해외/여행", "위험", "진로", "생활", "SNS/디지털", "취미/문화", "스펙/경쟁", "주거", "멘탈"];
-  const preferCategories = allCategories
-    .filter((category) => !tagCounts[category])
-    .slice(0, 4);
+  const preferCategories = categoryGuidance.preferCategories;
 
   return { recentTags, recentPeople, avoidCategories, preferCategories, avoidPeople };
 }
