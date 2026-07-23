@@ -598,9 +598,18 @@ function buildDiversityGuidance(eventHistory: Array<{
   const recentPeople = recent.flatMap((history) => readRelationshipNames(history.relationshipDelta));
   const tagCounts = countItems(recentTags.map(normalizeCategory).filter(Boolean));
   const peopleCounts = countItems(recentPeople);
-  const avoidCategories = Object.entries(tagCounts)
-    .filter(([, count]) => count >= 2)
-    .map(([category]) => category);
+  const lastTwoTags = eventHistory.slice(0, 2).flatMap((history) =>
+    Array.isArray(history.event?.tags) ? history.event.tags.filter((tag) => typeof tag === "string") : [],
+  );
+  const lastTwoCategories = [...new Set(lastTwoTags.map(normalizeCategory).filter(Boolean))];
+  const avoidCategories = [
+    ...new Set([
+      ...lastTwoCategories,
+      ...Object.entries(tagCounts)
+        .filter(([, count]) => count >= 1)
+        .map(([category]) => category),
+    ]),
+  ];
   const avoidPeople = Object.entries(peopleCounts)
     .filter(([, count]) => count >= 2)
     .map(([name]) => name);

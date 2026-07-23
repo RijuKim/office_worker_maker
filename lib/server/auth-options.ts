@@ -5,6 +5,7 @@ import { verifyPassword } from "@/lib/server/password";
 import { prisma } from "@/lib/server/prisma";
 
 export const authOptions: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET ?? "sano-officeworker-dev-secret",
   session: {
     strategy: "jwt",
   },

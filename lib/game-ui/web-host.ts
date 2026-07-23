@@ -55,10 +55,13 @@ function createWebApiPort(apiBaseUrl = "", location?: string | URL) {
 function createWebClipboardPort(clipboard?: Pick<Clipboard, "writeText">): HostClipboardPort {
   return {
     async copy(text: string) {
-      if (!clipboard?.writeText) {
+      const writeText = clipboard
+        ? clipboard.writeText.bind(clipboard)
+        : globalThis.navigator?.clipboard?.writeText?.bind(globalThis.navigator.clipboard);
+      if (!writeText) {
         throw new Error("Clipboard API is unavailable.");
       }
-      await clipboard.writeText(text);
+      await writeText(text);
     },
   };
 }

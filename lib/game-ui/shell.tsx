@@ -165,6 +165,7 @@ export function SharedOnboardingFlow(props: SharedOnboardingFlowProps) {
     <section className="screen-stack onboarding-panel">
       {props.step === "intro" && (
         <section className="create-step">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-[#8a4f2d]">캐릭터 생성</p>
           <div className="intro-dawn-art" data-testid="intro-dawn-art">
             <div className="pixel-scene-intro" aria-label="오전 6시 07분의 밝은 새벽 방 픽셀아트" data-palette="blue-lilac-apricot-cream" data-testid="pixel-scene-intro">
               <svg aria-hidden="true" data-testid="intro-scene-svg" shapeRendering="crispEdges" viewBox="0 0 320 180">

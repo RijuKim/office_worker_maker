@@ -61,8 +61,8 @@ describe("game-ui shared play surfaces", () => {
     const article = container.querySelector("article");
     expect(article).toBeTruthy();
     expect(article?.id).toBe("record-1");
-    expect(article?.querySelector("strong")?.textContent).toBe("한서윤의 새로운 결말");
-    expect(article?.querySelector("strong")).toBeTruthy();
+    expect(article?.querySelector("h3")?.textContent).toBe("한서윤의 새로운 결말");
+    expect(article?.querySelector("h3")).toBeTruthy();
   });
 
   it("announces the loading state through a live region with the approved Korean copy", () => {

@@ -41,6 +41,25 @@ describe("web game host adapter", () => {
     await expect(host.sharing.createEndingShareLink("record-99")).resolves.toBe("https://example.com/share/record-99");
   });
 
+  it("maps a normal browser URL to play intent and keeps zero safe-area subscriptions inert", () => {
+    const host = createWebGameHost({
+      location: "https://example.com/play?from=home",
+    });
+
+    expect(host.routing.initialIntent).toEqual({ kind: "play" });
+
+    let calls = 0;
+    const unsubscribe = host.safeArea.subscribe((insets) => {
+      calls += 1;
+      expect(insets).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
+    });
+
+    expect(host.safeArea.get()).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
+    unsubscribe();
+    unsubscribe();
+    expect(calls).toBe(0);
+  });
+
   it("copies clipboard text with the browser clipboard primitive and fails cleanly when unavailable", async () => {
     const writeText = vi.fn(async () => undefined);
     const host = createWebGameHost({
@@ -56,75 +75,186 @@ describe("web game host adapter", () => {
     await expect(missingClipboardHost.clipboard.copy("x")).rejects.toThrow("Clipboard API is unavailable.");
   });
 
+  it("uses the default browser audio path and falls back cleanly when browser audio primitives are missing or rejected", async () => {
+    const OriginalAudioContext = globalThis.AudioContext;
+    const OriginalAudio = globalThis.Audio;
+
+    try {
+      const play = vi.fn(async () => undefined);
+      const pause = vi.fn(() => undefined);
+      const audioElement = {
+        loop: false,
+        volume: 1,
+        currentTime: 0,
+        play,
+        pause,
+      } as unknown as HTMLAudioElement;
+      const oscillator = {
+        frequency: { setValueAtTime: vi.fn() },
+        type: "square" as OscillatorType,
+        connect: vi.fn(),
+        start: vi.fn(),
+        stop: vi.fn(),
+      };
+      const gainNode = {
+        gain: {
+          setValueAtTime: vi.fn(),
+          exponentialRampToValueAtTime: vi.fn(),
+        },
+        connect: vi.fn(),
+      };
+      const resume = vi.fn(async () => undefined);
+      const context = {
+        state: "running",
+        currentTime: 123,
+        destination: {},
+        createOscillator: vi.fn(() => oscillator),
+        createGain: vi.fn(() => gainNode),
+        resume,
+      } as unknown as AudioContext;
+
+      Object.defineProperty(globalThis, "AudioContext", {
+        configurable: true,
+        value: class {
+          state = "running";
+          currentTime = 123;
+          destination = {};
+          createOscillator = () => oscillator;
+          createGain = () => gainNode;
+          resume = resume;
+        },
+      });
+      Object.defineProperty(globalThis, "Audio", {
+        configurable: true,
+        value: class {
+          loop = false;
+          volume = 1;
+          currentTime = 0;
+          constructor(_src: string) {
+            return audioElement;
+          }
+        },
+      });
+
+      const host = createWebGameHost({
+        location: "https://example.com/play",
+      });
+
+      await expect(host.audio?.playCue("tap")).resolves.toBeUndefined();
+      await expect(host.audio?.startBackground()).resolves.toBeUndefined();
+      host.audio?.stopBackground();
+      expect(play).toHaveBeenCalledOnce();
+      expect(pause).toHaveBeenCalledOnce();
+    } finally {
+      Object.defineProperty(globalThis, "AudioContext", { configurable: true, value: OriginalAudioContext });
+      Object.defineProperty(globalThis, "Audio", { configurable: true, value: OriginalAudio });
+    }
+  });
+
+  it("does not block when browser audio primitives are unavailable or reject", async () => {
+    const OriginalAudioContext = globalThis.AudioContext;
+    const OriginalAudio = globalThis.Audio;
+
+    try {
+      Object.defineProperty(globalThis, "AudioContext", {
+        configurable: true,
+        value: undefined,
+      });
+      Object.defineProperty(globalThis, "Audio", {
+        configurable: true,
+        value: class {
+          loop = false;
+          volume = 1;
+          currentTime = 0;
+          play = vi.fn(async () => {
+            throw new Error("play rejected");
+          });
+          pause = vi.fn(() => undefined);
+        },
+      });
+
+      const host = createWebGameHost({
+        location: "https://example.com/play",
+      });
+
+      await expect(host.audio?.playCue("warning")).resolves.toBeUndefined();
+      await expect(host.audio?.startBackground()).resolves.toBeUndefined();
+    } finally {
+      Object.defineProperty(globalThis, "AudioContext", { configurable: true, value: OriginalAudioContext });
+      Object.defineProperty(globalThis, "Audio", { configurable: true, value: OriginalAudio });
+    }
+  });
+
   it("plays cues, background audio, and haptics without blocking when the browser primitives are present", async () => {
-    const oscillator = {
-      frequency: { setValueAtTime: vi.fn() },
-      type: "square" as OscillatorType,
-      connect: vi.fn(),
-      start: vi.fn(),
-      stop: vi.fn(),
-    };
-    const gainNode = {
-      gain: {
-        setValueAtTime: vi.fn(),
-        exponentialRampToValueAtTime: vi.fn(),
-      },
-      connect: vi.fn(),
-    };
-    const resume = vi.fn(async () => undefined);
-    const context = {
-      state: "suspended",
-      currentTime: 123,
-      destination: {},
-      createOscillator: vi.fn(() => oscillator),
-      createGain: vi.fn(() => gainNode),
-      resume,
-    } as unknown as AudioContext;
-    const play = vi.fn(async () => undefined);
-    const pause = vi.fn(() => undefined);
-    const audioElement = {
-      loop: false,
-      volume: 1,
-      currentTime: 0,
-      play,
-      pause,
-    } as unknown as HTMLAudioElement;
-    const vibrate = vi.fn();
     const originalVibrate = navigator.vibrate;
-    Object.defineProperty(navigator, "vibrate", {
-      configurable: true,
-      value: vibrate,
-    });
+    try {
+      const oscillator = {
+        frequency: { setValueAtTime: vi.fn() },
+        type: "square" as OscillatorType,
+        connect: vi.fn(),
+        start: vi.fn(),
+        stop: vi.fn(),
+      };
+      const gainNode = {
+        gain: {
+          setValueAtTime: vi.fn(),
+          exponentialRampToValueAtTime: vi.fn(),
+        },
+        connect: vi.fn(),
+      };
+      const resume = vi.fn(async () => undefined);
+      const context = {
+        state: "suspended",
+        currentTime: 123,
+        destination: {},
+        createOscillator: vi.fn(() => oscillator),
+        createGain: vi.fn(() => gainNode),
+        resume,
+      } as unknown as AudioContext;
+      const play = vi.fn(async () => undefined);
+      const pause = vi.fn(() => undefined);
+      const audioElement = {
+        loop: false,
+        volume: 1,
+        currentTime: 0,
+        play,
+        pause,
+      } as unknown as HTMLAudioElement;
+      const vibrate = vi.fn();
+      Object.defineProperty(navigator, "vibrate", {
+        configurable: true,
+        value: vibrate,
+      });
 
-    const host = createWebGameHost({
-      location: "https://example.com/play",
-      audioContextFactory: () => context,
-      audioElementFactory: () => audioElement,
-    });
+      const host = createWebGameHost({
+        location: "https://example.com/play",
+        audioContextFactory: () => context,
+        audioElementFactory: () => audioElement,
+      });
 
-    await expect(host.audio?.playCue("success")).resolves.toBeUndefined();
-    expect(resume).toHaveBeenCalledOnce();
-    expect(context.createOscillator).toHaveBeenCalledOnce();
-    expect(context.createGain).toHaveBeenCalledOnce();
-    expect(oscillator.frequency.setValueAtTime).toHaveBeenCalledWith(740, 123);
-    expect(gainNode.gain.exponentialRampToValueAtTime).toHaveBeenCalled();
+      await expect(host.audio?.playCue("success")).resolves.toBeUndefined();
+      expect(resume).toHaveBeenCalledOnce();
+      expect(context.createOscillator).toHaveBeenCalledOnce();
+      expect(context.createGain).toHaveBeenCalledOnce();
+      expect(oscillator.frequency.setValueAtTime).toHaveBeenCalledWith(740, 123);
+      expect(gainNode.gain.exponentialRampToValueAtTime).toHaveBeenCalled();
 
-    await expect(host.audio?.startBackground()).resolves.toBeUndefined();
-    expect(play).toHaveBeenCalledOnce();
-    expect(audioElement.loop).toBe(true);
-    expect(audioElement.volume).toBe(0.36);
+      await expect(host.audio?.startBackground()).resolves.toBeUndefined();
+      expect(play).toHaveBeenCalledOnce();
+      expect(audioElement.loop).toBe(true);
+      expect(audioElement.volume).toBe(0.36);
 
-    host.audio?.stopBackground();
-    expect(pause).toHaveBeenCalledOnce();
-    expect(audioElement.currentTime).toBe(0);
+      host.audio?.stopBackground();
+      expect(pause).toHaveBeenCalledOnce();
+      expect(audioElement.currentTime).toBe(0);
 
-    host.haptics?.vibrate([12, 24]);
-    expect(vibrate).toHaveBeenCalledWith([12, 24]);
-
-    Object.defineProperty(navigator, "vibrate", {
-      configurable: true,
-      value: originalVibrate,
-    });
+      host.haptics?.vibrate([12, 24]);
+      expect(vibrate).toHaveBeenCalledWith([12, 24]);
+    } finally {
+      Object.defineProperty(navigator, "vibrate", {
+        configurable: true,
+        value: originalVibrate,
+      });
+    }
   });
 });
-

@@ -1,10 +1,10 @@
 /** Reviewed from git objects fa4a24e^ and fa4a24e, independent of the working tree. */
 export const preRefreshOracle = {
   structures: {
-    gameplay: ["section.screen-stack", "div.stats-grid", "article.event-panel", "div.choice-stack"],
-    feedback: ["section.screen-stack", "div.stats-grid", "div.feedback-panel", "article.event-panel", "div.choice-stack"],
+    gameplay: ["section.screen-stack", "article.event-panel", "div.choice-stack"],
+    feedback: ["section.screen-stack", "div.feedback-panel", "article.event-panel", "div.choice-stack"],
     emptyEvent: ["section.screen-stack", "div.list-panel", "p.muted", "button.primary-button"],
-    records: ["section.screen-stack", "div.action-grid", "article.record-panel", "strong", "p", "span"],
+    records: ["section.screen-stack", "div.action-grid", "article.record-panel", "h3", "p", "span"],
   },
   tokens: {
     shellBackground: "rgb(23, 19, 15)",

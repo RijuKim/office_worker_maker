@@ -17,10 +17,10 @@ type AiProviderOptions = {
 
 const primaryProvider = (): AiProvider => ({
   id: "ollama",
-  label: "Ollama Gemma",
+  label: "Ollama GPT-OSS",
   baseUrl: "https://ollama.com/v1",
   key: process.env.OLLAMA_API_KEY ?? null,
-  model: "gemma4:31b",
+  model: "gpt-oss:20b",
 });
 
 const fallbackProvider = (): AiProvider => ({
@@ -41,12 +41,12 @@ const aiProviders = (options: AiProviderOptions = {}) =>
 // Keep the interactive generation attempt below the browser's 30 second action
 // budget. Both configured providers share this total window, after which the
 // route commits the validated static fallback.
-const DEFAULT_AI_TIMEOUT_MS = 12_000;
+const DEFAULT_AI_TIMEOUT_MS = 8_000;
 const MIN_AI_TIMEOUT_MS = 5_000;
 const MAX_AI_TIMEOUT_MS = 120_000;
 export const SLOW_AI_GENERATION_MS = 10_000;
 
-const DEFAULT_AI_MAX_TOKENS = 4_000;
+const DEFAULT_AI_MAX_TOKENS = 2_000;
 const MIN_AI_MAX_TOKENS = 400;
 const MAX_AI_MAX_TOKENS = 4_000;
 
@@ -125,6 +125,12 @@ Return ONLY valid JSON in a single JSON object with "title", "body", "tags", and
 Keep continuity with recent choices, relationships, open threads, and stats. Avoid repeating closed proposals or stale scenes. Use only the public stats in statDelta, keep health and mental decreases at -1 or above, and make at least one choice clearly risky with a downside. Choice labels should be natural actions. Summaries must start with "당신은".
 
 The scene can come from college, work, family, romance, clubs, career prep, exams, overseas plans, hobbies, or other daily life. Treat the protagonist as a woman by default, avoid male-coded address, and use fictional/parody names only.
+
+CRITICAL - Event diversity rules:
+1. Each event must cover a DIFFERENT life area than the previous event. If the last event was about work/part-time, the next must switch to study, relationships, hobbies, family, health, or another area.
+2. Never generate two consecutive events in the same category (e.g. two part-time events in a row, two study events in a row).
+3. The "회피" field lists categories to avoid. The "우선" field lists categories to prioritize. Follow these strictly.
+4. Vary locations, people, and pressure sources. Do not reuse the same setting or character from the previous event.
 `;
 
 export type AiEventPromptState = {

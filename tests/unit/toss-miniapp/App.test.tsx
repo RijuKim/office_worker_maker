@@ -251,9 +251,7 @@ describe("Toss entry refresh", () => {
     await flush(); await flush();
 
     const stack = container.querySelector(".screen-stack");
-    const stats = stack?.querySelector(".stats-grid");
     const event = stack?.querySelector("article.event-panel");
-    expect(stats?.querySelectorAll(":scope > span")).toHaveLength(2);
     expect(event?.querySelector("h2")?.textContent).toBe("첫 수업으로 향합니다");
     expect(event?.querySelector("p")?.textContent).toBe("캠퍼스의 아침입니다.");
     expect(container.querySelector(".choice-stack")).toBeTruthy();
@@ -268,7 +266,7 @@ describe("Toss entry refresh", () => {
     const stack = container.querySelector(".screen-stack");
     expect(stack?.querySelector(":scope > .action-grid")).toBeTruthy();
     const record = stack?.querySelector("article.record-panel");
-    expect(record?.querySelector("strong")?.textContent).toBe(careerRecord.title);
+    expect(record?.querySelector("h3")?.textContent).toBe(careerRecord.title);
     expect(record?.querySelector("p")?.textContent).toBe(careerRecord.summary);
     expect([...record!.querySelectorAll("span")].map((node) => node.textContent)).toContain("만족도 74");
     expect(button("진행으로")).toBeTruthy();

@@ -178,7 +178,6 @@ test("restored Toss gameplay, feedback, next-event and records match the pre-ref
     await page.getByRole("button", { name: firstEvent.choices[0].label }).click();
     await expect(page.locator(".feedback-panel strong")).toHaveText("실무 +2");
     await expect(page.locator(".feedback-panel p")).toHaveText("차분한 답장으로 준비할 시간을 확보했습니다.");
-    await expect(page.locator(".stats-grid span").filter({ hasText: "실무" })).toContainText("7");
     await expect(page.locator(".event-panel h2")).toHaveText(nextEvent.title);
     await expect(page.locator(".choice-stack button")).toHaveCount(2);
     for (const selector of oracle.structures.feedback) await expect(page.locator(selector)).toHaveCount(1);

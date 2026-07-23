@@ -75,7 +75,6 @@ test.describe("Toss visual acceptance — onboarding", () => {
 
     await expect(page.locator(".event-panel h2")).toHaveText(sharedEvent.title);
     await expect(page.locator(".choice-stack button")).toHaveCount(3);
-    await expect(page.locator(".stats-grid")).toBeVisible();
     for (const selector of tossVisualOracle.structures.gameplay) {
       await expect(page.locator(selector)).toHaveCount(1);
     }

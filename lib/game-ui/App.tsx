@@ -302,11 +302,6 @@ export function PlaySurface({
             <span>{currentCharacter.major ?? "전공 미정"}</span>
             <span>{formatWealth(currentCharacter.stats?.wealth ?? 0)}</span>
           </div>
-          <div className="stats-grid">
-            {Object.entries(currentCharacter.stats).map(([key, value]) => (
-              <span key={key}><b>{STAT_LABELS[key] ?? key}</b>{key === "wealth" ? formatWealth(value) : value}</span>
-            ))}
-          </div>
         </>
       )}
       {feedback && (
@@ -524,7 +519,7 @@ export function RecordCardShell({
   const content = (
     <div className="p-4">
       <div className="text-xs font-black text-[#8a4f2d]">SELECTED ENDING</div>
-      <strong className="mt-1 block text-xl font-black">{title}</strong>
+      <h3 className="mt-1 block text-xl font-black leading-tight">{title}</h3>
       {summary && <p className="mt-2 text-sm leading-6 text-[#706b62]">{summary}</p>}
       {preview && !expanded && <p className="mt-2 text-sm leading-6 text-[#706b62]">{preview}</p>}
     </div>

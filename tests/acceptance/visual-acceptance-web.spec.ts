@@ -117,7 +117,6 @@ test.describe("Web visual acceptance — gameplay", () => {
 
     await expect(page.locator(".event-panel h2")).toHaveText(sharedEvent.title);
     await expect(page.locator(".choice-stack button")).toHaveCount(3);
-    await expect(page.locator(".stats-grid")).toBeVisible();
     await expect(page.locator(".play-status-strip")).toBeVisible();
     for (const selector of webVisualOracle.structures.gameplay) {
       await expect(page.locator(selector)).toHaveCount(1);
@@ -138,7 +137,6 @@ test.describe("Web visual acceptance — gameplay", () => {
     await expect(page.locator(".feedback-panel p")).toHaveText(
       "차분한 답장으로 준비할 시간을 확보했습니다.",
     );
-    await expect(page.locator(".stats-grid span").filter({ hasText: "실무" })).toContainText("7");
     await expect(page.locator(".event-panel h2")).toHaveText(nextEvent.title);
     await expect(page.locator(".choice-stack button")).toHaveCount(2);
     for (const selector of webVisualOracle.structures.feedback) {

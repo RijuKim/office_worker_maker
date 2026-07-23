@@ -114,13 +114,11 @@ export const webVisualOracle = {
     ],
     gameplay: [
       "section.screen-stack",
-      "div.stats-grid",
       "article.event-panel",
       "div.choice-stack",
     ],
     feedback: [
       "section.screen-stack",
-      "div.stats-grid",
       "div.feedback-panel",
       "article.event-panel",
       "div.choice-stack",
