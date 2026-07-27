@@ -10,6 +10,7 @@ import { CodexDetailModal } from "@/app/components/codex/CodexDetailModal";
 import { CodexGrid } from "@/app/components/codex/CodexGrid";
 import { CODEX_CATALOG, type CodexSlot } from "@/lib/game/codex-catalog";
 import { deriveCodexState } from "@/lib/game/derive-codex-state";
+import { EndingArt } from "@/lib/game/ending-art";
 import type { CareerEndingRecord } from "@prisma/client";
 import { createTossEndingShareLink } from "./toss-host";
 import type { CareerPath, CareerRecord, CharacterData, CharacterSpec, ChoiceFeedback, EventData, JobApplication, Screen } from "./types";
@@ -592,6 +593,7 @@ export function App() {
             currentEvent={currentEvent}
             feedback={feedback}
             loading={loading || generatingNextEvent}
+            endingArt={<EndingArt type="default" size={160} />}
             endingNotice={endingNotice}
             onChoose={(choiceIndex) => void choose(choiceIndex)}
             onShowLatestRecord={() => {
