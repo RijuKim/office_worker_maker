@@ -364,6 +364,20 @@ function logAiAttempt(meta: Record<string, unknown>) {
   logger.info("ai_event_attempt", meta);
 }
 
+function logProviderFailure(meta: {
+  kind: "json" | "stream";
+  attemptId: string;
+  providerId: AiProvider["id"];
+  providerLabel: string;
+  model: string;
+  reason: unknown;
+  providerElapsedMs: number;
+  totalElapsedMs: number;
+  providerRole: "primary" | "fallback";
+}) {
+  logger.warn("ai_provider_attempt_failed", meta);
+}
+
 export async function generateAiEvent(
   state: AiEventPromptState,
   options: AiProviderOptions = {},
@@ -372,7 +386,8 @@ export async function generateAiEvent(
   let lastFailure: OpenRouterFailure = { success: false, reason: "no_key" };
   const providerFailures: AiProviderFailureTelemetry[] = [];
 
-  for (const provider of aiProviders(options)) {
+  const providers = aiProviders(options);
+  for (const [providerIndex, provider] of providers.entries()) {
     const providerStartedAt = Date.now();
     const remainingMs = getOpenRouterTimeoutMs() - (providerStartedAt - totalStartedAt);
     if (remainingMs <= 0) break;
@@ -384,6 +399,7 @@ export async function generateAiEvent(
       providerId: provider.id,
       providerLabel: provider.label,
       model: provider.model,
+      providerRole: providerIndex === 0 ? "primary" : "fallback",
       timeoutMs: remainingMs,
       maxTokens: getAiEventMaxTokens(provider.id),
       promptChars: buildUserPrompt(state).length,
@@ -406,6 +422,19 @@ export async function generateAiEvent(
       failureReasons: measured.success ? [] : (measured.providerFailures ?? []).map((failure) => failure.reason),
       ...options.trace,
     });
+    if (!measured.success) {
+      logProviderFailure({
+        kind: "json",
+        attemptId,
+        providerId: provider.id,
+        providerLabel: provider.label,
+        model: provider.model,
+        reason: measured.reason,
+        providerElapsedMs: measured.providerElapsedMs ?? 0,
+        totalElapsedMs,
+        providerRole: providerIndex === 0 ? "primary" : "fallback",
+      });
+    }
     if (measured.success) return { ...measured, retryUsed: providerFailures.length > 0, providerFailures };
     lastFailure = measured;
     providerFailures.push(toProviderFailureTelemetry(provider, measured));
@@ -590,7 +619,8 @@ export async function generateAiEventStream(
   let lastFailure: OpenRouterFailure = { success: false, reason: "no_key" };
   const providerFailures: AiProviderFailureTelemetry[] = [];
 
-  for (const provider of aiProviders(options)) {
+  const providers = aiProviders(options);
+  for (const [providerIndex, provider] of providers.entries()) {
     const providerStartedAt = Date.now();
     const remainingMs = getOpenRouterTimeoutMs() - (providerStartedAt - totalStartedAt);
     if (remainingMs <= 0) break;
@@ -602,6 +632,7 @@ export async function generateAiEventStream(
       providerId: provider.id,
       providerLabel: provider.label,
       model: provider.model,
+      providerRole: providerIndex === 0 ? "primary" : "fallback",
       timeoutMs: remainingMs,
       maxTokens: getAiEventMaxTokens(provider.id),
       promptChars: buildUserPrompt(state).length,
@@ -629,6 +660,19 @@ export async function generateAiEventStream(
       providerSentBody,
       ...options.trace,
     });
+    if (!measured.success) {
+      logProviderFailure({
+        kind: "stream",
+        attemptId,
+        providerId: provider.id,
+        providerLabel: provider.label,
+        model: provider.model,
+        reason: measured.reason,
+        providerElapsedMs: measured.providerElapsedMs ?? 0,
+        totalElapsedMs,
+        providerRole: providerIndex === 0 ? "primary" : "fallback",
+      });
+    }
     if (measured.success) return { ...measured, retryUsed: providerFailures.length > 0, providerFailures };
     lastFailure = measured;
     providerFailures.push(toProviderFailureTelemetry(provider, measured));
