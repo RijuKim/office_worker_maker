@@ -78,6 +78,35 @@ function recordText(record: CareerRecord, key: string, fallback = "") {
   return typeof value === "string" || typeof value === "number" ? String(value) : fallback;
 }
 
+function formatRelationshipResult(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return "싱글";
+  if (normalized.includes("divorc") || normalized.includes("이혼")) return "이혼";
+  if (normalized.includes("widow") || normalized.includes("사별")) return "사별";
+  if (normalized.includes("married") || normalized.includes("결혼")) return "결혼";
+  if (normalized.includes("cohab") || normalized.includes("동거")) return "동거 중";
+  if (normalized.includes("dating") || normalized.includes("연애")) return "연애 중";
+  if (normalized.includes("single") || normalized.includes("싱글") || normalized.includes("혼자")) return "싱글";
+  return value;
+}
+
+async function copyText(text: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  textarea.remove();
+  if (!copied) throw new Error("clipboard unavailable");
+}
+
 export function App() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [screen, setScreen] = useState<Screen>("create");
@@ -94,6 +123,7 @@ export function App() {
   const [feedback, setFeedback] = useState<ChoiceFeedback | null>(null);
   const [records, setRecords] = useState<CareerRecord[]>([]);
   const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
+  const [copiedRecordId, setCopiedRecordId] = useState<string | null>(null);
   const [recordsTab, setRecordsTab] = useState<"records" | "codex">("records");
   const [selectedCodexSlot, setSelectedCodexSlot] = useState<CodexSlot | null>(null);
   const [specs, setSpecs] = useState<CharacterSpec[]>([]);
@@ -322,6 +352,7 @@ export function App() {
       }
       if (result.data.result?.endingTriggered) {
         setCurrentEvent(null);
+        setCurrentCharacter((character) => character ? { ...character, academicStatus: "GRADUATED", currentEventId: null, events: [] } : character);
         cue("ending");
         const recordsResult = await api.records();
         if (recordsResult.ok) {
@@ -370,11 +401,17 @@ export function App() {
     const result = await copyEndingShareLink(
       {
         sharing: {
-          createEndingShareLink: createTossEndingShareLink,
+          async createEndingShareLink(id) {
+            try {
+              return await createTossEndingShareLink(id);
+            } catch {
+              return `https://sano-officeworker.vercel.app/share/${encodeURIComponent(id)}`;
+            }
+          },
         },
         clipboard: {
           async copy(text: string) {
-            await navigator.clipboard.writeText(text);
+            await copyText(text);
           },
         },
       },
@@ -387,6 +424,8 @@ export function App() {
     }
 
     setError("");
+    setCopiedRecordId(recordId);
+    window.setTimeout(() => setCopiedRecordId((current) => current === recordId ? null : current), 1_800);
   }, []);
 
   useEffect(() => {
@@ -574,7 +613,8 @@ export function App() {
             <div><p className="record-kicker">ARCHIVE</p><h2>선택의 결과 기록</h2><p>가상 취준 생활이 남긴 직업, 관계, 생활의 스냅샷</p></div>
             <div className="record-actions flex items-center gap-4 max-[720px]:mt-4">
               <button className="record-action" type="button" onClick={() => void loadRecords()}>새로고침</button>
-              <button className="record-action" type="button" onClick={() => setScreen(currentCharacter ? "play" : "create")}>이어가기</button>
+              {currentCharacter && !isCompletedCharacter(currentCharacter) && <button className="record-action" type="button" onClick={() => setScreen("play")}>이어가기</button>}
+              {(!currentCharacter || isCompletedCharacter(currentCharacter)) && <button className="record-action" type="button" onClick={requestNewSimulation}>새로 시작하기</button>}
             </div>
           </div>
           <div className="record-tabs mb-6" role="tablist">
@@ -588,7 +628,7 @@ export function App() {
             const preview = narrative.length > 150 ? `${narrative.slice(0, 150)}...` : narrative;
             const careerPath = recordText(record, "careerPath", "진로 기록");
             const healthState = recordText(record, "healthState", "생활 상태");
-            const relationshipState = recordText(record, "relationshipState", "관계의 여운");
+            const relationshipState = formatRelationshipResult(recordText(record, "relationshipState", "싱글"));
             return (
             <RecordCardShell
               className="record-card pixel-panel overflow-hidden p-0"
@@ -600,19 +640,14 @@ export function App() {
               summary={record.summary ?? ""}
               title={record.title ?? record.destination ?? "선택의 결과"}
             >
-              <div className="border-t-4 border-[#2a2018] bg-[#fffaf0] p-5">
-                {narrative && <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#2a241e]">{narrative}</p>}
-                <div className="mt-4 grid grid-cols-3 gap-2 border-t-2 border-[#f2efe7] pt-4 text-center text-sm">
-                  <div><span className="block text-xs text-[#706b62]">만족도</span><strong>{recordText(record, "satisfaction", "-")}</strong></div>
-                  <div><span className="block text-xs text-[#706b62]">성장 가능성</span><strong>{recordText(record, "growthPotential", "-")}</strong></div>
-                  <div><span className="block text-xs text-[#706b62]">워라밸</span><strong>{recordText(record, "workLifeBalance", "-")}</strong></div>
-                </div>
+              <div className="record-detail border-t-4 border-[#2a2018] bg-[#fffaf0] p-5">
+                {narrative && <div className="record-narrative whitespace-pre-wrap text-sm text-[#2a241e]">{narrative}</div>}
                 <div className="mt-3 flex flex-wrap gap-2">
                   <span className="record-chip">{careerPath}</span>
                   <span className="record-chip">{healthState}</span>
-                  <span className="record-chip">관계: {relationshipState}</span>
+                  <span className="record-chip">관계 · {relationshipState}</span>
                 </div>
-                <RecordShareActions onCopyLink={shareRecord} recordId={record.id} wrapperClassName="mt-3 flex flex-wrap gap-2" />
+                <RecordShareActions copyLabel={copiedRecordId === record.id ? "복사 완료" : "링크 복사"} onCopyLink={shareRecord} recordId={record.id} wrapperClassName="mt-3 flex flex-wrap gap-2" />
               </div>
             </RecordCardShell>
             );

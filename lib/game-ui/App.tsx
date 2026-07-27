@@ -584,7 +584,7 @@ export function RecordCardShell({
 }: RecordCardShellProps) {
   const content = (
     <div className="p-4">
-      <div className="text-xs font-black text-[#8a4f2d]">SELECTED ENDING</div>
+      <div className="text-xs font-black text-[#8a4f2d]">선택의 결과</div>
       <h3 className="mt-1 block text-xl font-black leading-tight">{title}</h3>
       {summary && <p className="mt-2 text-sm leading-6 text-[#706b62]">{summary}</p>}
       {preview && !expanded && <p className="mt-2 text-sm leading-6 text-[#706b62]">{preview}</p>}
@@ -620,6 +620,7 @@ export interface RecordShareActionsProps {
   onSaveImage?: (recordId: string) => void | Promise<void>;
   wrapperClassName?: string;
   copyButtonClassName?: string;
+  copyLabel?: string;
 }
 
 export function RecordShareActions({
@@ -628,10 +629,11 @@ export function RecordShareActions({
   onSaveImage,
   wrapperClassName,
   copyButtonClassName,
+  copyLabel,
 }: RecordShareActionsProps) {
   return (
     <div className={wrapperClassName ?? "mt-3 flex flex-wrap gap-2"}>
-      <button className={copyButtonClassName ?? "pixel-button-dark px-3 py-2 text-xs font-bold"} type="button" onClick={() => void onCopyLink(recordId)}>🔗 링크 복사</button>
+      <button className={copyButtonClassName ?? "pixel-button-dark px-3 py-2 text-xs font-bold"} type="button" onClick={() => void onCopyLink(recordId)}>🔗 {copyLabel ?? "링크 복사"}</button>
       {onSaveImage && <button className={copyButtonClassName ?? "pixel-button px-3 py-2 text-xs font-bold"} type="button" onClick={() => void onSaveImage(recordId)}>이미지 저장</button>}
     </div>
   );

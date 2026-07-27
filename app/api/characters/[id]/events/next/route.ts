@@ -57,6 +57,10 @@ export async function POST(request: Request | NextRequest, context: RouteContext
     return NextResponse.json({ error: "캐릭터를 찾을 수 없습니다." }, { status: 404 });
   }
 
+  if (character.academicStatus === "GRADUATED" || character.academicStatus === "DROPPED_OUT") {
+    return NextResponse.json({ error: "이미 완료된 이야기입니다." }, { status: 409 });
+  }
+
   if (!character.hiddenState) {
     return NextResponse.json({ error: "캐릭터 데이터가 불완전합니다." }, { status: 500 });
   }

@@ -218,9 +218,33 @@ body {
 }
 
 .records-screen .record-card {
+  display: block !important;
+  grid-template-columns: none !important;
+  width: 100%;
   margin-top: 20px;
   padding: 0;
   overflow: hidden;
+}
+
+.records-screen .record-detail {
+  display: block !important;
+  width: 100% !important;
+  box-sizing: border-box;
+  padding: 22px 18px 24px !important;
+}
+
+.records-screen .record-narrative {
+  display: block;
+  width: 100%;
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.95;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.records-screen .record-detail > div {
+  width: 100%;
 }
 
 .records-screen .record-card > button,

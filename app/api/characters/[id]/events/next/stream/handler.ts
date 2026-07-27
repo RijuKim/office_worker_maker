@@ -135,6 +135,11 @@ export function createNextEventStreamPost({
           return;
         }
 
+        if (character.academicStatus === "GRADUATED" || character.academicStatus === "DROPPED_OUT") {
+          send("error", { error: "이미 완료된 이야기입니다." });
+          return;
+        }
+
         const authorityStartedAt = Date.now();
         let authorityStore = createPrismaEventAuthorityStore({ client: prisma, characterRunId: id, userId });
         const committedEvent = await authorityStore.getCurrent();
