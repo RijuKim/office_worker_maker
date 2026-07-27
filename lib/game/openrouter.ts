@@ -35,7 +35,9 @@ const openRouterProvider = (): AiProvider => ({
 const ollamaProvider = (): AiProvider => ({
   id: "ollama",
   label: "Ollama GPT-OSS",
-  baseUrl: "https://ollama.com/v1",
+  // Use Ollama's native Cloud API. The OpenAI-compatible endpoint does not
+  // expose the native `think` and `format` controls consistently.
+  baseUrl: "https://ollama.com/api",
   key: process.env.OLLAMA_API_KEY?.trim() || null,
   model: (process.env.OLLAMA_MODEL ?? "gpt-oss:20b").trim(),
 });
@@ -476,7 +478,9 @@ async function generateAiEventWithProvider(
 
   try {
     const response = await fetch(
-      `${provider.baseUrl}/chat/completions`,
+      provider.id === "ollama"
+        ? `${provider.baseUrl}/chat`
+        : `${provider.baseUrl}/chat/completions`,
       {
         method: "POST",
         headers: {
@@ -535,8 +539,11 @@ async function generateAiEventWithProvider(
     const data = parsedData as Record<string, unknown> | null;
     const choices = data?.choices;
     const firstChoice = Array.isArray(choices) ? choices[0] : null;
-    const message = firstChoice && typeof firstChoice === "object" ? (firstChoice as Record<string, unknown>).message : null;
-    let content: string | undefined = message && typeof message === "object" ? (message as Record<string, unknown>).content as string | undefined : undefined;
+    const openAiMessage = firstChoice && typeof firstChoice === "object" ? (firstChoice as Record<string, unknown>).message : null;
+    const message = provider.id === "ollama" ? (data?.message ?? openAiMessage) : openAiMessage;
+    let content: string | undefined = message && typeof message === "object"
+      ? (message as Record<string, unknown>).content as string | undefined
+      : undefined;
     if (!content) {
       logAiAttempt({
         kind: "json",
@@ -769,8 +776,7 @@ async function generateAiEventStreamWithProvider(
 
       for (const line of lines) {
         const trimmed = line.trim();
-        if (!trimmed.startsWith("data:")) continue;
-        const payload = trimmed.slice(5).trim();
+        const payload = trimmed.startsWith("data:") ? trimmed.slice(5).trim() : trimmed;
         if (!payload || payload === "[DONE]") continue;
         const parsed = safeJson(payload);
         if (readRecord(parsed)?.error) return failure("api_error");
@@ -848,6 +854,26 @@ async function generateAiEventStreamWithProvider(
 }
 
 function buildAiEventRequestBody(state: AiEventPromptState, provider: AiProvider) {
+  if (provider.id === "ollama") {
+    return {
+      model: provider.model,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: buildUserPrompt(state) },
+      ],
+      // Ollama's native API supports JSON mode directly. Cloud currently does
+      // not support JSON Schema structured outputs, so keep the schema in the
+      // prompt and validate the result locally with Zod.
+      format: "json",
+      stream: false,
+      think: false,
+      options: {
+        temperature: 0.2,
+        num_predict: getAiEventMaxTokens(provider.id),
+      },
+    };
+  }
+
   return {
     model: provider.model,
     messages: [
@@ -865,6 +891,28 @@ function buildAiEventRequestBody(state: AiEventPromptState, provider: AiProvider
 }
 
 function buildAiEventStreamRequestBody(state: AiEventPromptState, provider: AiProvider) {
+  if (provider.id === "ollama") {
+    return {
+      model: provider.model,
+      messages: [
+        {
+          role: "system",
+          content: `${SYSTEM_PROMPT}
+
+For streaming responsiveness, output the JSON object in this field order exactly: "title", "body", "choices", "tags". Start the "body" field immediately after the title. Do not delay the body text until after choices.`,
+        },
+        { role: "user", content: buildUserPrompt(state) },
+      ],
+      format: "json",
+      stream: true,
+      think: false,
+      options: {
+        temperature: 0.2,
+        num_predict: getAiEventMaxTokens(provider.id),
+      },
+    };
+  }
+
   return {
     model: provider.model,
     messages: [
