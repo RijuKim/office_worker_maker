@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   generateAiEvent,
   generateAiEventStream,
+  getOllamaEventMaxTokens,
   getOpenRouterMaxTokens,
   getOpenRouterTimeoutMs,
   parseAiEventContentDetailed,
@@ -25,6 +26,7 @@ describe("AI event diagnostics", () => {
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.OLLAMA_API_KEY;
     delete process.env.OPENROUTER_TIMEOUT_MS;
+    delete process.env.OLLAMA_EVENT_MAX_TOKENS;
     vi.useRealTimers();
   });
 
@@ -51,6 +53,18 @@ describe("AI event diagnostics", () => {
     ["4001", 2_000],
   ])("parses max tokens %s as %i", (raw, expected) => {
     expect(getOpenRouterMaxTokens(raw)).toBe(expected);
+  });
+
+  it.each([
+    [undefined, 2_600],
+    ["abc", 2_600],
+    ["399", 2_600],
+    ["1600", 1_600],
+    ["2600", 2_600],
+    ["4000", 4_000],
+    ["4001", 2_600],
+  ])("parses Ollama event token budget %s as %i", (raw, expected) => {
+    expect(getOllamaEventMaxTokens(raw)).toBe(expected);
   });
 
   it("classifies malformed JSON separately", () => {

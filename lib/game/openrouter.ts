@@ -69,7 +69,7 @@ export const SLOW_AI_GENERATION_MS = 10_000;
 const DEFAULT_AI_MAX_TOKENS = 2_000;
 const MIN_AI_MAX_TOKENS = 400;
 const MAX_AI_MAX_TOKENS = 4_000;
-const MAX_OLLAMA_EVENT_TOKENS = 1_600;
+const DEFAULT_OLLAMA_EVENT_TOKENS = 2_600;
 
 export function getOpenRouterTimeoutMs(raw = process.env.OPENROUTER_TIMEOUT_MS): number {
   if (raw === undefined || !/^\d+$/.test(raw.trim())) return DEFAULT_AI_TIMEOUT_MS;
@@ -87,11 +87,18 @@ export function getOpenRouterMaxTokens(raw = process.env.OPENROUTER_MAX_TOKENS):
     : DEFAULT_AI_MAX_TOKENS;
 }
 
+export function getOllamaEventMaxTokens(raw = process.env.OLLAMA_EVENT_MAX_TOKENS): number {
+  if (raw === undefined || !/^\d+$/.test(raw.trim())) return DEFAULT_OLLAMA_EVENT_TOKENS;
+  const parsed = Number(raw);
+  return parsed >= MIN_AI_MAX_TOKENS && parsed <= MAX_AI_MAX_TOKENS
+    ? parsed
+    : DEFAULT_OLLAMA_EVENT_TOKENS;
+}
+
 function getAiEventMaxTokens(providerId: AiProvider["id"]): number {
-  const configured = getOpenRouterMaxTokens();
   return providerId === "ollama"
-    ? Math.min(configured, MAX_OLLAMA_EVENT_TOKENS)
-    : configured;
+    ? getOllamaEventMaxTokens()
+    : getOpenRouterMaxTokens();
 }
 
 const aiEventSchema = z.object({
@@ -550,6 +557,11 @@ async function generateAiEventWithProvider(
       return failure("api_error");
     }
     const data = parsedData as Record<string, unknown> | null;
+    const responseUsage = {
+      doneReason: typeof data?.done_reason === "string" ? data.done_reason : null,
+      promptEvalCount: typeof data?.prompt_eval_count === "number" ? data.prompt_eval_count : null,
+      evalCount: typeof data?.eval_count === "number" ? data.eval_count : null,
+    };
     const choices = data?.choices;
     const firstChoice = Array.isArray(choices) ? choices[0] : null;
     const openAiMessage = firstChoice && typeof firstChoice === "object" ? (firstChoice as Record<string, unknown>).message : null;
@@ -574,7 +586,7 @@ async function generateAiEventWithProvider(
         contentType: typeof messageRecord?.content,
         contentLength: typeof messageRecord?.content === "string" ? messageRecord.content.length : 0,
         thinkingLength: typeof messageRecord?.thinking === "string" ? messageRecord.thinking.length : 0,
-        doneReason: typeof data?.done_reason === "string" ? data.done_reason : null,
+        ...responseUsage,
       });
       return failure("empty_content");
     }
@@ -598,6 +610,8 @@ async function generateAiEventWithProvider(
         providerElapsedMs: Date.now() - startedAt,
         responseJsonMs: parseStartedAt - startedAt,
         parseMs: Date.now() - parseStartedAt,
+        contentLength: content.length,
+        ...responseUsage,
       });
       return failure(parsed.reason, parsed.issues, content.slice(0, 500));
     }
@@ -611,6 +625,8 @@ async function generateAiEventWithProvider(
       providerElapsedMs,
       responseJsonMs: parseStartedAt - startedAt,
       parseMs: Date.now() - parseStartedAt,
+      contentLength: content.length,
+      ...responseUsage,
     });
     return { success: true, event: parsed.event, providerId: provider.id, providerLabel: provider.label, providerElapsedMs, totalElapsedMs: 0, slow: false, retryUsed: false, providerFailures: [] };
   } catch (error) {
