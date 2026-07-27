@@ -323,6 +323,14 @@ export function App() {
       if (result.data.result?.endingTriggered) {
         setCurrentEvent(null);
         cue("ending");
+        const recordsResult = await api.records();
+        if (recordsResult.ok) {
+          setRecords(recordsResult.data.records ?? []);
+          setExpandedRecord(result.data.result.endingRecordId ?? null);
+        } else {
+          setError(recordsResult.data.error ?? "선택의 결과를 불러오지 못했습니다.");
+        }
+        setScreen("records");
         return;
       }
       setCurrentEvent(null);
@@ -522,7 +530,7 @@ export function App() {
             feedback={feedback}
             loading={loading || generatingNextEvent}
             onChoose={(choiceIndex) => void choose(choiceIndex)}
-            onContinueToNextEvent={currentCharacter ? () => {
+            onContinueToNextEvent={currentCharacter && !isCompletedCharacter(currentCharacter) ? () => {
               setGeneratingNextEvent(true);
               void api.nextEvent(currentCharacter.id).then((next) => {
                 if (next.ok && next.data.event) setCurrentEvent(next.data.event);
