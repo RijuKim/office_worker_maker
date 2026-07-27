@@ -302,14 +302,28 @@ export function createGameController(options: GameControllerOptions): GameContro
     }
 
     const currentRun = result.data.character ?? null;
+    let currentEvent = result.data.currentEvent ?? currentRun?.events?.[0] ?? null;
     update({
       loadingTask: null,
       currentRun,
-      currentEvent: result.data.currentEvent ?? currentRun?.events?.[0] ?? null,
+      currentEvent,
       feedback: null,
       error: "",
       screen: "play",
     });
+
+    if (currentRun && !currentEvent && currentRun.academicStatus !== "GRADUATED" && currentRun.academicStatus !== "DROPPED_OUT") {
+      const nextEventRequest = currentApi.nextEvent ?? currentApi.nextEventStream;
+      if (!nextEventRequest) return;
+      update({ loadingTask: "run" });
+      const next = await nextEventRequest(currentRun.id);
+      currentEvent = next.ok ? next.data.event ?? null : null;
+      update({
+        loadingTask: null,
+        currentEvent,
+        error: currentEvent ? "" : resolveApiError(next, "다음 사건을 생성하지 못했습니다.") ?? "다음 사건을 생성하지 못했습니다.",
+      });
+    }
   }
 
   async function createRun() {

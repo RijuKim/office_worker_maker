@@ -63,6 +63,10 @@ function progressLabel(character: CharacterData | null) {
   return `${character.currentGradeYear ?? character.startGradeYear}학년`;
 }
 
+function isCompletedCharacter(character: CharacterData) {
+  return character.academicStatus === "GRADUATED" || character.academicStatus === "DROPPED_OUT";
+}
+
 function statDeltaText(delta: Record<string, number>) {
   const entries = Object.entries(delta).filter(([, value]) => value !== 0);
   if (entries.length === 0) return "변화 없음";
@@ -231,10 +235,26 @@ export function App() {
         setError(result.data.error ?? "진행 정보를 불러오지 못했습니다.");
         return;
       }
-      setCurrentCharacter(result.data.character ?? character);
-      setCurrentEvent(result.data.currentEvent ?? result.data.character?.events?.[0] ?? null);
+      const restoredCharacter = result.data.character ?? character;
+      const restoredEvent = result.data.currentEvent ?? restoredCharacter.events?.[0] ?? null;
+      setCurrentCharacter(restoredCharacter);
+      setCurrentEvent(restoredEvent);
       setScreen("play");
+
+      // A choice can be committed just before the WebView is backgrounded. In
+      // that state the run is valid but has no active event yet, so resume the
+      // generation automatically instead of requiring a tap on the placeholder.
+      if (!restoredEvent && !isCompletedCharacter(restoredCharacter)) {
+        setGeneratingNextEvent(true);
+        const next = await api.nextEvent(restoredCharacter.id);
+        if (next.ok && next.data.event) {
+          setCurrentEvent(next.data.event);
+        } else if (!next.ok) {
+          setError(next.data.error ?? "다음 상황을 생성하지 못했습니다.");
+        }
+      }
     } finally {
+      setGeneratingNextEvent(false);
       setLoading(false);
     }
   }, []);

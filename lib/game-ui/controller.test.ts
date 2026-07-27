@@ -280,6 +280,30 @@ describe("game controller", () => {
     });
   });
 
+  it("automatically prepares a missing event when resuming an unfinished run", async () => {
+    const host = makeHost();
+    const stubs = createApiStubs();
+    stubs.api.getCharacter.mockResolvedValueOnce({
+      ok: true as const,
+      status: 200,
+      data: {
+        character: makeCharacter({ currentEventId: null, events: [] }),
+        currentEvent: undefined as unknown as EventData,
+      },
+    });
+    const controller = createGameController({ host, apiFactory: () => stubs.api });
+
+    await controller.bootstrap();
+    await controller.resumeRun("run-1");
+
+    expect(stubs.nextEventStream).toHaveBeenCalledOnce();
+    expect(controller.getState()).toMatchObject({
+      loadingTask: null,
+      currentEvent: expect.objectContaining({ id: "event-2" }),
+      screen: "play",
+    });
+  });
+
   it("calls nextEventStream exactly once per choose and does not render the same event twice", async () => {
     const host = makeHost();
     const stubs = createApiStubs();

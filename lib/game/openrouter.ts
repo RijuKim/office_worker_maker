@@ -291,6 +291,9 @@ function buildCareerDiversityPrompt(state: AiEventPromptState) {
   if (state.lifeStage === "college_late") {
     guidance.push("후반: 서류/인성검사/코테/면접/발표/불합격/조건협상");
   }
+  if (/의학|간호|약학|치의|수의|방사선|임상|보건/.test(state.major)) {
+    guidance.push("의료·보건계열: 4학년에는 임상실습, 국가시험, 병원 지원, 환자·보호자 응대, 당직과 진로 선택을 전공 맥락에 맞게 우선한다. 기존 창업 서사가 명시적으로 진행 중인 경우가 아니면 앱 개발, 코딩테스트, IT 포트폴리오, 범용 스타트업 소재를 사용하지 않는다");
+  }
   if (state.lifeStage === "college_late" || state.graduation === "gate_ready") {
     guidance.push("관문: 최근 선택+지원/스펙/관계 2개 이상 반영");
     guidance.push("관문 선택지는 합격/불합격이 아니라 전략 행동으로");

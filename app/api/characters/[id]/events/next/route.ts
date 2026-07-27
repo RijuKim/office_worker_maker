@@ -111,6 +111,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
   const previousChoiceSummary = lastHistory?.summary;
   const selectionContext = {
     burnoutRisk: character.hiddenState.burnoutRisk,
+    major: character.major,
     coreEventCount: character.coreEventCount,
     age: character.age,
     gradeYear: character.currentGradeYear,

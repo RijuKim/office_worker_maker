@@ -10,6 +10,7 @@ type PublicStats = Record<string, number>;
 
 export interface EventSelectionContext {
   burnoutRisk: number;
+  major?: string;
   coreEventCount?: number;
   age?: number;
   gradeYear?: number | null;
@@ -1643,6 +1644,13 @@ export function isEventAllowedForLifeStage(event: Pick<StaticEvent, "title" | "t
   const candidates = context.destinationCandidates ?? [];
 
   if (isResolvedOfferEvent(title, context.eventFlags)) {
+    return false;
+  }
+
+  const medicalMajor = /의학|간호|약학|치의|수의|방사선|임상|보건/.test(context.major ?? "");
+  const hasStartupHistory = context.eventFlags?.startupThread !== undefined ||
+    context.careerPaths?.some((path) => path.pathType === "startup");
+  if (medicalMajor && !hasStartupHistory && (title.includes("앱") || hasAny(tags, ["창업", "포트폴리오"]))) {
     return false;
   }
 

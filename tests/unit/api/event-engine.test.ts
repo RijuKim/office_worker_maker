@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildBurnoutEvent, getStoryArc, pickRandomStaticEvent, selectNextEvent, STATIC_EVENTS } from "@/lib/game/event-engine";
+import { buildBurnoutEvent, getStoryArc, isEventAllowedForLifeStage, pickRandomStaticEvent, selectNextEvent, STATIC_EVENTS } from "@/lib/game/event-engine";
 
 describe("STATIC_EVENTS", () => {
   it("has events with valid structure", () => {
@@ -156,6 +156,19 @@ describe("pickRandomStaticEvent", () => {
         expect(event.title).not.toBe("공모전 팀 구성");
       }
     }
+  });
+
+  it("does not introduce a generic app startup to a medical senior without an existing startup thread", () => {
+    const appEvent = STATIC_EVENTS.find((event) => event.title === "작은 앱 아이디어");
+    expect(appEvent).toBeDefined();
+    expect(isEventAllowedForLifeStage(appEvent!, {
+      burnoutRisk: 0,
+      major: "의학과",
+      gradeYear: 4,
+      lifeStage: "college_late",
+      eventFlags: {},
+      careerPaths: [],
+    })).toBe(false);
   });
 });
 

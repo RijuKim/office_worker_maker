@@ -190,6 +190,7 @@ export function createNextEventStreamPost({
         const diversityGuidance = buildDiversityGuidance(character.eventHistory, character.coreEventCount, character.id);
         const selectionContext: EventSelectionContext = {
           burnoutRisk: character.hiddenState.burnoutRisk,
+          major: character.major,
           coreEventCount: character.coreEventCount,
           age: character.age,
           gradeYear: character.currentGradeYear,
