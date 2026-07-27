@@ -162,6 +162,9 @@ CRITICAL - Event diversity rules:
 5. When "이번사건필수주제" is not "자유", the event title, main conflict, body, and tags must clearly belong to that category. When it is "자유", continue a recent choice, relationship, or open thread instead of introducing an unrelated premise.
 6. New-category events must still reuse at least one established person, consequence, resource constraint, or open thread so the full run feels like one story rather than disconnected episodes.
 7. Stay inside "이번이야기영역". These are the recurring themes selected for this protagonist; deepen and cross them rather than sampling every possible life category.
+8. Follow 취준서사.eventKind: CAREER_GATE is a concrete stage-appropriate career decision; CAREER_LINKED is an ordinary life event that can later become evidence without turning into an interview scene; LIFE may remain personally meaningful without an immediate career payoff.
+9. Use only organizations supplied in 취준서사.organizations. They are fictional parody organizations; never claim real salaries, policies, scandals, or hiring facts.
+10. 소재예시는 범주의 폭을 설명하는 영감일 뿐 고정 소재가 아니다. 최근 사건과 같은 구체 소재(예: 버튜버, 특정 공연, 특정 여행)를 반복하지 말고, 같은 범주에서도 인물·장소·갈등·선택의 형태를 바꿔라.
 `;
 
 export type AiEventPromptState = {
@@ -189,6 +192,7 @@ export type AiEventPromptState = {
   preferCategories?: string[];
   targetCategory?: string | null;
   allowedCategories?: string[];
+  careerNarrative?: unknown;
   avoidPeople?: string[];
 };
 
@@ -220,6 +224,7 @@ export function buildUserPrompt(state: AiEventPromptState): string {
     `사용제목=${state.usedEventTitles.slice(0, 8).join(" | ") || "없음"}`,
     `닫힘=${buildResolvedOfferPrompt(state.eventFlags)}`,
     `이번이야기영역=${state.allowedCategories?.join(",") || "자유"}`,
+    `취준서사=${JSON.stringify(state.careerNarrative ?? {})}`,
     `스토리모드=${state.targetCategory ? "새영역확장" : "기존선택연결"}|이번사건필수주제=${state.targetCategory ?? "자유"}|소재예시=${state.targetCategory ? eventCategoryExamples(state.targetCategory).join(",") : "최근 선택·관계·열린 갈등 중 하나의 구체적 결과"}`,
     `회피=${state.avoidCategories?.join(",") || "없음"}|보조후보=${state.preferCategories?.join(",") || "없음"}|회피인물=${state.avoidPeople?.join(",") || "없음"}`,
     `스탯=${JSON.stringify(state.stats)}`,
@@ -1053,6 +1058,7 @@ The longNarrative must be 700-1400 Korean characters when possible. It must cove
 Mention at least three concrete past event titles or relationship names from the supplied history when they matter. Avoid generic summaries that could fit any playthrough.
 Do not write route grades such as A/B/C, GOOD ROUTE, MIXED ROUTE, or HARD ROUTE.
 Use fictional/parody company or institution names only. No real defamatory claims.
+Use hiddenState.eventFlags.careerState as the causal career spine. Prefer its leading candidates and selected organizations, and explicitly connect at least two careerState.evidence entries to the final role. Do not invent an organization outside that supplied pool.
 If the character has a relationship life state (single, dating, cohabitation, married, divorced, widowed) or parenting state (expecting, newborn, toddler, school_age), reflect it naturally in the narrative. A marriage ending should feel earned from prior relationship history, not sudden. A parenting ending should show how the child changed the character's daily life and priorities. A single/independent ending should feel like a conscious choice, not a failure.`,
             },
             {

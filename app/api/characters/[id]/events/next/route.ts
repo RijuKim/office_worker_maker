@@ -4,6 +4,7 @@ import type { EventSource } from "@prisma/client";
 import { getStoryArc, isEventAllowedForLifeStage, selectNextEvent, type StaticEvent } from "@/lib/game/event-engine";
 import { evaluateCandidateEvent, findValidatedStaticFallback } from "@/lib/game/event-quality-policy";
 import { deriveLifeStageState } from "@/lib/game/life-stage";
+import { normalizeCareerNarrativeState, summarizeCareerNarrativeForPrompt } from "@/lib/game/career-narrative";
 import { buildDiversityCategoryGuidance, eventMatchesCategory, normalizeEventCategory, selectStoryCategoryPalette } from "@/lib/game/event-diversity";
 import { checkDailyAiLimit, generateAiEvent, getOpenRouterTimeoutMs, incrementAiUsage } from "@/lib/game/openrouter";
 import { recordEventQualityLog } from "@/lib/server/event-quality-log";
@@ -100,6 +101,11 @@ export async function POST(request: Request | NextRequest, context: RouteContext
   });
   const selectionLifeStage = lifeStage;
   const selectionFlags = currentFlags;
+  const careerNarrative = normalizeCareerNarrativeState(currentFlags.careerState, {
+    storySeed: character.id,
+    major: character.major,
+    coreEventCount: character.coreEventCount,
+  });
   const diversityGuidance = buildDiversityGuidance(character.eventHistory, character.coreEventCount, character.id);
   const lastHistory = character.eventHistory[0];
   const previousChoiceSummary = lastHistory?.summary;
@@ -235,6 +241,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
       preferCategories: diversityGuidance.preferCategories,
       targetCategory: diversityGuidance.targetCategory,
       allowedCategories: diversityGuidance.allowedCategories,
+      careerNarrative: summarizeCareerNarrativeForPrompt(careerNarrative),
       avoidPeople: diversityGuidance.avoidPeople,
     };
     const providerStartedAt = Date.now();

@@ -15,6 +15,7 @@ import {
   getRelationshipEndingType,
 } from "@/lib/game/life-stage";
 import { generateAiEnding } from "@/lib/game/openrouter";
+import { advanceCareerNarrativeState, normalizeCareerNarrativeState } from "@/lib/game/career-narrative";
 import { gateConcreteResultFields } from "@/lib/game/result-gating";
 import {
   evaluateCodingTest,
@@ -167,9 +168,22 @@ export async function POST(request: Request | NextRequest, context: RouteContext
     coreEventCount: character.coreEventCount,
     currentFlags,
   });
+  const currentCareerState = normalizeCareerNarrativeState(currentFlags.careerState, {
+    storySeed: character.id,
+    major: character.major,
+    coreEventCount: character.coreEventCount,
+  });
+  const nextCareerState = advanceCareerNarrativeState(currentCareerState, {
+    eventTitle: activeEvent.title,
+    eventTags: Array.isArray(activeEvent.tags) ? activeEvent.tags.filter((tag): tag is string => typeof tag === "string") : [],
+    choiceSummary: resolvedSummary,
+    statDelta,
+    nextCoreEventCount: character.coreEventCount + 1,
+  });
   const updatedEventFlags = applyFlagDeltas(currentFlags, {
     ...resolvedFlagDelta,
     ...storyFlagDelta,
+    careerState: nextCareerState,
   });
   const updatedBurnoutRisk = getNextBurnoutRisk({
     currentRisk: character.hiddenState.burnoutRisk,
@@ -368,7 +382,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
       summary: resolvedSummary,
       stats: updatedStats,
       statDelta: diffPublicStats(previousStats, updatedStats),
-      relationships: [...updatedRelationships, ...newRelationships.map((rel) => ({ name: rel.name, trust: rel.trust }))],
+      relationships: [...updatedRelationships, ...newRelationships.map((rel) => ({ name: rel.name, role: rel.role, trust: rel.trust, tags: rel.tags }))],
       relationshipDelta: choice.relationshipDelta,
       eventResolved: true,
       endingTriggered: Boolean(endingRecord),
