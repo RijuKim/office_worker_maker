@@ -121,6 +121,8 @@ export function App() {
   const [currentCharacter, setCurrentCharacter] = useState<CharacterData | null>(null);
   const [currentEvent, setCurrentEvent] = useState<EventData | null>(null);
   const [feedback, setFeedback] = useState<ChoiceFeedback | null>(null);
+  const [endingNotice, setEndingNotice] = useState("");
+  const [latestRecordId, setLatestRecordId] = useState<string | null>(null);
   const [records, setRecords] = useState<CareerRecord[]>([]);
   const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
   const [copiedRecordId, setCopiedRecordId] = useState<string | null>(null);
@@ -198,6 +200,8 @@ export function App() {
     setCurrentCharacter(null);
     setCurrentEvent(null);
     setFeedback(null);
+    setEndingNotice("");
+    setLatestRecordId(null);
     setCharacters([]);
     setSpecs([]);
     setJobApplications([]);
@@ -285,6 +289,8 @@ export function App() {
         return;
       }
 
+      setEndingNotice("");
+      setLatestRecordId(null);
       setScreen("play");
 
       // A choice can be committed just before the WebView is backgrounded. In
@@ -369,6 +375,8 @@ export function App() {
       if (result.data.result?.endingTriggered) {
         setCurrentEvent(null);
         setCurrentCharacter((character) => character ? { ...character, academicStatus: "GRADUATED", currentEventId: null, events: [] } : character);
+        setLatestRecordId(result.data.result.endingRecordId ?? null);
+        setEndingNotice("선택의 결과가 기록되었습니다. 당신이 지나온 선택이 어떤 삶으로 이어졌는지 확인해 보세요.");
         cue("ending");
         const recordsResult = await api.records();
         if (recordsResult.ok) {
@@ -377,7 +385,7 @@ export function App() {
         } else {
           setError(recordsResult.data.error ?? "선택의 결과를 불러오지 못했습니다.");
         }
-        setScreen("records");
+        setScreen("play");
         return;
       }
       setCurrentEvent(null);
@@ -584,7 +592,22 @@ export function App() {
             currentEvent={currentEvent}
             feedback={feedback}
             loading={loading || generatingNextEvent}
+            endingNotice={endingNotice}
             onChoose={(choiceIndex) => void choose(choiceIndex)}
+            onShowLatestRecord={() => {
+              if (latestRecordId) setExpandedRecord(latestRecordId);
+              setRecordsTab("records");
+              setScreen("records");
+            }}
+            onStartNewCharacter={requestNewSimulation}
+            endingActions={latestRecordId ? (
+              <RecordShareActions
+                copyLabel={copiedRecordId === latestRecordId ? "복사 완료" : "링크 복사"}
+                onCopyLink={shareRecord}
+                recordId={latestRecordId}
+                wrapperClassName="mt-3 flex flex-wrap gap-2"
+              />
+            ) : undefined}
             onContinueToNextEvent={currentCharacter && !isCompletedCharacter(currentCharacter) ? () => {
               setGeneratingNextEvent(true);
               void api.nextEvent(currentCharacter.id).then((next) => {
