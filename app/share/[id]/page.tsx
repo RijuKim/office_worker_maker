@@ -53,43 +53,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-function StatLabels({ statSnapshot }: { statSnapshot: Record<string, number> }) {
-  const statLabels: Record<string, string> = {
-    academic: "학업",
-    practical: "실무",
-    health: "건강",
-    mental: "멘탈",
-    wealth: "자산",
-    charm: "매력",
-    reputation: "평판",
-    communication: "커뮤니케이션",
-    creativity: "창의성",
-    network: "인맥",
-  };
-
-  return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-      {Object.entries(statLabels).map(([key, label]) => {
-        const val = statSnapshot[key];
-        if (val === undefined) return null;
-        return (
-          <div className="rounded border-2 border-[#ded9ce] bg-[#f2efe7] px-3 py-2 text-center" key={key}>
-            <span className="text-xs text-[#706b62]">{label}</span>
-            <span className="ml-2 text-lg font-bold">{Math.max(1, Math.min(10, Math.round(val)))}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function PublicEndingDetail({ ending }: { ending: Awaited<ReturnType<typeof loadEnding>> }) {
   if (!ending) {
     notFound();
   }
 
   const tags = ending.tags ?? [];
-  const statSnapshot = ending.statSnapshot ?? {};
   const keyRelationships = ending.keyRelationships ?? [];
   const majorEvents = ending.majorEvents ?? [];
 
@@ -115,11 +84,6 @@ function PublicEndingDetail({ ending }: { ending: Awaited<ReturnType<typeof load
           <div className="p-6">
             <div className="prose prose-sm max-w-none whitespace-pre-wrap text-sm leading-relaxed">
               {ending.longNarrative}
-            </div>
-
-            <div className="mt-6">
-              <h2 className="mb-3 text-sm font-black text-[#8a4f2d]">최종 능력치</h2>
-              <StatLabels statSnapshot={statSnapshot} />
             </div>
 
             <div className="mt-6 grid grid-cols-3 gap-3 border-t-2 border-[#f2efe7] pt-4 text-center text-sm">

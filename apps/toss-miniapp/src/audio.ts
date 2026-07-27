@@ -1,10 +1,12 @@
+import { generateHapticFeedback, type HapticFeedbackType } from "@apps-in-toss/web-framework";
+
 export type AudioSettings = {
   music: boolean;
   sfx: boolean;
   haptics: boolean;
 };
 
-type Cue = "tap" | "success" | "warning" | "ending";
+export type Cue = "tap" | "success" | "warning" | "ending";
 
 let bgm: HTMLAudioElement | null = null;
 let audioContext: AudioContext | null = null;
@@ -51,12 +53,27 @@ export function playCue(cue: Cue, enabled: boolean) {
   }
 }
 
-export function vibrate(enabled: boolean, pattern: number | number[] = 12) {
+export function vibrate(enabled: boolean, pattern: number | number[] = 12, cue: Cue = "tap") {
   if (!enabled) return;
+  const hapticTypes: Record<Cue, HapticFeedbackType> = {
+    tap: "tap",
+    success: "success",
+    warning: "error",
+    ending: "confetti",
+  };
+
+  const fallback = () => {
+    try {
+      navigator.vibrate?.(pattern);
+    } catch {
+      // Haptics are an optional enhancement.
+    }
+  };
+
   try {
-    navigator.vibrate?.(pattern);
+    void generateHapticFeedback({ type: hapticTypes[cue] }).catch(fallback);
   } catch {
-    // Haptics are an optional enhancement.
+    fallback();
   }
 }
 

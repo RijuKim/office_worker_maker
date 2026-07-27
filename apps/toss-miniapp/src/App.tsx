@@ -205,7 +205,7 @@ export function App() {
 
   const cue = useCallback((kind: "tap" | "success" | "warning" | "ending" = "tap") => {
     runOptional(() => playCue(kind, audioSettings.sfx));
-    runOptional(() => vibrate(audioSettings.haptics, kind === "warning" ? [16, 20, 16] : 12));
+    runOptional(() => vibrate(audioSettings.haptics, kind === "warning" ? [16, 20, 16] : 12, kind));
   }, [audioSettings.haptics, audioSettings.sfx]);
 
   const updateAudioSetting = useCallback((key: keyof AudioSettings, value: boolean) => {
@@ -366,6 +366,22 @@ export function App() {
     if (audioSettings.music) runOptional(() => startBgm(true));
     else runOptional(stopBgm);
   }, [audioSettings]);
+
+  useEffect(() => {
+    if (!audioSettings.music) return;
+
+    const unlockBgm = () => {
+      runOptional(() => startBgm(true));
+    };
+    window.addEventListener("pointerdown", unlockBgm, { once: true, capture: true });
+    window.addEventListener("touchstart", unlockBgm, { once: true, capture: true });
+    window.addEventListener("keydown", unlockBgm, { once: true, capture: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlockBgm, true);
+      window.removeEventListener("touchstart", unlockBgm, true);
+      window.removeEventListener("keydown", unlockBgm, true);
+    };
+  }, [audioSettings.music]);
 
   useEffect(() => {
     const onVisibilityChange = () => {

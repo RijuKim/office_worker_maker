@@ -233,16 +233,8 @@ const STAT_LABELS: Record<string, string> = {
   health: "건강",
   mental: "멘탈",
   wealth: "자산",
+  charm: "매력",
   reputation: "평판",
-};
-const STAT_ICONS: Record<string, string> = {
-  academic: "BK",
-  practical: "TL",
-  health: "HP",
-  mental: "MP",
-  wealth: "CO",
-  charm: "CH",
-  reputation: "RP",
 };
 
 export function SharedOnboardingFlow(props: SharedOnboardingFlowProps) {
@@ -304,7 +296,7 @@ export function SharedOnboardingFlow(props: SharedOnboardingFlowProps) {
       {props.step === "residence" && (
         <section className="create-step">
           <h2 className={productionWeb ? "create-question" : undefined}>당신은 어디에서 깨어났나요?</h2>
-          <div className={productionWeb ? "grid gap-2" : "residence-grid"}>
+          <div className={productionWeb ? "residence-options grid gap-2" : "residence-grid"}>
             {RESIDENCE_OPTIONS.map((option) => (
               <button
                 aria-pressed={props.residence === option.id}
@@ -328,15 +320,15 @@ export function SharedOnboardingFlow(props: SharedOnboardingFlowProps) {
       {props.step === "abilities" && (
         <section className="create-step">
           <h2 className={productionWeb ? "create-question" : undefined}>당신이 믿고 싶은 능력 두 가지는 무엇인가요? ({props.selectedStats.length}/2)</h2>
-          <div className={productionWeb ? "grid grid-cols-2 gap-2" : "chip-grid"}>
+          <div className={productionWeb ? "abilities-options grid grid-cols-2 gap-2" : "chip-grid"}>
             {PREFERRED_STATS.map((stat) => (
               <button aria-pressed={props.selectedStats.includes(stat)} className={productionWeb ? `pixel-button px-3 py-3 text-left text-sm ${props.selectedStats.includes(stat) ? "bg-[#ffe0a2]" : ""}` : props.selectedStats.includes(stat) ? "selected" : ""} key={stat} type="button" onClick={() => props.onToggleStat(stat)}>
-                {productionWeb && <span className="mr-2 text-xs text-[#8a4f2d]">{props.selectedStats.includes(stat) ? "●" : "○"} {STAT_ICONS[stat]}</span>}
+                {productionWeb && <span className="ability-choice-marker">{props.selectedStats.includes(stat) ? "●" : "○"}</span>}
                 <span className="font-bold">{STAT_LABELS[stat] ?? stat}</span>
               </button>
             ))}
           </div>
-          <p className={productionWeb ? "mt-2 text-xs text-[#706b62]" : "muted"}>선택한 두 능력은 첫 능력치에 조금 더 높게 반영됩니다.</p>
+          <p className={productionWeb ? "abilities-help text-xs text-[#706b62]" : "muted"}>선택한 두 능력은 첫 능력치에 조금 더 높게 반영됩니다.</p>
           <div className="onboarding-actions">
             <button onClick={() => props.onStepChange("residence")}>이전</button>
             <button disabled={props.loading || props.submitDisabled} onClick={props.onSubmit}>눈을 뜬다</button>

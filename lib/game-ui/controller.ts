@@ -38,6 +38,7 @@ export interface GameControllerApi {
   choose(characterId: string, choiceIndex: number): Promise<JsonApiResult<{
     result?: {
       stats?: Record<string, number>;
+      relationships?: { name: string; role: string; trust: number; tags?: string[] }[];
       statDelta?: Record<string, number>;
       relationshipDelta?: { name: string; trust: number }[];
       summary?: string;
@@ -181,7 +182,7 @@ function createDefaultGameApi(host: GameHost, credential: HostRequestCredential,
       return transport.requestJson<{ character?: CharacterData; currentEvent?: EventData; error?: string }>(`/api/characters/${id}`);
     },
     choose(characterId: string, choiceIndex: number) {
-      return transport.requestJson<{ result?: { stats?: Record<string, number>; statDelta?: Record<string, number>; relationshipDelta?: { name: string; trust: number }[]; summary?: string; endingTriggered?: boolean; endingRecordId?: string }; error?: string }>(`/api/characters/${characterId}/choices`, {
+      return transport.requestJson<{ result?: { stats?: Record<string, number>; relationships?: { name: string; role: string; trust: number; tags?: string[] }[]; statDelta?: Record<string, number>; relationshipDelta?: { name: string; trust: number }[]; summary?: string; endingTriggered?: boolean; endingRecordId?: string }; error?: string }>(`/api/characters/${characterId}/choices`, {
         method: "POST",
         body: { choiceIndex },
       });
@@ -362,7 +363,7 @@ export function createGameController(options: GameControllerOptions): GameContro
     const choiceResult = result.data.result;
     if (choiceResult?.stats) {
       update({
-        currentRun: snapshot.currentRun ? { ...snapshot.currentRun, stats: choiceResult.stats } : snapshot.currentRun,
+        currentRun: snapshot.currentRun ? { ...snapshot.currentRun, stats: choiceResult.stats, ...(choiceResult.relationships ? { relationships: choiceResult.relationships.map((rel) => ({ ...rel, tags: rel.tags ?? [] })) } : {}) } : snapshot.currentRun,
       });
     }
 

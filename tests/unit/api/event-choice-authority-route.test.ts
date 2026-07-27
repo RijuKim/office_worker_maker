@@ -218,6 +218,29 @@ describe("choice event authority", () => {
     expect(mocks.eventUpdate).not.toHaveBeenCalled();
   });
 
+  it("keeps internal career gate scores out of the player-facing result summary", async () => {
+    const gateEvent = activeEvent("career-gate", "첫 지원 절차");
+    gateEvent.choices[0] = {
+      ...gateEvent.choices[0],
+      summary: "당신은 지원서를 직무에 맞게 다듬어 제출했다.",
+      flagDelta: {
+        authoritativeChoice: true,
+        careerGateAttempt: { path: "general_job", approach: "tailored" },
+      } as Record<string, unknown> & { authoritativeChoice: boolean },
+    };
+    mocks.characterFindFirst.mockResolvedValue(character([gateEvent], gateEvent.id));
+
+    const response = await choose(request(), { params: Promise.resolve({ id: "run-1" }) });
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.result.summary).toContain("판정 결과: 첫 지원 절차 통과.");
+    expect(payload.result.summary).not.toMatch(/\(\d+\/\d+\)/);
+    expect(mocks.historyCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ summary: expect.not.stringMatching(/\(\d+\/\d+\)/) }),
+    });
+  });
+
   it("rejects a stale choice after another transaction advances the pointer without applying duplicate effects", async () => {
     const oldEvent = activeEvent("old-event", "먼저 소비된 사건");
     const state = {

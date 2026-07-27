@@ -777,10 +777,7 @@ function getDestinationNameForCareerGate(path: string) {
 function appendCareerGateOutcomeSummary(summary: string, flagDelta: Record<string, unknown>) {
   const gate = readRecord(flagDelta.careerGate);
   if (!gate || typeof gate.label !== "string" || typeof gate.status !== "string") return summary;
-  const score = typeof gate.score === "number" && typeof gate.threshold === "number"
-    ? ` (${gate.score}/${gate.threshold})`
-    : "";
-  return `${summary} 판정 결과: ${gate.label}${score}.`;
+  return `${summary} 판정 결과: ${gate.label}.`;
 }
 
 function buildStoryFlagDelta(input: {

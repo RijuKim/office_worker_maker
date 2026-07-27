@@ -44,25 +44,25 @@ describe("AI event diagnostics", () => {
   });
 
   it.each([
-    [undefined, 2_000],
-    ["abc", 2_000],
-    ["399", 2_000],
+    [undefined, 1_400],
+    ["abc", 1_400],
+    ["399", 1_400],
     ["400", 400],
     ["1800", 1_800],
     ["4000", 4_000],
-    ["4001", 2_000],
+    ["4001", 1_400],
   ])("parses max tokens %s as %i", (raw, expected) => {
     expect(getOpenRouterMaxTokens(raw)).toBe(expected);
   });
 
   it.each([
-    [undefined, 2_600],
-    ["abc", 2_600],
-    ["399", 2_600],
+    [undefined, 1_600],
+    ["abc", 1_600],
+    ["399", 1_600],
     ["1600", 1_600],
     ["2600", 2_600],
     ["4000", 4_000],
-    ["4001", 2_600],
+    ["4001", 1_600],
   ])("parses Ollama event token budget %s as %i", (raw, expected) => {
     expect(getOllamaEventMaxTokens(raw)).toBe(expected);
   });

@@ -42,6 +42,8 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: "Courier New", "DungGeunMo", "Apple SD Gothic Neo", "Noto Sans KR", monospace;
+  font-size: 17px;
+  line-height: 1.6;
   letter-spacing: 0;
   overscroll-behavior-y: none;
 }
@@ -129,8 +131,17 @@ button {
 }
 
 .novel-text {
+  font-size: 17px;
   word-break: keep-all;
-  line-height: 1.9;
+  line-height: 2.05;
+}
+
+.novel-text p {
+  margin: 0;
+}
+
+.novel-text p + p {
+  margin-top: 18px;
 }
 
 .new-scene-text {

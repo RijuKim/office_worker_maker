@@ -426,7 +426,7 @@ export function PlaySurface({
                   <h2 className="text-xl font-black leading-tight text-[#2a241e]">{currentEvent.title}</h2>
                 </div>
                 <div className={`novel-text text-lg tracking-normal max-[900px]:text-[16px] ${currentEvent.source === "AI" ? "new-scene-text" : ""}`}>
-                  {currentEvent.body.split("\n").map((paragraph, index) => (
+                  {currentEvent.body.split(/\n\s*\n|\n/).map((paragraph) => paragraph.trim()).filter(Boolean).map((paragraph, index) => (
                     <p className="mt-3 first:mt-0" key={index}>{paragraph}</p>
                   ))}
                 </div>

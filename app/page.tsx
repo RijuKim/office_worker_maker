@@ -122,6 +122,9 @@ function formatWealth(value: number) {
 }
 
 function relationshipState(trust: number) {
+  // TODO(relationship-status-ui): Render the persisted relationship status
+  // (dating/friend/ex) as a badge. Keep the current relationship UI unchanged
+  // until the dedicated relationship-screen update.
   if (trust >= 80) return "연애";
   if (trust >= 45) return "호감";
   if (trust >= 10) return "우호";
@@ -1075,7 +1078,7 @@ export default function AppPage() {
                 <PixelScene scene="intro" label="오전 6시 07분의 밝은 새벽 방 픽셀아트" />
               </div>
               <h2 className="create-question mt-5">낯선 아침이 시작됩니다.</h2>
-              <div className="space-y-3 text-[15px] leading-7 text-[#2a2018]">
+              <div className="create-copy space-y-3 text-[15px] leading-7 text-[#2a2018]">
                 <p>눈을 뜨니 오전 6시 07분입니다. 휴대폰에는 읽지 않은 카톡 알림이 수북하게 쌓여 있습니다.</p>
                 <p>학과 단체방 공지, 새로 올라온 동아리 모집 글, 아르바이트 연락, 그리고 아직 열어보지 않은 메시지 하나가 화면 위에 겹쳐 있습니다. 마지막 메시지에는 짧은 문장만 남아 있습니다. “이번에는 어떤 사람이 될 수 있을까요?”</p>
                 <p>오늘은 평범한 학기의 첫날일 수도, 오래 미뤄둔 변화를 시작하는 날일 수도 있습니다. 지금 고르는 작은 선택들은 수업과 관계, 생활과 진로를 조금씩 다른 방향으로 이끌게 될 것입니다.</p>
@@ -1090,7 +1093,7 @@ export default function AppPage() {
             </section>}
             {createStep === "age" && <section className="create-step">
               <h2 className="create-question">당신의 나이는 몇 살인가요?</h2>
-              <select aria-label="당신의 나이는 몇 살인가요?" className="pixel-input w-full px-4 py-3 text-sm" value={charAge} onChange={(event) => setCharAge(event.target.value)}>{Array.from({ length: 63 }, (_, index) => index + 18).map((age) => <option key={age} value={age}>{age}세</option>)}</select>
+              <input aria-label="당신의 나이는 몇 살인가요?" className="pixel-input w-full px-4 py-3 text-sm" inputMode="numeric" pattern="[0-9]*" step="1" type="number" value={charAge} onChange={(event) => setCharAge(event.target.value.replace(/\D/g, ""))} />
               <div className="onboarding-actions"><button onClick={() => setCreateStep("name")} type="button">이전</button><button onClick={() => setCreateStep("residence")} type="button">다음</button></div>
             </section>}
             {createStep === "residence" && <section className="create-step">

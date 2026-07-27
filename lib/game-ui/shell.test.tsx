@@ -89,9 +89,9 @@ describe("shared game shell", () => {
     act(() => setStep("abilities"));
 
     expect(container.textContent).toContain("(0/2)");
-    expect(container.textContent).toContain("○ BK");
-    expect(container.textContent).toContain("○ RP");
-    expect(container.textContent).not.toContain("○ AC");
+    expect(container.textContent).toContain("○학업");
+    expect(container.textContent).toContain("○매력");
+    expect(container.textContent).not.toContain("charm");
     expect(container.querySelector('button[disabled]')?.textContent).toBe("눈을 뜬다");
 
     click(container, "학업");

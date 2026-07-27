@@ -66,10 +66,10 @@ const MIN_AI_TIMEOUT_MS = 5_000;
 const MAX_AI_TIMEOUT_MS = 120_000;
 export const SLOW_AI_GENERATION_MS = 10_000;
 
-const DEFAULT_AI_MAX_TOKENS = 2_000;
+const DEFAULT_AI_MAX_TOKENS = 1_400;
 const MIN_AI_MAX_TOKENS = 400;
 const MAX_AI_MAX_TOKENS = 4_000;
-const DEFAULT_OLLAMA_EVENT_TOKENS = 2_600;
+const DEFAULT_OLLAMA_EVENT_TOKENS = 1_600;
 
 export function getOpenRouterTimeoutMs(raw = process.env.OPENROUTER_TIMEOUT_MS): number {
   if (raw === undefined || !/^\d+$/.test(raw.trim())) return DEFAULT_AI_TIMEOUT_MS;
@@ -156,13 +156,15 @@ const allowedStats = ["academic", "practical", "health", "mental", "wealth", "re
 
 const SYSTEM_PROMPT = `You are a Korean college-life text-adventure writer.
 
-Return ONLY valid JSON in a single JSON object with "title", "body", "tags", and "choices". "choices" must contain 2-4 complete objects, and each choice must include "id", "label", "summary", "statDelta", and "relationshipDelta". Keep the event in Korean, in "당신은" voice, with 2-3 paragraphs and 6-10 sentences. Make it one small incident inside the larger story arc.
+Return ONLY valid JSON in a single JSON object with "title", "body", "tags", and "choices". "choices" must contain 2-4 complete objects, and each choice must include "id", "label", "summary", "statDelta", and "relationshipDelta". Keep the event in Korean, in "당신은" voice. Write 2-3 short paragraphs with a blank line between paragraphs, splitting naturally when the scene, action, or reaction changes. Use 4-7 sentences total and roughly 350-650 Korean characters for the body; even a short event must not be one unbroken paragraph. Make it one small incident inside the larger story arc. Prefer concrete action and dialogue over repeated explanation.
 
 Keep continuity with recent choices, relationships, open threads, and stats. Avoid repeating closed proposals or stale scenes. Use only the public stats in statDelta, keep health and mental decreases at -1 or above, and make at least one choice clearly risky with a downside. Choice labels should be natural actions. Summaries must start with "당신은".
 
 Stats and relationship trust values in the context are INTERNAL STATE ONLY. Never reveal, quote, or paraphrase an exact stat/trust score, signed change, percentage, or threshold in the title, body, tags, choice labels, or summaries. In particular, never write phrases such as "동규와의 신뢰가 -5%", "신뢰 20", or "호감도 +10". Express relationships only through observable behavior and qualitative atmosphere, such as "동규가 아직 거리를 둔다".
 
 relationshipDelta may include status only for an explicit relationship transition. Set status="dating" only when both people explicitly agree to date after a confession or equivalent conversation; never infer dating from high trust or ordinary affection. Use status="ex" only after an explicit breakup. Otherwise omit status.
+
+Relationship continuity is persistent game state, not optional flavor text. When a named person is an active participant in the scene, every choice that changes, deepens, maintains, or strains that interaction must include that exact person's name in relationshipDelta with a small, directionally appropriate trust change. This also applies to ordinary time spent together, cooperation, conversation, and emotional support—not only dramatic romance or conflict. If the event introduces a recurring named person, at least one plausible choice must create that relationship. Do not leave relationshipDelta empty for every choice in a person-centered event.
 
 The scene can come from college, work, family, romance, clubs, career prep, exams, overseas plans, hobbies, or other daily life. Treat the protagonist as a woman by default, avoid male-coded address, and use fictional/parody names only.
 
