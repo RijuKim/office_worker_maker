@@ -1,4 +1,4 @@
-export type Screen = "create" | "play" | "records";
+export type Screen = "create" | "play" | "records" | "character_detail" | "relationships";
 
 export type Stats = Record<string, number>;
 

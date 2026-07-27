@@ -1,11 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { api } from "./api";
 import { playCue, startBgm, stopBgm, vibrate, type AudioSettings } from "./audio";
 import { getTossAnonymousKey } from "./toss-auth";
-import { PlaySurface } from "@/lib/game-ui/App";
-import { SharedGameChrome, SharedOnboardingFlow } from "../../../lib/game-ui/shell";
+import { CharacterSheet, PlaySurface, RelationshipsSheet } from "@/lib/game-ui/App";
+import { SharedGameChrome, SharedGameWorkspace, SharedOnboardingFlow } from "../../../lib/game-ui/shell";
 import { RecordCardShell, RecordShareActions, copyEndingShareLink } from "@/lib/game-ui/App";
+import { CodexDetailModal } from "@/app/components/codex/CodexDetailModal";
+import { CODEX_CATALOG, CATEGORY_ORDER, type CodexSlot } from "@/lib/game/codex-catalog";
+import { deriveCodexState } from "@/lib/game/derive-codex-state";
+import { EndingArt } from "@/lib/game/ending-art";
+import type { CareerEndingRecord } from "@prisma/client";
 import { createTossEndingShareLink } from "./toss-host";
 import type { CareerRecord, CharacterData, ChoiceFeedback, EventData, Screen } from "./types";
 
@@ -64,6 +69,11 @@ function statDeltaText(delta: Record<string, number>) {
   return entries.map(([key, value]) => `${statLabels[key] ?? key} ${value > 0 ? "+" : ""}${value}`).join(" · ");
 }
 
+function recordText(record: CareerRecord, key: string, fallback = "") {
+  const value = record[key];
+  return typeof value === "string" || typeof value === "number" ? String(value) : fallback;
+}
+
 export function App() {
   const [screen, setScreen] = useState<Screen>("create");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -76,12 +86,25 @@ export function App() {
   const [currentEvent, setCurrentEvent] = useState<EventData | null>(null);
   const [feedback, setFeedback] = useState<ChoiceFeedback | null>(null);
   const [records, setRecords] = useState<CareerRecord[]>([]);
+  const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
+  const [recordsTab, setRecordsTab] = useState<"records" | "codex">("records");
+  const [selectedCodexSlot, setSelectedCodexSlot] = useState<CodexSlot | null>(null);
   const [createStep, setCreateStep] = useState<CreateStep>("intro");
   const [name, setName] = useState("");
   const [age, setAge] = useState(22);
   const [residence, setResidence] = useState("");
   const [selectedStats, setSelectedStats] = useState<string[]>([]);
   const audioReady = true;
+  const codexState = useMemo(
+    () => deriveCodexState(records as unknown as CareerEndingRecord[], CODEX_CATALOG),
+    [records],
+  );
+  const selectedCodexState = selectedCodexSlot
+    ? codexState.slots.find((item) => item.slot.id === selectedCodexSlot.id) ?? null
+    : null;
+  const selectedCodexRecord = selectedCodexSlot
+    ? records.find((record) => selectedCodexSlot.matches(record as unknown as CareerEndingRecord)) ?? null
+    : null;
 
   const startNewSimulation = useCallback(() => {
     setLoading(false);
@@ -189,7 +212,9 @@ export function App() {
         summary: result.data.result?.summary ?? "",
       });
       if (result.data.result?.stats) {
-        setCurrentCharacter((character) => character ? { ...character, stats: result.data.result!.stats! } : character);
+        setCurrentCharacter((character) => character ? { ...character, stats: result.data.result!.stats!, ...(result.data.result?.relationships ? { relationships: result.data.result.relationships.map((rel) => ({ ...rel, tags: rel.tags ?? [] })) } : {}) } : character);
+      } else if (result.data.result?.relationships) {
+        setCurrentCharacter((character) => character ? { ...character, relationships: result.data.result!.relationships!.map((rel) => ({ ...rel, tags: rel.tags ?? [] })) } : character);
       }
       if (result.data.result?.endingTriggered) {
         setCurrentEvent(null);
@@ -293,7 +318,7 @@ export function App() {
   }, [refreshCharacters]);
 
   return (
-    <main className="app-shell toss-production-app">
+    <main className="app-shell">
       <SharedGameChrome
         variant="web"
         menuOpen={menuOpen}
@@ -337,39 +362,143 @@ export function App() {
       )}
 
       {screen === "play" && (
-        <PlaySurface
-          variant="web"
-          currentCharacter={currentCharacter}
-          currentEvent={currentEvent}
-          feedback={feedback}
-          loading={loading || generatingNextEvent}
-          onChoose={(choiceIndex) => void choose(choiceIndex)}
-          onContinueToNextEvent={currentCharacter ? () => void api.nextEvent(currentCharacter.id).then(() => openCharacter(currentCharacter)) : undefined}
-        />
+        <SharedGameWorkspace
+          mode="web"
+          character={currentCharacter}
+          activeTab="play"
+          onTabChange={(tab) => setScreen(tab === "play" ? "play" : tab === "character" ? "character_detail" : "relationships")}
+          onOpenRecords={() => void loadRecords()}
+          rightContent={null}
+        >
+          <PlaySurface
+            variant="web"
+            currentCharacter={currentCharacter}
+            currentEvent={currentEvent}
+            feedback={feedback}
+            loading={loading || generatingNextEvent}
+            onChoose={(choiceIndex) => void choose(choiceIndex)}
+            onContinueToNextEvent={currentCharacter ? () => {
+              setGeneratingNextEvent(true);
+              void api.nextEvent(currentCharacter.id).then((next) => {
+                if (next.ok && next.data.event) setCurrentEvent(next.data.event);
+                else void openCharacter(currentCharacter);
+              }).finally(() => setGeneratingNextEvent(false));
+            } : undefined}
+          />
+        </SharedGameWorkspace>
+      )}
+
+      {screen === "character_detail" && currentCharacter && (
+        <SharedGameWorkspace
+          mode="web"
+          character={currentCharacter}
+          activeTab="character"
+          onTabChange={(tab) => setScreen(tab === "play" ? "play" : tab === "character" ? "character_detail" : "relationships")}
+          onOpenRecords={() => void loadRecords()}
+          rightContent={null}
+        >
+          <CharacterSheet character={currentCharacter} />
+        </SharedGameWorkspace>
+      )}
+
+      {screen === "relationships" && currentCharacter && (
+        <SharedGameWorkspace
+          mode="web"
+          character={currentCharacter}
+          activeTab="relationships"
+          onTabChange={(tab) => setScreen(tab === "play" ? "play" : tab === "character" ? "character_detail" : "relationships")}
+          onOpenRecords={() => void loadRecords()}
+          rightContent={null}
+        >
+          <RelationshipsSheet character={currentCharacter} />
+        </SharedGameWorkspace>
       )}
 
       {screen === "records" && (
         <section className="screen-stack">
+          <div className="record-hero">
+            <p className="record-kicker">ARCHIVE</p>
+            <h2>선택의 결과 기록</h2>
+            <p>가상 취준 생활이 남긴 직업, 관계, 생활의 스냅샷</p>
+          </div>
           <div className="action-grid">
             <button className="secondary-button" type="button" onClick={() => void loadRecords()}>새로고침</button>
-          <button className="secondary-button" type="button" onClick={() => setScreen(currentCharacter ? "play" : "create")}>진행으로</button>
+            <button className="secondary-button" type="button" onClick={() => setScreen(currentCharacter ? "play" : "create")}>진행으로</button>
           </div>
-          {records.length === 0 && <div className="list-panel"><p className="muted">아직 남겨진 기록이 없습니다.</p></div>}
-          {records.map((record) => (
+          <div className="toss-record-tabs" role="tablist">
+            <button className={recordsTab === "records" ? "active" : ""} type="button" role="tab" aria-selected={recordsTab === "records"} onClick={() => setRecordsTab("records")}>지난 루트</button>
+            <button className={recordsTab === "codex" ? "active" : ""} type="button" role="tab" aria-selected={recordsTab === "codex"} onClick={() => setRecordsTab("codex")}>결말 모음</button>
+          </div>
+          {recordsTab === "records" && records.length === 0 && <div className="list-panel"><p className="muted">아직 남겨진 기록이 없습니다.</p></div>}
+          {recordsTab === "records" && records.map((record) => {
+            const isExpanded = expandedRecord === record.id;
+            const narrative = recordText(record, "longNarrative");
+            const preview = narrative.length > 150 ? `${narrative.slice(0, 150)}...` : narrative;
+            const careerPath = recordText(record, "careerPath", "진로 기록");
+            const healthState = recordText(record, "healthState", "생활 상태");
+            const relationshipState = recordText(record, "relationshipState", "관계의 여운");
+            return (
             <RecordCardShell
               className="record-panel overflow-hidden p-0"
-              expanded
+              expanded={isExpanded}
               id={record.id}
               key={record.id}
+              onToggle={() => setExpandedRecord(isExpanded ? null : record.id)}
+              preview={preview}
               summary={record.summary ?? ""}
               title={record.title ?? record.destination ?? "선택의 결과"}
             >
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                <span>{record.satisfaction ? `만족도 ${record.satisfaction}` : record.createdAt?.slice(0, 10)}</span>
-                <RecordShareActions onCopyLink={shareRecord} recordId={record.id} wrapperClassName="flex flex-wrap gap-2 border-t-0 p-0" />
+              <div className="border-t-4 border-[#2a2018] bg-[#fffaf0] p-5">
+                {narrative && <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#2a241e]">{narrative}</p>}
+                <div className="mt-4 grid grid-cols-3 gap-2 border-t-2 border-[#f2efe7] pt-4 text-center text-sm">
+                  <div><span className="block text-xs text-[#706b62]">만족도</span><strong>{recordText(record, "satisfaction", "-")}</strong></div>
+                  <div><span className="block text-xs text-[#706b62]">성장 가능성</span><strong>{recordText(record, "growthPotential", "-")}</strong></div>
+                  <div><span className="block text-xs text-[#706b62]">워라밸</span><strong>{recordText(record, "workLifeBalance", "-")}</strong></div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span className="record-chip">{careerPath}</span>
+                  <span className="record-chip">{healthState}</span>
+                  <span className="record-chip">관계: {relationshipState}</span>
+                </div>
+                <RecordShareActions onCopyLink={shareRecord} recordId={record.id} wrapperClassName="mt-3 flex flex-wrap gap-2" />
               </div>
             </RecordCardShell>
-          ))}
+            );
+          })}
+          {recordsTab === "codex" && (
+            <div className="toss-codex">
+              <h3 className="toss-codex-count">{codexState.unlockedCount} / {codexState.totalSlots} 달성</h3>
+              {CATEGORY_ORDER.map((category) => {
+                const categoryState = codexState.byCategory[category];
+                if (!categoryState) return null;
+                return (
+                  <section className="toss-codex-category" key={category}>
+                    <div className="toss-codex-category-title"><h4>{category}</h4><span>({categoryState.unlocked}/{categoryState.total})</span></div>
+                    <div className="toss-codex-grid">
+                      {codexState.slots.filter((item) => item.slot.category === category).map((item) => (
+                        <button className="toss-codex-card" type="button" key={item.slot.id} onClick={() => setSelectedCodexSlot(item.slot)}>
+                          <span className={`toss-codex-art ${item.unlocked ? "unlocked" : "locked"}`}><EndingArt type={item.slot.endingArtType} size={42} locked={!item.unlocked} /></span>
+                          <strong>{item.unlocked ? item.slot.title : "???"}</strong>
+                          <small>{item.unlocked ? `${item.achievementCount}회 달성` : item.slot.categoryHint}</small>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+              {selectedCodexSlot && selectedCodexState && (
+                <CodexDetailModal
+                  achievementCount={selectedCodexState.achievementCount}
+                  firstAchievedAt={selectedCodexState.firstAchievedAt}
+                  isOpen
+                  onClose={() => setSelectedCodexSlot(null)}
+                  recordSample={selectedCodexRecord as unknown as CareerEndingRecord | null}
+                  slot={selectedCodexSlot}
+                  unlocked={selectedCodexState.unlocked}
+                />
+              )}
+            </div>
+          )}
         </section>
       )}
     </main>

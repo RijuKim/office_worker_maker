@@ -9,145 +9,118 @@ html,
 body,
 #root {
   min-height: 100%;
-  margin: 0;
 }
 
 body {
-  background: #17263f;
-  color: #2a241e;
-  font-family: "Courier New", "DungGeunMo", "Apple SD Gothic Neo", "Noto Sans KR", monospace;
+  padding:
+    max(0px, var(--safe-area-top))
+    max(0px, var(--safe-area-right))
+    max(22px, var(--safe-area-bottom))
+    max(0px, var(--safe-area-left));
 }
 
-.toss-production-app {
-  min-height: 100dvh;
-  padding: max(0px, var(--safe-area-top)) max(0px, var(--safe-area-right)) max(22px, var(--safe-area-bottom)) max(0px, var(--safe-area-left));
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(180deg, #17263f 0%, #243754 46%, #18243a 100%);
-  background-size: 18px 18px;
-}
-
-/* The Toss bundle must use the same production pixel palette as the web app. */
-.toss-production-app .onboarding-panel-web {
-  border: 3px solid #2a2018;
-  border-radius: 6px;
-  background: #fff8e8;
-  box-shadow: 8px 8px 0 #0d0b09;
-  color: #2a241e;
-}
-
-.toss-production-app .onboarding-panel-web .create-copy,
-.toss-production-app .onboarding-panel-web .create-copy p {
-  color: #2a2018;
-}
-
-.toss-production-app .onboarding-panel-web .create-copy .disclaimer {
-  color: #706b62;
-}
-
-.toss-production-app .onboarding-panel-web .create-question {
-  color: #2a2018;
-}
-
-.toss-production-app .onboarding-panel-web .pixel-button-dark {
-  border-color: #2a2018;
-  background: #2a2018;
-  color: #fff8e8;
-}
-
-/* Match the production web chrome: navy grid, cream title, pixel hamburger. */
-.toss-production-app > .app-title-header {
-  position: relative;
-  z-index: 80;
-  display: flex;
-  width: min(560px, calc(100% - 32px));
-  margin: max(18px, var(--safe-area-top)) auto 18px;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: #fff3d7;
-}
-
-.toss-production-app > .app-title-header .title-row {
-  width: 100%;
-}
-
-.toss-production-app > .app-title-header .app-title {
-  color: #fff3d7;
-  font-size: 24px;
-  font-weight: 900;
-  line-height: 1.15;
-}
-
-.toss-production-app > .app-title-header .chrome-icon-button {
+.toss-record-tabs {
   display: grid;
-  flex: 0 0 44px;
-  width: 44px;
-  height: 44px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 18px 0;
+  border-bottom: 3px solid #2a2018;
+}
+
+.toss-record-tabs button {
+  border: 0;
+  border-bottom: 4px solid transparent;
+  padding: 10px;
+  background: transparent;
+  color: #706b62;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.toss-record-tabs button.active {
+  border-bottom-color: #2a2018;
+  color: #2a2018;
+}
+
+.toss-codex-count {
+  margin: 20px 0;
+  color: #2a241e;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.toss-codex-category {
+  margin: 26px 0;
+}
+
+.toss-codex-category-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  border-bottom: 3px solid #2a2018;
+  padding-bottom: 8px;
+}
+
+.toss-codex-category-title h4 {
+  margin: 0;
+  color: #2a241e;
+  font-size: 17px;
+}
+
+.toss-codex-category-title span {
+  color: #8a4f2d;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.toss-codex-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.toss-codex-card {
+  display: flex;
+  min-height: 142px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 3px solid #2a2018;
+  background: #fffaf0;
+  padding: 12px 8px;
+  color: #2a241e;
+  text-align: center;
+  box-shadow: 4px 4px 0 #2a2018;
+}
+
+.toss-codex-card:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 #2a2018;
+}
+
+.toss-codex-card strong {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.toss-codex-card small {
+  color: #706b62;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.toss-codex-art {
+  display: grid;
+  width: 42px;
+  height: 42px;
   place-items: center;
   border: 3px solid #2a2018;
-  border-radius: 0;
-  padding: 0;
-  background: #fff8e8;
-  box-shadow: 4px 4px 0 #2a2018;
-  color: #2a2018;
 }
 
-.toss-production-app > .app-title-header .chrome-menu-button {
-  gap: 4px;
-}
+.toss-codex-art.unlocked { background: #f7d08b; }
+.toss-codex-art.locked { background: #ded9ce; }
 
-.toss-production-app > .app-title-header .chrome-menu-button span {
-  display: block;
-  width: 18px;
-  height: 3px;
-  background: #2a2018;
-}
-
-.toss-production-app > .app-title-header .chrome-menu-button .visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-
-.toss-production-app > .app-title-header .status-row {
-  display: none;
-}
-
-.toss-production-app > .app-title-header .app-menu-popover {
-  position: absolute;
-  top: 52px;
-  right: 0;
-  z-index: 81;
-  width: min(260px, calc(100vw - 24px));
-  border: 3px solid #2a2018;
-  border-radius: 0;
-  background: #fff8e8;
-  box-shadow: 6px 6px 0 #2a2018;
-}
-
-.toss-production-app > .app-title-header .app-menu-popover button,
-.toss-production-app > .app-title-header .app-menu-popover .menu-row {
-  border: 0;
-  border-bottom: 2px solid #eadfce;
-  border-radius: 0;
-  background: transparent;
-  color: #2a241e;
-}
-
-.toss-production-app > .screen-stack,
-.toss-production-app > .error-banner {
-  width: min(calc(100% - 24px), 720px);
-}
-
-.toss-production-app > .hero-panel {
-  width: min(calc(100% - 24px), 720px);
-  margin-inline: auto;
+@media (max-width: 360px) {
+  .toss-codex-grid { grid-template-columns: 1fr; }
 }

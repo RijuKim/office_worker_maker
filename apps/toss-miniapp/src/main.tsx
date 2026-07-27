@@ -3,7 +3,10 @@ import { useLayoutEffect } from "react";
 import { createRoot } from "react-dom/client";
 
 import { App } from "./App";
-import "../../../lib/game-ui/styles.css";
+// Load the exact same global/Tailwind stylesheet as the production Next app.
+// The Toss bundle uses a responsive wrapper, but its visual tokens and utility
+// classes must come from the same source as Vercel.
+import "../../../app/globals.css";
 import "./theme.css";
 import { createTossSafeAreaPort } from "./toss-host";
 
