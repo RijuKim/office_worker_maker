@@ -664,13 +664,112 @@ body {
   line-height: 1.55;
 }
 
-/* Gameplay needs native controls, but onboarding inherits Production's exact
-   pixel typography and spacing from app/globals.css. */
+/* Vite does not emit Next's arbitrary Tailwind utilities, so preserve the
+   Production onboarding layout explicitly in the Toss bundle. */
+.app-screen {
+  display: flex;
+  min-height: 100vh;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 16px 16px max(16px, var(--safe-area-bottom));
+}
+
+.app-screen > .w-full {
+  width: 100%;
+  max-width: 560px;
+}
+
+.app-screen .create-panel {
+  padding: 24px;
+}
+
 .shared-game-workspace,
 .shared-game-workspace button,
 .shared-game-workspace input,
 .shared-game-workspace select {
   font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+}
+
+.app-screen .create-hero-art {
+  overflow: hidden;
+  border: 4px solid #2a2018;
+}
+
+.app-screen .create-hero-art .pixel-scene {
+  width: 100%;
+  max-width: 100%;
+}
+
+.app-screen .create-step {
+  gap: 0;
+}
+
+.app-screen .create-question {
+  margin: 20px 0 22px;
+  color: #2a2018;
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1.35;
+  word-break: keep-all;
+}
+
+.app-screen .create-copy {
+  color: #2a2018;
+  font-size: 15px;
+  line-height: 1.75;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.app-screen .create-copy p {
+  margin: 0;
+}
+
+.app-screen .create-copy p + p {
+  margin-top: 12px;
+}
+
+.app-screen .pixel-input {
+  display: block;
+  width: 100%;
+  min-height: 52px;
+  padding: 13px 14px;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.app-screen .pixel-button,
+.app-screen .pixel-button-dark {
+  min-height: 52px;
+  padding: 12px 14px;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.app-screen .onboarding-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.app-screen .onboarding-actions button {
+  min-height: 52px;
+  padding: 12px;
+}
+
+.app-screen .create-step > div.grid {
+  display: grid;
+  gap: 10px;
+}
+
+.app-screen .create-step > div.grid.grid-cols-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.app-screen .create-step > div.grid > .pixel-button {
+  width: 100%;
+  min-height: 58px;
 }
 
 @media (max-width: 720px) {

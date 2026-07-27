@@ -253,7 +253,7 @@ export function SharedOnboardingFlow(props: SharedOnboardingFlowProps) {
     <section className={productionWeb ? "pixel-panel create-panel p-6" : "screen-stack onboarding-panel"}>
       {props.step === "intro" && (
         <section className="create-step" data-testid="onboarding-intro">
-          <div className={productionWeb ? "create-hero-art intro-dawn-art overflow-hidden border-4 border-[#2a2018]" : "create-hero-art intro-dawn-art"} data-testid="intro-dawn-art">
+          <div className={productionWeb ? "create-hero-art overflow-hidden border-4 border-[#2a2018]" : "create-hero-art intro-dawn-art"} data-testid="intro-dawn-art">
             <PixelScene scene="intro" label="오전 6시 07분의 밝은 새벽 방 픽셀아트" />
           </div>
           <h2 className={productionWeb ? "create-question mt-5" : "create-question"}>낯선 아침이 시작됩니다.</h2>
@@ -336,7 +336,7 @@ export function SharedOnboardingFlow(props: SharedOnboardingFlowProps) {
               </button>
             ))}
           </div>
-          <p className="muted">선택한 두 능력은 첫 능력치에 조금 더 높게 반영됩니다.</p>
+          <p className={productionWeb ? "mt-2 text-xs text-[#706b62]" : "muted"}>선택한 두 능력은 첫 능력치에 조금 더 높게 반영됩니다.</p>
           <div className="onboarding-actions">
             <button onClick={() => props.onStepChange("residence")}>이전</button>
             <button disabled={props.loading || props.submitDisabled} onClick={props.onSubmit}>눈을 뜬다</button>
