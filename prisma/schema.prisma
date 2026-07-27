@@ -138,6 +138,7 @@ model Relationship {
   name           String
   role           String
   trust          Int
+  status         String       @default("acquaintance")
   tags           Json         @default("[]")
   createdAt      DateTime     @default(now())
   characterRun   CharacterRun @relation(fields: [characterRunId], references: [id], onDelete: Cascade)

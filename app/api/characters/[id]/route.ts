@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { serializeCharacterRun } from "@/lib/game/character-foundation";
+import { resolveCurrentEvent } from "@/lib/server/current-event";
 import { prisma } from "@/lib/server/prisma";
 import { requireCurrentUserId } from "@/lib/server/session";
 import { logger } from "@/lib/server/logger";
@@ -29,6 +30,7 @@ export async function GET(request: Request | NextRequest, context: RouteContext)
       },
       events: {
         where: { status: "ACTIVE" },
+        orderBy: { createdAt: "desc" },
       },
       eventHistory: {
         orderBy: { createdAt: "desc" },
@@ -46,9 +48,31 @@ export async function GET(request: Request | NextRequest, context: RouteContext)
     return NextResponse.json({ error: "캐릭터를 찾을 수 없습니다." }, { status: 404 });
   }
 
-  const currentEvent = character.events.find(
-    (event: { id: string }) => event.id === character.currentEventId,
-  ) ?? null;
+  const currentEvent = resolveCurrentEvent(character.events, character.currentEventId);
+
+  if (currentEvent && currentEvent.id !== character.currentEventId) {
+    try {
+      await prisma.characterRun.updateMany({
+        where: { id, userId },
+        data: { currentEventId: currentEvent.id },
+      });
+      log.info("활성 사건 포인터 자동 복구", {
+        userId,
+        characterId: id,
+        previousEventId: character.currentEventId,
+        restoredEventId: currentEvent.id,
+      });
+    } catch (error) {
+      // Return the recovered event even if pointer repair fails. The user can
+      // continue immediately and a later resume can retry the repair.
+      log.warn("활성 사건 포인터 복구 실패", {
+        userId,
+        characterId: id,
+        restoredEventId: currentEvent.id,
+        error: String(error),
+      });
+    }
+  }
 
   return NextResponse.json({
     character: serializeCharacterRun({ ...character, events: currentEvent ? [currentEvent] : [] }),

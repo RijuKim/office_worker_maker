@@ -83,10 +83,15 @@ describe("shared game shell", () => {
     act(() => setStep("age"));
     act(() => setAge(80));
     act(() => setStep("residence"));
+    expect(container.textContent).toContain("가족의 규칙과 지원 사이에서 하루가 시작됩니다.");
+    expect(container.textContent).toContain("혼자 버티는 자유와 생활비의 압박이 함께 옵니다.");
     act(() => setResidence("dorm"));
     act(() => setStep("abilities"));
 
     expect(container.textContent).toContain("(0/2)");
+    expect(container.textContent).toContain("○ BK");
+    expect(container.textContent).toContain("○ RP");
+    expect(container.textContent).not.toContain("○ AC");
     expect(container.querySelector('button[disabled]')?.textContent).toBe("눈을 뜬다");
 
     click(container, "학업");

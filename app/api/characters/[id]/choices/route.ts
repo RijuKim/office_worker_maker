@@ -6,6 +6,7 @@ import {
   applyRelationshipDeltas,
   applyStatDeltas,
   normalizeStatDeltas,
+  type RelationshipStatus,
   validateChoiceIndex,
 } from "@/lib/game/game-rules";
 import {
@@ -91,7 +92,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
     label: string;
     summary: string;
     statDelta: Record<string, number>;
-    relationshipDelta: { name: string; trust: number }[];
+    relationshipDelta: { name: string; trust: number; status?: RelationshipStatus }[];
     flagDelta: Record<string, unknown>;
   }[];
   const choice = choices[choiceIndex];
@@ -144,6 +145,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
       name: rel.name,
       role: inferRelationshipRole(rel.name, activeEvent.title),
       trust: Math.max(-100, Math.min(100, rel.trust >= 0 ? 35 + rel.trust : rel.trust)),
+      status: rel.status ?? "acquaintance",
       tags: inferRelationshipTags(rel.name, activeEvent.title),
     }));
   const resolvedFlagDelta = resolveCareerGateFlagDelta({
@@ -319,7 +321,12 @@ export async function POST(request: Request | NextRequest, context: RouteContext
         ...updatedRelationships.map((rel) =>
           tx.relationship.updateMany({
             where: { characterRunId: id, name: rel.name },
-            data: { trust: rel.trust },
+            data: {
+              trust: rel.trust,
+              ...(choice.relationshipDelta.find((delta) => delta.name === rel.name)?.status
+                ? { status: choice.relationshipDelta.find((delta) => delta.name === rel.name)!.status }
+                : {}),
+            },
           }),
         ),
         ...newRelationships.map((rel) => tx.relationship.create({ data: rel })),
@@ -382,7 +389,17 @@ export async function POST(request: Request | NextRequest, context: RouteContext
       summary: resolvedSummary,
       stats: updatedStats,
       statDelta: diffPublicStats(previousStats, updatedStats),
-      relationships: [...updatedRelationships, ...newRelationships.map((rel) => ({ name: rel.name, role: rel.role, trust: rel.trust, tags: rel.tags }))],
+      relationships: [
+        ...updatedRelationships.map((rel) => ({
+          ...rel,
+          role: character.relationships.find((existing) => existing.name === rel.name)?.role ?? "관계 인물",
+          tags: character.relationships.find((existing) => existing.name === rel.name)?.tags ?? [],
+          status: choice.relationshipDelta.find((delta) => delta.name === rel.name)?.status
+            ?? character.relationships.find((existing) => existing.name === rel.name)?.status
+            ?? "acquaintance",
+        })),
+        ...newRelationships.map((rel) => ({ name: rel.name, role: rel.role, trust: rel.trust, status: rel.status, tags: rel.tags })),
+      ],
       relationshipDelta: choice.relationshipDelta,
       eventResolved: true,
       endingTriggered: Boolean(endingRecord),

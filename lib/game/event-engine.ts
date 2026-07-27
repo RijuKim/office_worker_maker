@@ -1107,7 +1107,7 @@ export interface StaticEventChoice {
   label: string;
   summary: string;
   statDelta: Record<string, number>;
-  relationshipDelta: { name: string; trust: number }[];
+  relationshipDelta: { name: string; trust: number; status?: "acquaintance" | "friend" | "crush" | "dating" | "ex" }[];
   flagDelta: Record<string, unknown>;
 }
 

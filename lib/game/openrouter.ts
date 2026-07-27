@@ -122,6 +122,7 @@ const aiEventSchema = z.object({
         relationshipDelta: z.array(z.object({
           name: z.string().min(1).max(60),
           trust: z.number().int().min(-30).max(30),
+          status: z.enum(["acquaintance", "friend", "crush", "dating", "ex"]).optional(),
         })).optional(),
       }),
     )
@@ -158,6 +159,10 @@ const SYSTEM_PROMPT = `You are a Korean college-life text-adventure writer.
 Return ONLY valid JSON in a single JSON object with "title", "body", "tags", and "choices". "choices" must contain 2-4 complete objects, and each choice must include "id", "label", "summary", "statDelta", and "relationshipDelta". Keep the event in Korean, in "당신은" voice, with 2-3 paragraphs and 6-10 sentences. Make it one small incident inside the larger story arc.
 
 Keep continuity with recent choices, relationships, open threads, and stats. Avoid repeating closed proposals or stale scenes. Use only the public stats in statDelta, keep health and mental decreases at -1 or above, and make at least one choice clearly risky with a downside. Choice labels should be natural actions. Summaries must start with "당신은".
+
+Stats and relationship trust values in the context are INTERNAL STATE ONLY. Never reveal, quote, or paraphrase an exact stat/trust score, signed change, percentage, or threshold in the title, body, tags, choice labels, or summaries. In particular, never write phrases such as "동규와의 신뢰가 -5%", "신뢰 20", or "호감도 +10". Express relationships only through observable behavior and qualitative atmosphere, such as "동규가 아직 거리를 둔다".
+
+relationshipDelta may include status only for an explicit relationship transition. Set status="dating" only when both people explicitly agree to date after a confession or equivalent conversation; never infer dating from high trust or ordinary affection. Use status="ex" only after an explicit breakup. Otherwise omit status.
 
 The scene can come from college, work, family, romance, clubs, career prep, exams, overseas plans, hobbies, or other daily life. Treat the protagonist as a woman by default, avoid male-coded address, and use fictional/parody names only.
 
@@ -235,7 +240,11 @@ export function buildUserPrompt(state: AiEventPromptState): string {
     `스토리모드=${state.targetCategory ? "새영역확장" : "기존선택연결"}|이번사건필수주제=${state.targetCategory ?? "자유"}|소재예시=${state.targetCategory ? eventCategoryExamples(state.targetCategory).join(",") : "최근 선택·관계·열린 갈등 중 하나의 구체적 결과"}`,
     `회피=${state.avoidCategories?.join(",") || "없음"}|보조후보=${state.preferCategories?.join(",") || "없음"}|회피인물=${state.avoidPeople?.join(",") || "없음"}`,
     `스탯=${JSON.stringify(state.stats)}`,
-    `관계=${JSON.stringify(state.relationships)}`,
+    `관계=${JSON.stringify(state.relationships.map(({ name, role, trust }) => ({
+      name,
+      role,
+      state: relationshipTrustBand(trust),
+    })))}`,
   ];
 
   const activeParts = [
@@ -248,6 +257,15 @@ export function buildUserPrompt(state: AiEventPromptState): string {
   ].filter(Boolean);
 
   return [...contextParts, ...activeParts].join("\n");
+}
+
+function relationshipTrustBand(trust: number) {
+  if (trust >= 70) return "매우 가까움";
+  if (trust >= 30) return "가까움";
+  if (trust >= 10) return "우호적";
+  if (trust > -10) return "어색함";
+  if (trust > -40) return "거리감";
+  return "갈등이 큼";
 }
 
 function buildCareerDiversityPrompt(state: AiEventPromptState) {
@@ -1386,9 +1404,12 @@ function normalizeRelationshipDelta(raw: unknown) {
       return {
         name: rel.name,
         trust: Math.max(-30, Math.min(30, Math.round(trust))),
+        ...(typeof rel.status === "string" && ["acquaintance", "friend", "crush", "dating", "ex"].includes(rel.status)
+          ? { status: rel.status as "acquaintance" | "friend" | "crush" | "dating" | "ex" }
+          : {}),
       };
     })
-    .filter((item): item is { name: string; trust: number } => Boolean(item));
+    .filter((item): item is { name: string; trust: number; status?: "acquaintance" | "friend" | "crush" | "dating" | "ex" } => Boolean(item));
 }
 
 const aiBranchProposalSchema = z.object({

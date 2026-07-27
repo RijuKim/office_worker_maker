@@ -252,6 +252,25 @@ describe("evaluateEventQuality lifecycle closure", () => {
     expect(stripNumericStatExposure("학점 10의 지식과 academic: 7, 건강 6, 네트워크 3이 보였다.")).toBe(
       "탄탄한 학업 기반과 학업 기반, 몸 상태, 관계망이 보였다.",
     );
+    expect(stripNumericStatExposure("동규와의 신뢰가 -5%로 낮다.")).toBe("동규와의 관계로 낮다.");
+  });
+
+  it("hard-fails when relationship trust numbers leak into prose", () => {
+    const verdict = evaluateEventQuality({
+      source: "AI",
+      candidate: {
+        title: "어색한 대화",
+        body: "동규와의 신뢰가 -5%로 낮아 대화가 자꾸 끊긴다.",
+        tags: ["우정"],
+        choices: [
+          { id: "a", label: "먼저 말을 건다", summary: "당신은 먼저 말을 건다.", statDelta: {}, relationshipDelta: [] },
+          { id: "b", label: "거리를 둔다", summary: "당신은 잠시 거리를 둔다.", statDelta: {}, relationshipDelta: [] },
+        ],
+      },
+    });
+
+    expect(verdict.hardFailure).toBe(true);
+    expect(verdict.reasons).toContain("numeric_stat_exposure");
   });
 
   it("hard-fails when a closed activity is offered again as the same invitation", () => {

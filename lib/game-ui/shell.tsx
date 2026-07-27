@@ -222,9 +222,9 @@ export interface SharedOnboardingFlowProps {
 }
 
 const RESIDENCE_OPTIONS = [
-  { id: "family_home", label: "본가", description: "익숙한 가족의 생활 소리 속에서 시작합니다." },
-  { id: "studio", label: "자취방", description: "작지만 온전히 내 몫인 방에서 시작합니다." },
-  { id: "dorm", label: "기숙사", description: "학교와 가까운 공동생활 공간에서 시작합니다." },
+  { id: "family_home", label: "본가", description: "가족의 규칙과 지원 사이에서 하루가 시작됩니다." },
+  { id: "studio", label: "자취방", description: "혼자 버티는 자유와 생활비의 압박이 함께 옵니다." },
+  { id: "dorm", label: "기숙사", description: "타인의 생활 리듬과 우연한 관계가 가까이 있습니다." },
 ] as const;
 const PREFERRED_STATS = ["academic", "practical", "health", "mental", "wealth", "charm", "reputation"] as const;
 const STAT_LABELS: Record<string, string> = {
@@ -235,6 +235,15 @@ const STAT_LABELS: Record<string, string> = {
   wealth: "자산",
   reputation: "평판",
 };
+const STAT_ICONS: Record<string, string> = {
+  academic: "BK",
+  practical: "TL",
+  health: "HP",
+  mental: "MP",
+  wealth: "CO",
+  charm: "CH",
+  reputation: "RP",
+};
 
 export function SharedOnboardingFlow(props: SharedOnboardingFlowProps) {
   const productionWeb = props.variant === "web";
@@ -243,7 +252,7 @@ export function SharedOnboardingFlow(props: SharedOnboardingFlowProps) {
     <div className={productionWeb ? "w-full max-w-[560px]" : ""}>
     <section className={productionWeb ? "pixel-panel create-panel p-6" : "screen-stack onboarding-panel"}>
       {props.step === "intro" && (
-        <section className="create-step">
+        <section className="create-step" data-testid="onboarding-intro">
           <div className={productionWeb ? "create-hero-art intro-dawn-art overflow-hidden border-4 border-[#2a2018]" : "create-hero-art intro-dawn-art"} data-testid="intro-dawn-art">
             <PixelScene scene="intro" label="오전 6시 07분의 밝은 새벽 방 픽셀아트" />
           </div>
@@ -322,7 +331,7 @@ export function SharedOnboardingFlow(props: SharedOnboardingFlowProps) {
           <div className={productionWeb ? "grid grid-cols-2 gap-2" : "chip-grid"}>
             {PREFERRED_STATS.map((stat) => (
               <button aria-pressed={props.selectedStats.includes(stat)} className={productionWeb ? `pixel-button px-3 py-3 text-left text-sm ${props.selectedStats.includes(stat) ? "bg-[#ffe0a2]" : ""}` : props.selectedStats.includes(stat) ? "selected" : ""} key={stat} type="button" onClick={() => props.onToggleStat(stat)}>
-                {productionWeb && <span className="mr-2 text-xs text-[#8a4f2d]">{props.selectedStats.includes(stat) ? "●" : "○"} {stat.slice(0, 2).toUpperCase()}</span>}
+                {productionWeb && <span className="mr-2 text-xs text-[#8a4f2d]">{props.selectedStats.includes(stat) ? "●" : "○"} {STAT_ICONS[stat]}</span>}
                 <span className="font-bold">{STAT_LABELS[stat] ?? stat}</span>
               </button>
             ))}

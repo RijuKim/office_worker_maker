@@ -115,7 +115,10 @@ const directLifecycleOutcomeChoicePattern =
   /(퇴출(?:된|당한)다|제명(?:된|당한)다|쫓겨난다|강제로\s*나(?:간|가게\s*된)다|강제\s*퇴장한다|내보내진다|제외된다|방출된다|탈락한다|거절당한다|거부당한다|퇴출을\s*선택|제명을\s*선택|탈락을\s*선택)/;
 
 const numericStatPattern =
-  /(건강|멘탈|정신|학점|학업|실무|평판|매력|자산|재산|네트워크|network|academic|practical|health|mental|wealth|reputation|charm)\s*[:：]?\s*[0-9]{1,3}/gi;
+  /(건강|멘탈|정신|학점|학업|실무|평판|매력|자산|재산|네트워크|network|academic|practical|health|mental|wealth|reputation|charm)\s*(?:수치|점수|스탯|stat)?\s*(?:은|는|이|가|의)?\s*[:：]?\s*[+-]?\d{1,3}(?:\s*%|퍼센트)?/gi;
+
+const numericRelationshipPattern =
+  /(?:[가-힣A-Za-z0-9]{1,20}(?:와|과)의\s*)?(?:관계\s*)?(?:신뢰|호감도|친밀도|관계도)\s*(?:수치|점수)?\s*(?:은|는|이|가|의)?\s*[:：]?\s*[+-]?\d{1,3}(?:\s*%|퍼센트)?/gi;
 
 const dropoutCampusPattern = /(강의|강의실|수강|출석|과제|학기|전공\s*수업|학생\s*동아리|캠퍼스\s*수업)/;
 const dropoutAllowedExceptionPattern =
@@ -278,6 +281,10 @@ export function stripNumericStatExposure(text: string): string {
       if (lower.includes("자산") || lower.includes("재산") || lower.includes("wealth")) return "경제 사정";
       return "관계망";
     })
+    .replace(numericRelationshipPattern, (match) => {
+      const subject = match.match(/^([가-힣A-Za-z0-9]{1,20})(?:와|과)의/)?.[1];
+      return subject ? `${subject}와의 관계` : "관계의 분위기";
+    })
     .replace(/\s{2,}/g, " ")
     .trim();
 }
@@ -412,7 +419,8 @@ function hasForbiddenOrdinaryStatDrop(choice: EventQualityChoice) {
 
 function hasNumericStatExposure(text: string) {
   numericStatPattern.lastIndex = 0;
-  return numericStatPattern.test(text);
+  numericRelationshipPattern.lastIndex = 0;
+  return numericStatPattern.test(text) || numericRelationshipPattern.test(text);
 }
 
 function hasDropoutAcademicConflict(academicStatus: string | null | undefined, text: string) {

@@ -64,7 +64,7 @@ export function buildAiRetryGuidance(verdict: EventQualityVerdict) {
     `previous candidate rejected: ${reasons}`,
     diversity,
     exemptions,
-    "Generate a different valid event. Avoid direct pass/fail or forced-removal choice labels, raw stat-number phrases, closed proposal repeats, and stale repetition unless it clearly advances an active thread.",
+    "Generate a different valid event. Avoid direct pass/fail or forced-removal choice labels, raw stat/trust numbers or percentages, closed proposal repeats, and stale repetition unless it clearly advances an active thread.",
   ].join(" ");
 }
 

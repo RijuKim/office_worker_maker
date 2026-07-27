@@ -8,7 +8,9 @@ export const TRUST_MIN = -100;
 export const TRUST_MAX = 100;
 
 export type StatDelta = Partial<Record<string, number>>;
-export type RelationshipDelta = { name: string; trust: number };
+export const RELATIONSHIP_STATUSES = ["acquaintance", "friend", "crush", "dating", "ex"] as const;
+export type RelationshipStatus = typeof RELATIONSHIP_STATUSES[number];
+export type RelationshipDelta = { name: string; trust: number; status?: RelationshipStatus };
 export type FlagDelta = Record<string, unknown>;
 
 function clamp(value: number, min: number, max: number): number {
