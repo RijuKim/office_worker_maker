@@ -269,6 +269,22 @@ export function App() {
       const restoredEvent = result.data.currentEvent ?? restoredCharacter.events?.[0] ?? null;
       setCurrentCharacter(restoredCharacter);
       setCurrentEvent(restoredEvent);
+
+      if (isCompletedCharacter(restoredCharacter)) {
+        const recordsResult = await api.records();
+        if (recordsResult.ok) {
+          const restoredRecords = recordsResult.data.records ?? [];
+          const matchingRecord = restoredRecords.find((record) => record.characterRunId === restoredCharacter.id) ?? restoredRecords[0];
+          setRecords(restoredRecords);
+          setExpandedRecord(matchingRecord?.id ?? null);
+          setRecordsTab("records");
+        } else {
+          setError(recordsResult.data.error ?? "선택의 결과를 불러오지 못했습니다.");
+        }
+        setScreen("records");
+        return;
+      }
+
       setScreen("play");
 
       // A choice can be committed just before the WebView is backgrounded. In
