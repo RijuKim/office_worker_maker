@@ -3,7 +3,7 @@ import { defineConfig } from "@apps-in-toss/web-framework/config";
 export default defineConfig({
   appName: "sano-job-seeker",
   brand: {
-    displayName: "일어나보니 대한민국 취준생",
+    displayName: "취준생 시뮬레이션",
     primaryColor: "#FF6655",
     icon: "https://sano-officeworker.vercel.app/toss-app-icon.png",
   },
