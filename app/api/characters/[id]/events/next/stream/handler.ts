@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 import { getStoryArc, isEventAllowedForLifeStage, selectNextEvent, type EventSelectionContext, type StaticEvent } from "@/lib/game/event-engine";
 import { evaluateCandidateEvent, findValidatedStaticFallback } from "@/lib/game/event-quality-policy";
 import { deriveLifeStageState } from "@/lib/game/life-stage";
-import { buildDiversityCategoryGuidance } from "@/lib/game/event-diversity";
+import { buildDiversityCategoryGuidance, eventMatchesCategory, normalizeEventCategory, selectStoryCategoryPalette } from "@/lib/game/event-diversity";
 import { checkDailyAiLimit, generateAiEventStream, getOpenRouterTimeoutMs, incrementAiUsage } from "@/lib/game/openrouter";
 import { recordEventQualityLog } from "@/lib/server/event-quality-log";
 import { acquireAuthoritativeEvent, createPrismaEventAuthorityStore, EventAuthorityLostError, resolveEventGenerationRole, startEventGenerationHeartbeat, toPublicEvent, type EventGenerationHeartbeat } from "@/lib/server/event-authority";
@@ -181,7 +181,7 @@ export function createNextEventStreamPost({
           coreEventCount: character.coreEventCount,
           major: character.major,
         });
-        const diversityGuidance = buildDiversityGuidance(character.eventHistory);
+        const diversityGuidance = buildDiversityGuidance(character.eventHistory, character.coreEventCount, character.id);
         const selectionContext: EventSelectionContext = {
           burnoutRisk: character.hiddenState.burnoutRisk,
           coreEventCount: character.coreEventCount,
@@ -309,6 +309,8 @@ export function createNextEventStreamPost({
             careerPaths: selectionContext.careerPaths,
             avoidCategories: diversityGuidance.avoidCategories,
             preferCategories: diversityGuidance.preferCategories,
+            targetCategory: diversityGuidance.targetCategory,
+            allowedCategories: diversityGuidance.allowedCategories,
             avoidPeople: diversityGuidance.avoidPeople,
           };
 
@@ -387,12 +389,13 @@ export function createNextEventStreamPost({
             });
             qualityElapsedMs = initialEvaluation.durationMs;
 
-            if (initialEvaluation.verdict.status === "pass" && isEventAllowedForLifeStage({ title: aiEvent.title, tags: aiEvent.tags }, selectionContext)) {
+            const matchesTargetCategory = !diversityGuidance.targetCategory || eventMatchesCategory(diversityGuidance.targetCategory, aiEvent);
+            if (initialEvaluation.verdict.status === "pass" && matchesTargetCategory && isEventAllowedForLifeStage({ title: aiEvent.title, tags: aiEvent.tags }, selectionContext)) {
               selectedEvent = aiEvent;
               source = "AI";
-            } else if (initialEvaluation.verdict.hardFailure) {
+            } else if (initialEvaluation.verdict.hardFailure || !matchesTargetCategory) {
               aiFailed = true;
-              generationReason = "post_parse_quality_failure";
+              generationReason = matchesTargetCategory ? "post_parse_quality_failure" : "target_category_mismatch";
               generationStage = "quality";
             } else {
               selectedEvent = aiEvent;
@@ -602,24 +605,28 @@ function advanceStoryArc(rawArc: unknown, coreEventCount: number, flags: Record<
 function buildDiversityGuidance(eventHistory: Array<{
   event?: { tags?: unknown };
   relationshipDelta?: unknown;
-}>) {
+}>, coreEventCount: number, storySeed: string) {
   const recent = eventHistory.slice(0, 5);
   const recentTags = recent.flatMap((history) =>
     Array.isArray(history.event?.tags) ? history.event.tags.filter((tag) => typeof tag === "string") : [],
   );
   const recentPeople = recent.flatMap((history) => readRelationshipNames(history.relationshipDelta));
   const peopleCounts = countItems(recentPeople);
+  const allowedCategories = selectStoryCategoryPalette(storySeed);
   const categoryGuidance = buildDiversityCategoryGuidance(
-    recentTags.map(normalizeCategory).filter(Boolean),
-    ["돈", "가족", "연애", "건강", "알바", "동아리", "해외", "위험", "진로", "생활"],
+    recentTags.map(normalizeEventCategory).filter(Boolean),
+    allowedCategories,
+    2,
+    coreEventCount % 3 === 2,
   );
   const avoidCategories = categoryGuidance.avoidCategories;
   const avoidPeople = Object.entries(peopleCounts)
     .filter(([, count]) => count >= 2)
     .map(([name]) => name);
   const preferCategories = categoryGuidance.preferCategories;
+  const targetCategory = categoryGuidance.targetCategory;
 
-  return { recentTags, recentPeople, avoidCategories, preferCategories, avoidPeople };
+  return { recentTags, recentPeople, avoidCategories, preferCategories, targetCategory, allowedCategories, avoidPeople };
 }
 
 function readRelationshipNames(raw: unknown) {
@@ -634,17 +641,4 @@ function countItems(items: string[]) {
     counts[item] = (counts[item] ?? 0) + 1;
     return counts;
   }, {});
-}
-
-function normalizeCategory(tag: string) {
-  if (["학업", "스터디", "시험", "중간고사", "교수", "연구실", "대학원", "수업", "공무원", "공기업", "자격증"].includes(tag)) return "학업/스터디";
-  if (["자산", "돈", "월세", "알바", "자취"].includes(tag)) return "돈";
-  if (["가족", "본가", "압박"].includes(tag)) return "가족";
-  if (["연애", "결혼", "관계"].includes(tag)) return "연애";
-  if (["범죄", "위험", "도박", "다단계", "사기"].includes(tag)) return "위험";
-  if (["해외", "워홀"].includes(tag)) return "해외";
-  if (["취업", "진로", "면접", "지원서", "기업"].includes(tag)) return "진로";
-  if (["건강", "멘탈", "운동", "번아웃"].includes(tag)) return "건강";
-  if (["동아리", "학생회"].includes(tag)) return "동아리";
-  return tag;
 }

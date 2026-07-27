@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { logger } from "@/lib/server/logger";
+import { eventCategoryExamples } from "@/lib/game/event-diversity";
 
 type AiProvider = {
   id: "ollama" | "openrouter";
@@ -158,6 +159,9 @@ CRITICAL - Event diversity rules:
 2. Never generate two consecutive events in the same category (e.g. two part-time events in a row, two study events in a row).
 3. The "회피" field lists categories to avoid. The "우선" field lists categories to prioritize. Follow these strictly.
 4. Vary locations, people, and pressure sources. Do not reuse the same setting or character from the previous event.
+5. When "이번사건필수주제" is not "자유", the event title, main conflict, body, and tags must clearly belong to that category. When it is "자유", continue a recent choice, relationship, or open thread instead of introducing an unrelated premise.
+6. New-category events must still reuse at least one established person, consequence, resource constraint, or open thread so the full run feels like one story rather than disconnected episodes.
+7. Stay inside "이번이야기영역". These are the recurring themes selected for this protagonist; deepen and cross them rather than sampling every possible life category.
 `;
 
 export type AiEventPromptState = {
@@ -183,6 +187,8 @@ export type AiEventPromptState = {
   careerPaths?: { pathType: string; pathName?: string; status: string }[];
   avoidCategories?: string[];
   preferCategories?: string[];
+  targetCategory?: string | null;
+  allowedCategories?: string[];
   avoidPeople?: string[];
 };
 
@@ -213,7 +219,9 @@ export function buildUserPrompt(state: AiEventPromptState): string {
     `최근=${state.recentSummaries.slice(0, 4).join(" || ") || "낯선 아침"}`,
     `사용제목=${state.usedEventTitles.slice(0, 8).join(" | ") || "없음"}`,
     `닫힘=${buildResolvedOfferPrompt(state.eventFlags)}`,
-    `회피=${state.avoidCategories?.join(",") || "없음"}|우선=${state.preferCategories?.join(",") || "없음"}|회피인물=${state.avoidPeople?.join(",") || "없음"}`,
+    `이번이야기영역=${state.allowedCategories?.join(",") || "자유"}`,
+    `스토리모드=${state.targetCategory ? "새영역확장" : "기존선택연결"}|이번사건필수주제=${state.targetCategory ?? "자유"}|소재예시=${state.targetCategory ? eventCategoryExamples(state.targetCategory).join(",") : "최근 선택·관계·열린 갈등 중 하나의 구체적 결과"}`,
+    `회피=${state.avoidCategories?.join(",") || "없음"}|보조후보=${state.preferCategories?.join(",") || "없음"}|회피인물=${state.avoidPeople?.join(",") || "없음"}`,
     `스탯=${JSON.stringify(state.stats)}`,
     `관계=${JSON.stringify(state.relationships)}`,
   ];
@@ -259,7 +267,7 @@ function buildCareerDiversityPrompt(state: AiEventPromptState) {
     guidance.push("교육계열만 임용 가능");
   }
     guidance.push("장소/인물/압박을 바꾸고, 학교 밖 사건도 우선 고려");
-    guidance.push("여가도 끝내지 말고 인맥/비용/포트폴리오/관계/정보 씨앗을 남길 것");
+    guidance.push("사건의 필수 주제가 여가나 일상이면 취업·스펙·실습으로 억지로 연결하지 말고 그 경험 자체를 중심에 둘 것");
 
   return guidance.join(" / ");
 }

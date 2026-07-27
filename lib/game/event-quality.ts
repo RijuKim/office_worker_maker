@@ -464,7 +464,11 @@ function detectContinuityExemptions(input: EvaluateEventQualityInput, choices: E
 }
 
 function scoreDiversity(input: EvaluateEventQualityInput, continuityExemptions: string[]) {
-  if (continuityExemptions.length > 0) return 100;
+  // A relationship delta appears on nearly every generated event and must not
+  // erase repetition penalties. Only concrete lifecycle progression may
+  // legitimately continue a recently used category.
+  const progressionExemptions = new Set(["lifecycle_closure", "job_application", "spec_progression"]);
+  if (continuityExemptions.some((exemption) => progressionExemptions.has(exemption))) return 100;
   const candidateTags = Array.isArray(input.candidate.tags)
     ? input.candidate.tags.filter((tag): tag is string => typeof tag === "string")
     : [];
