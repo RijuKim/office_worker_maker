@@ -875,7 +875,7 @@ function buildAiEventRequestBody(state: AiEventPromptState, provider: AiProvider
       // prompt and validate the result locally with Zod.
       format: "json",
       stream: false,
-      think: false,
+      think: "low",
       options: {
         temperature: 0.2,
         num_predict: getAiEventMaxTokens(provider.id),
@@ -914,7 +914,7 @@ For streaming responsiveness, output the JSON object in this field order exactly
       ],
       format: "json",
       stream: true,
-      think: false,
+      think: "low",
       options: {
         temperature: 0.2,
         num_predict: getAiEventMaxTokens(provider.id),
