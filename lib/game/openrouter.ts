@@ -66,6 +66,7 @@ export const SLOW_AI_GENERATION_MS = 10_000;
 const DEFAULT_AI_MAX_TOKENS = 2_000;
 const MIN_AI_MAX_TOKENS = 400;
 const MAX_AI_MAX_TOKENS = 4_000;
+const MAX_OLLAMA_EVENT_TOKENS = 1_600;
 
 export function getOpenRouterTimeoutMs(raw = process.env.OPENROUTER_TIMEOUT_MS): number {
   if (raw === undefined || !/^\d+$/.test(raw.trim())) return DEFAULT_AI_TIMEOUT_MS;
@@ -81,6 +82,13 @@ export function getOpenRouterMaxTokens(raw = process.env.OPENROUTER_MAX_TOKENS):
   return parsed >= MIN_AI_MAX_TOKENS && parsed <= MAX_AI_MAX_TOKENS
     ? parsed
     : DEFAULT_AI_MAX_TOKENS;
+}
+
+function getAiEventMaxTokens(providerId: AiProvider["id"]): number {
+  const configured = getOpenRouterMaxTokens();
+  return providerId === "ollama"
+    ? Math.min(configured, MAX_OLLAMA_EVENT_TOKENS)
+    : configured;
 }
 
 const aiEventSchema = z.object({
@@ -377,7 +385,7 @@ export async function generateAiEvent(
       providerLabel: provider.label,
       model: provider.model,
       timeoutMs: remainingMs,
-      maxTokens: getOpenRouterMaxTokens(),
+      maxTokens: getAiEventMaxTokens(provider.id),
       promptChars: buildUserPrompt(state).length,
       ...options.trace,
     });
@@ -595,7 +603,7 @@ export async function generateAiEventStream(
       providerLabel: provider.label,
       model: provider.model,
       timeoutMs: remainingMs,
-      maxTokens: getOpenRouterMaxTokens(),
+      maxTokens: getAiEventMaxTokens(provider.id),
       promptChars: buildUserPrompt(state).length,
       ...options.trace,
     });
@@ -807,7 +815,7 @@ function buildAiEventRequestBody(state: AiEventPromptState, provider: AiProvider
     // short, deterministic JSON document. Disable reasoning to preserve the
     // output budget for the actual event.
     ...(provider.id === "openrouter" ? { reasoning: { effort: "none" } } : { think: "low" }),
-    max_tokens: provider.id === "ollama" ? Math.max(getOpenRouterMaxTokens(), 4_000) : getOpenRouterMaxTokens(),
+    max_tokens: getAiEventMaxTokens(provider.id),
     temperature: 0.85,
   };
 }
@@ -825,7 +833,7 @@ For streaming responsiveness, output the JSON object in this field order exactly
       { role: "user", content: buildUserPrompt(state) },
     ],
     response_format: { type: "json_object" },
-    max_tokens: getOpenRouterMaxTokens(),
+    max_tokens: getAiEventMaxTokens(provider.id),
     temperature: 0.85,
     stream: true,
   };
