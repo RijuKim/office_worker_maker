@@ -1,4 +1,4 @@
-import type { CareerRecord, CharacterData, EventData } from "./types";
+import type { CareerPath, CareerRecord, CharacterData, CharacterSpec, EventData, JobApplication } from "./types";
 
 type ApiResult<T> = {
   ok: boolean;
@@ -56,10 +56,14 @@ export const api = {
   async character(id: string) {
     return request<{ character?: CharacterData; currentEvent?: EventData; error?: string }>(`/api/characters/${id}`);
   },
+  async deleteCharacter(id: string) {
+    return request<{ deleted?: boolean; error?: string }>(`/api/characters/${id}`, { method: "DELETE" });
+  },
   async choose(characterId: string, choiceIndex: number) {
     return request<{
       result?: {
         stats?: Record<string, number>;
+        relationships?: { name: string; role: string; trust: number; tags?: string[] }[];
         statDelta?: Record<string, number>;
         relationshipDelta?: { name: string; trust: number }[];
         summary?: string;
@@ -79,5 +83,14 @@ export const api = {
   },
   async records() {
     return request<{ records?: CareerRecord[]; error?: string }>("/api/records");
+  },
+  async specs(characterId: string) {
+    return request<{ specs?: CharacterSpec[]; error?: string }>(`/api/characters/${characterId}/specs`);
+  },
+  async jobApplications(characterId: string) {
+    return request<{ applications?: JobApplication[]; error?: string }>(`/api/characters/${characterId}/job-applications`);
+  },
+  async careerPaths(characterId: string) {
+    return request<{ paths?: CareerPath[]; error?: string }>(`/api/characters/${characterId}/career-paths`);
   },
 };

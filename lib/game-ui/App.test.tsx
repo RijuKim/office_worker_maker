@@ -2,7 +2,7 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { LoadingPanel, PlaySurface, RecordCardShell, type SharedCharacterView, type SharedChoiceFeedbackView, type SharedEventView } from "./App";
+import { getPixelPortraitCombination, LoadingPanel, PixelPortrait, PlaySurface, RecordCardShell, type SharedCharacterView, type SharedChoiceFeedbackView, type SharedEventView } from "./App";
 
 const character: SharedCharacterView = {
   name: "한서윤",
@@ -55,6 +55,18 @@ afterEach(() => {
 });
 
 describe("game-ui shared play surfaces", () => {
+  it("creates stable, varied portrait combinations for newly introduced characters", () => {
+    const first = getPixelPortraitCombination("character-id-한서윤");
+    expect(getPixelPortraitCombination("character-id-한서윤")).toEqual(first);
+    expect(getPixelPortraitCombination("character-id-김민준")).not.toEqual(first);
+
+    render(<PixelPortrait name="새 인물" seed="new-character-id" large />);
+    const portrait = container.querySelector(".pixel-portrait");
+    expect(portrait?.getAttribute("data-portrait-combination")).toMatch(/^[a-z-]+$/);
+    expect(portrait?.className).toContain("hair-");
+    expect(portrait?.className).toContain("outfit-");
+  });
+
   it("exposes a restored record title with the shared oracle semantics", () => {
     render(<RecordCardShell expanded={false} id="record-1" title="한서윤의 새로운 결말" />);
 

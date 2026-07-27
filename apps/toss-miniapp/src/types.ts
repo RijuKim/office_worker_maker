@@ -22,7 +22,12 @@ export interface CharacterData {
     graduation?: string;
   };
   events?: EventData[];
+  specScore?: number;
 }
+
+export interface CharacterSpec { specType: string; specName: string; status: string; score?: string | null }
+export interface JobApplication { companyName: string; currentStage: string }
+export interface CareerPath { pathName: string; status: string }
 
 export interface EventData {
   id: string;

@@ -6,6 +6,7 @@ import type { GameHost } from "./host";
 export type SharedStats = Record<string, number>;
 
 export interface SharedCharacterView {
+  id?: string;
   name: string;
   age: number;
   major: string;
@@ -57,16 +58,6 @@ const STAT_LABELS: Record<string, string> = {
   wealth: "자산",
   charm: "매력",
   reputation: "평판",
-};
-
-const STAT_ICONS: Record<string, string> = {
-  academic: "BK",
-  practical: "TL",
-  health: "HP",
-  mental: "MP",
-  wealth: "CO",
-  charm: "CH",
-  reputation: "RP",
 };
 
 function statLevel(value: number) {
@@ -203,9 +194,43 @@ export function PixelScene({ scene, label }: { scene: string; label?: string }) 
   );
 }
 
-function PixelPortrait({ name, compact = false, large = false, variant }: { name?: string; compact?: boolean; large?: boolean; variant?: string }) {
+const PORTRAIT_HAIR_STYLES = ["short", "bob", "long", "side", "spiky", "tied"] as const;
+const PORTRAIT_OUTFIT_STYLES = ["shirt", "hoodie", "blazer", "knit", "jacket"] as const;
+const PORTRAIT_EXPRESSIONS = ["calm", "smile", "serious", "tired"] as const;
+const PORTRAIT_ACCESSORIES = ["none", "glasses", "hairclip", "headphones", "earring"] as const;
+const PORTRAIT_POSES = ["straight", "lean-left", "lean-right"] as const;
+
+function portraitSeedHash(value: string) {
+  let hash = 2166136261;
+  for (const character of value.normalize("NFC")) {
+    hash ^= character.codePointAt(0) ?? 0;
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+export function getPixelPortraitCombination(value: string) {
+  let state = portraitSeedHash(value || "?");
+  const next = (length: number) => {
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    state >>>= 0;
+    return state % length;
+  };
+  return {
+    hair: PORTRAIT_HAIR_STYLES[next(PORTRAIT_HAIR_STYLES.length)],
+    outfit: PORTRAIT_OUTFIT_STYLES[next(PORTRAIT_OUTFIT_STYLES.length)],
+    expression: PORTRAIT_EXPRESSIONS[next(PORTRAIT_EXPRESSIONS.length)],
+    accessory: PORTRAIT_ACCESSORIES[next(PORTRAIT_ACCESSORIES.length)],
+    pose: PORTRAIT_POSES[next(PORTRAIT_POSES.length)],
+  };
+}
+
+export function PixelPortrait({ name, compact = false, large = false, variant, seed }: { name?: string; compact?: boolean; large?: boolean; variant?: string; seed?: string }) {
   const refName = variant || name || "";
   const initial = refName.trim().slice(0, 1) || "?";
+  const combination = getPixelPortraitCombination(seed || refName || "?");
 
   let variantClass = "";
   if (refName.includes("지민 선배") || refName.includes("지민")) variantClass = "variant-jimin";
@@ -236,7 +261,10 @@ function PixelPortrait({ name, compact = false, large = false, variant }: { name
   else if (refName.includes("해외") || refName.includes("emma") || refName.includes("엠마")) variantClass = "variant-overseas";
 
   return (
-    <div className={`pixel-portrait ${compact ? "pixel-portrait-compact" : ""} ${large ? "pixel-portrait-large" : ""} ${variantClass}`}>
+    <div
+      className={`pixel-portrait hair-${combination.hair} outfit-${combination.outfit} expression-${combination.expression} accessory-${combination.accessory} pose-${combination.pose} ${compact ? "pixel-portrait-compact" : ""} ${large ? "pixel-portrait-large" : ""} ${variantClass}`}
+      data-portrait-combination={`${combination.hair}-${combination.outfit}-${combination.expression}-${combination.accessory}-${combination.pose}`}
+    >
       <div className="portrait-backdrop" />
       <div className="portrait-hair" />
       <div className="portrait-face">
@@ -247,6 +275,7 @@ function PixelPortrait({ name, compact = false, large = false, variant }: { name
         <span className="portrait-mouth" />
         <span className="portrait-initial">{initial}</span>
       </div>
+      <span className="portrait-accessory" aria-hidden="true" />
       <div className="portrait-collar" />
       <div className="portrait-body" />
     </div>
@@ -330,20 +359,20 @@ export function PlaySurface({
       {feedback && (
         variant === "web" ? (
           <div className="feedback-pop pixel-panel mb-5 p-4">
-            <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-4 max-[520px]:grid-cols-1">
+            <div className={`feedback-layout ${feedbackArt ? "has-art" : ""}`}>
               {feedbackArt}
               <div className="min-w-0">
                 <p className="text-sm font-black text-[#6d4a2f]">선택의 결과</p>
                 {feedback.choiceLabel && <p className="mt-1 text-base font-black leading-6 text-[#2a241e]">“{feedback.choiceLabel}”</p>}
                 {feedback.summary && <p className="mt-2 text-sm leading-6">{feedback.summary}</p>}
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="feedback-deltas mt-3 flex flex-wrap gap-2">
                   {Object.entries(feedback.statDelta).map(([key, delta]) => (
-                    <span className={`border-2 px-2 py-1 text-xs font-bold ${delta > 0 ? "border-[#305d73] bg-[#d5edf6] text-[#244c5e]" : "border-[#b3423c] bg-[#ffe1db] text-[#7b2d29]"}`} key={key}>
+                    <span className={delta > 0 ? "feedback-delta-positive" : "feedback-delta-negative"} key={key}>
                       {STAT_LABELS[key] ?? key} {key === "wealth" ? `${delta > 0 ? "+" : ""}${delta}만원` : `${delta > 0 ? "+" : ""}${delta}`}
                     </span>
                   ))}
                   {feedback.relationshipDelta.map((rel) => (
-                    <span className={`border-2 px-2 py-1 text-xs font-bold ${rel.trust > 0 ? "border-[#a53f66] bg-[#ffe1ec] text-[#842b50]" : "border-[#2b3348] bg-[#dce2f5] text-[#26304a]"}`} key={`${rel.name}-${rel.trust}`}>
+                    <span className={rel.trust > 0 ? "feedback-relation-positive" : "feedback-relation-negative"} key={`${rel.name}-${rel.trust}`}>
                       {rel.name} {rel.trust > 0 ? "♥+" : "💀"}{rel.trust}
                     </span>
                   ))}
@@ -396,7 +425,7 @@ export function PlaySurface({
                   </span>
                   <h2 className="text-xl font-black leading-tight text-[#2a241e]">{currentEvent.title}</h2>
                 </div>
-                <div className="novel-text text-lg tracking-normal max-[900px]:text-[16px]">
+                <div className={`novel-text text-lg tracking-normal max-[900px]:text-[16px] ${currentEvent.source === "AI" ? "new-scene-text" : ""}`}>
                   {currentEvent.body.split("\n").map((paragraph, index) => (
                     <p className="mt-3 first:mt-0" key={index}>{paragraph}</p>
                   ))}
@@ -406,7 +435,7 @@ export function PlaySurface({
                     {currentEvent.choices.map((choice, index) => (
                       <button className="choice-button pixel-button grid min-h-12 grid-cols-[32px_minmax(0,1fr)] items-center gap-3 px-4 py-3.5 text-left text-[15px] disabled:opacity-50" disabled={loading} key={choice.id} onClick={() => onChoose(index)}>
                         <span className="choice-index">{index + 1}</span>
-                        <span>{choice.label}</span>
+                        <span className="choice-label">{choice.label}</span>
                       </button>
                     ))}
                   </div>
@@ -419,7 +448,7 @@ export function PlaySurface({
               {currentEvent.choices.map((choice, index) => (
                 <button className="choice-button pixel-button grid min-h-12 grid-cols-[32px_minmax(0,1fr)] items-center gap-3 px-5 py-4 text-left text-[16px] disabled:opacity-50" disabled={loading} key={choice.id} onClick={() => onChoose(index)}>
                   <span className="choice-index">{index + 1}</span>
-                  <span>{choice.label}</span>
+                  <span className="choice-label">{choice.label}</span>
                 </button>
               ))}
             </div>
@@ -455,11 +484,9 @@ export function CharacterSheet({ character }: { character: SharedCharacterView }
       <h2 className="screen-title text-xl font-black">캐릭터 상세</h2>
       <div className="character-sheet pixel-panel mt-4 overflow-hidden">
         <div className="character-portrait-stage">
-          <PixelPortrait name={character.name} large />
+          <PixelPortrait name={character.name} seed={character.id ?? character.name} large />
         </div>
         <div className="character-sheet-body p-5">
-          <p className="text-xs font-black text-[#8a4f2d]">CURRENT STUDENT FILE</p>
-          <h3 className="mt-1 text-2xl font-black leading-tight">{character.name}</h3>
           <div className="mt-4 grid grid-cols-2 gap-2 text-sm max-[520px]:grid-cols-1">
             <p className="profile-chip"><strong>이름:</strong> {character.name}</p>
             <p className="profile-chip"><strong>전공:</strong> {character.major}</p>
@@ -471,12 +498,12 @@ export function CharacterSheet({ character }: { character: SharedCharacterView }
             {Object.entries(STAT_LABELS).sort(([a], [b]) => (a === "wealth" ? -1 : b === "wealth" ? 1 : 0)).map(([key, label]) => (
               <div className="stat-card" key={key}>
                 <div className="flex items-center justify-between gap-2">
-                  <span><span className="mr-1 text-xs text-[#8a4f2d]">{STAT_ICONS[key]}</span>{label}</span>
+                  <span>{label}</span>
                   <strong>{key === "wealth" ? formatWealth(character.stats?.[key] ?? 0) : `${statLevel(character.stats?.[key] ?? 0)}/10`}</strong>
                 </div>
                 {key !== "wealth" && (
-                  <div className="mt-2 h-2 border-2 border-[#2a2018] bg-[#e2d7c8]">
-                    <div className="h-full bg-[#2f7a84]" style={{ width: `${statLevel(character.stats?.[key] ?? 0) * 10}%` }} />
+                  <div className="stat-meter">
+                    <div className="stat-meter-fill" style={{ width: `${statLevel(character.stats?.[key] ?? 0) * 10}%` }} />
                   </div>
                 )}
               </div>
@@ -508,7 +535,7 @@ export function RelationshipsSheet({ character }: { character: SharedCharacterVi
                 </div>
                 <div className="relationship-meter mt-2 h-3 border-2 border-[#2a2018] bg-[#d8c8b4]">
                   <div
-                    className={`${rel.trust >= 0 ? "bg-[#d85f87]" : "bg-[#3f5f9f]"} h-full`}
+                    className={`relationship-meter-fill ${rel.trust >= 0 ? "positive" : "negative"}`}
                     style={{ width: `${Math.min(100, Math.abs(rel.trust))}%` }}
                   />
                 </div>

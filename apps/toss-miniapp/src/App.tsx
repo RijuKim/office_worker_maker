@@ -7,12 +7,12 @@ import { CharacterSheet, PlaySurface, RelationshipsSheet } from "@/lib/game-ui/A
 import { SharedGameChrome, SharedGameWorkspace, SharedOnboardingFlow } from "../../../lib/game-ui/shell";
 import { RecordCardShell, RecordShareActions, copyEndingShareLink } from "@/lib/game-ui/App";
 import { CodexDetailModal } from "@/app/components/codex/CodexDetailModal";
-import { CODEX_CATALOG, CATEGORY_ORDER, type CodexSlot } from "@/lib/game/codex-catalog";
+import { CodexGrid } from "@/app/components/codex/CodexGrid";
+import { CODEX_CATALOG, type CodexSlot } from "@/lib/game/codex-catalog";
 import { deriveCodexState } from "@/lib/game/derive-codex-state";
-import { EndingArt } from "@/lib/game/ending-art";
 import type { CareerEndingRecord } from "@prisma/client";
 import { createTossEndingShareLink } from "./toss-host";
-import type { CareerRecord, CharacterData, ChoiceFeedback, EventData, Screen } from "./types";
+import type { CareerPath, CareerRecord, CharacterData, CharacterSpec, ChoiceFeedback, EventData, JobApplication, Screen } from "./types";
 
 const statLabels: Record<string, string> = {
   academic: "학업",
@@ -75,8 +75,11 @@ function recordText(record: CareerRecord, key: string, fallback = "") {
 }
 
 export function App() {
+  const [initialLoading, setInitialLoading] = useState(true);
   const [screen, setScreen] = useState<Screen>("create");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showNewSimulationConfirm, setShowNewSimulationConfirm] = useState(false);
+  const [deletingSimulation, setDeletingSimulation] = useState(false);
   const [audioSettings, setAudioSettings] = useState<AudioSettings>(readAudioSettings);
   const [loading, setLoading] = useState(false);
   const [generatingNextEvent, setGeneratingNextEvent] = useState(false);
@@ -89,6 +92,9 @@ export function App() {
   const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
   const [recordsTab, setRecordsTab] = useState<"records" | "codex">("records");
   const [selectedCodexSlot, setSelectedCodexSlot] = useState<CodexSlot | null>(null);
+  const [specs, setSpecs] = useState<CharacterSpec[]>([]);
+  const [jobApplications, setJobApplications] = useState<JobApplication[]>([]);
+  const [careerPaths, setCareerPaths] = useState<CareerPath[]>([]);
   const [createStep, setCreateStep] = useState<CreateStep>("intro");
   const [name, setName] = useState("");
   const [age, setAge] = useState(22);
@@ -106,10 +112,62 @@ export function App() {
     ? records.find((record) => selectedCodexSlot.matches(record as unknown as CareerEndingRecord)) ?? null
     : null;
 
+  useEffect(() => {
+    if (!currentCharacter) {
+      setSpecs([]);
+      setJobApplications([]);
+      setCareerPaths([]);
+      return;
+    }
+    let active = true;
+    void Promise.all([
+      api.specs(currentCharacter.id),
+      api.jobApplications(currentCharacter.id),
+      api.careerPaths(currentCharacter.id),
+    ]).then(([specsResult, applicationsResult, pathsResult]) => {
+      if (!active) return;
+      if (specsResult.ok) setSpecs(specsResult.data.specs ?? []);
+      if (applicationsResult.ok) setJobApplications(applicationsResult.data.applications ?? []);
+      if (pathsResult.ok) setCareerPaths(pathsResult.data.paths ?? []);
+    });
+    return () => { active = false; };
+  }, [currentCharacter]);
+
+  const productionRightContent = (
+    <>
+      <section className="pixel-panel-dark mt-3.5 p-3.5" data-testid="spec-panel">
+        <div className="flex items-center justify-between gap-2"><h3 className="font-bold">스펙</h3><span className="text-xs font-bold text-[#f7d08b]" data-testid="spec-score">총점 {currentCharacter?.specScore ?? 0}</span></div>
+        <div className="mt-2 space-y-2">
+          {specs.map((spec, index) => <div className="flex items-center justify-between text-[13px]" key={`${spec.specType}-${index}`}><div><span className="mr-1 text-[#a9967d]">[{spec.specType}]</span><span className="text-[#d9c9b5]">{spec.specName}</span></div><span className={`rounded px-1.5 py-0.5 text-[11px] font-bold ${spec.status === "COMPLETED" ? "bg-[#2d4a22] text-[#8fce74]" : spec.status === "FAILED" ? "bg-[#4a2222] text-[#ce7474]" : "bg-[#4a3d22] text-[#ceb074]"}`}>{spec.status}</span></div>)}
+          {specs.length === 0 && <p className="text-[13px] text-[#d9c9b5]">정보 없음</p>}
+        </div>
+      </section>
+      <section className="pixel-panel-dark mt-3.5 p-3.5" data-testid="job-application-panel">
+        <h3 className="font-bold">취업 전형</h3><div className="mt-2 space-y-2">
+          {jobApplications.map((application, index) => <div className="text-[13px]" key={`${application.companyName}-${index}`}><div className="flex items-center justify-between"><span className="font-bold text-[#d9c9b5]">{application.companyName}</span><span className="text-[11px] text-[#a9967d]">{application.currentStage}</span></div><p className="mt-0.5 text-[11px] text-[#8a7f72]">서류 → 인적성 → 면접 → 최종</p></div>)}
+          {jobApplications.length === 0 && <p className="text-[13px] text-[#d9c9b5]">진행 중인 전형 없음</p>}
+        </div>
+      </section>
+      <section className="pixel-panel-dark mt-3.5 p-3.5" data-testid="career-path-panel">
+        <h3 className="font-bold">진로 트랙</h3><div className="mt-2 space-y-2">
+          {careerPaths.map((path, index) => <div className="flex items-center justify-between text-[13px]" key={`${path.pathName}-${index}`}><span className="text-[#d9c9b5]">{path.pathName}</span><span className={`rounded px-1.5 py-0.5 text-[11px] font-bold ${path.status === "COMPLETED" ? "bg-[#2d4a22] text-[#8fce74]" : path.status === "FAILED" ? "bg-[#4a2222] text-[#ce7474]" : "bg-[#4a3d22] text-[#ceb074]"}`}>{path.status}</span></div>)}
+          {careerPaths.length === 0 && <p className="text-[13px] text-[#d9c9b5]">정보 없음</p>}
+        </div>
+      </section>
+    </>
+  );
+
   const startNewSimulation = useCallback(() => {
     setLoading(false);
     setGeneratingNextEvent(false);
     setError("");
+    setCurrentCharacter(null);
+    setCurrentEvent(null);
+    setFeedback(null);
+    setCharacters([]);
+    setSpecs([]);
+    setJobApplications([]);
+    setCareerPaths([]);
     setCreateStep("intro");
     setName("");
     setAge(22);
@@ -117,7 +175,33 @@ export function App() {
     setSelectedStats([]);
     setScreen("create");
     setMenuOpen(false);
+    setShowNewSimulationConfirm(false);
   }, []);
+
+  const requestNewSimulation = useCallback(() => {
+    setMenuOpen(false);
+    setShowNewSimulationConfirm(true);
+  }, []);
+
+  const confirmNewSimulation = useCallback(async () => {
+    if (deletingSimulation) return;
+    setDeletingSimulation(true);
+    setError("");
+    try {
+      if (currentCharacter) {
+        const result = await api.deleteCharacter(currentCharacter.id);
+        if (!result.ok) {
+          setError(result.data.error ?? "기존 진행을 삭제하지 못했습니다.");
+          return;
+        }
+      }
+      startNewSimulation();
+    } catch {
+      setError("기존 진행을 삭제하지 못했습니다.");
+    } finally {
+      setDeletingSimulation(false);
+    }
+  }, [currentCharacter, deletingSimulation, startNewSimulation]);
 
   const cue = useCallback((kind: "tap" | "success" | "warning" | "ending" = "tap") => {
     runOptional(() => playCue(kind, audioSettings.sfx));
@@ -309,6 +393,7 @@ export function App() {
           // Missing/rejected host permission APIs must leave guest onboarding usable.
         } finally {
           setLoading(false);
+          setInitialLoading(false);
         }
       })();
     }, 0);
@@ -316,6 +401,17 @@ export function App() {
       window.clearTimeout(timer);
     };
   }, [refreshCharacters]);
+
+  if (initialLoading) {
+    return (
+      <main className="initial-loading-screen pixel-shell" aria-busy="true" aria-live="polite">
+        <div className="initial-loading-content">
+          <span className="initial-loading-spinner" aria-hidden="true" />
+          <p>눈을 뜨고 있습니다...</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="app-shell">
@@ -328,11 +424,24 @@ export function App() {
           setMenuOpen(false);
           void loadRecords();
         }}
-        onStartNewSimulation={startNewSimulation}
+        onStartNewSimulation={requestNewSimulation}
         audioSettings={audioSettings}
         onAudioSettingChange={updateAudioSetting}
         currentCharacterName={currentCharacter?.name ?? null}
       />
+
+      {showNewSimulationConfirm && (
+        <div className="new-simulation-backdrop" role="presentation" onClick={() => !deletingSimulation && setShowNewSimulationConfirm(false)}>
+          <section className="new-simulation-dialog pixel-panel" role="dialog" aria-modal="true" aria-label="새 시뮬레이션 확인" onClick={(event) => event.stopPropagation()}>
+            <h2>새 시뮬레이션을 시작할까요?</h2>
+            <p>현재 진행 중인 시뮬레이션은 삭제되고 되돌릴 수 없습니다.</p>
+            <div className="new-simulation-actions">
+              <button className="pixel-button" disabled={deletingSimulation} type="button" onClick={() => setShowNewSimulationConfirm(false)}>취소</button>
+              <button className="pixel-button-dark" disabled={deletingSimulation} type="button" onClick={() => void confirmNewSimulation()}>{deletingSimulation ? "삭제 중..." : "새로 시작"}</button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {error && <p className="error-banner">{error}</p>}
 
@@ -368,7 +477,7 @@ export function App() {
           activeTab="play"
           onTabChange={(tab) => setScreen(tab === "play" ? "play" : tab === "character" ? "character_detail" : "relationships")}
           onOpenRecords={() => void loadRecords()}
-          rightContent={null}
+          rightContent={productionRightContent}
         >
           <PlaySurface
             variant="web"
@@ -395,7 +504,7 @@ export function App() {
           activeTab="character"
           onTabChange={(tab) => setScreen(tab === "play" ? "play" : tab === "character" ? "character_detail" : "relationships")}
           onOpenRecords={() => void loadRecords()}
-          rightContent={null}
+          rightContent={productionRightContent}
         >
           <CharacterSheet character={currentCharacter} />
         </SharedGameWorkspace>
@@ -408,28 +517,27 @@ export function App() {
           activeTab="relationships"
           onTabChange={(tab) => setScreen(tab === "play" ? "play" : tab === "character" ? "character_detail" : "relationships")}
           onOpenRecords={() => void loadRecords()}
-          rightContent={null}
+          rightContent={productionRightContent}
         >
           <RelationshipsSheet character={currentCharacter} />
         </SharedGameWorkspace>
       )}
 
       {screen === "records" && (
-        <section className="screen-stack">
-          <div className="record-hero">
-            <p className="record-kicker">ARCHIVE</p>
-            <h2>선택의 결과 기록</h2>
-            <p>가상 취준 생활이 남긴 직업, 관계, 생활의 스냅샷</p>
+        <main className="records-screen min-h-screen p-4 pt-8">
+          <div className="mx-auto max-w-5xl">
+          <div className="record-hero mb-4 flex items-end justify-between gap-5 border-b-4 border-[#2a2018] pb-5 max-[720px]:block">
+            <div><p className="record-kicker">ARCHIVE</p><h2>선택의 결과 기록</h2><p>가상 취준 생활이 남긴 직업, 관계, 생활의 스냅샷</p></div>
+            <div className="record-actions flex items-center gap-4 max-[720px]:mt-4">
+              <button className="record-action" type="button" onClick={() => void loadRecords()}>새로고침</button>
+              <button className="record-action" type="button" onClick={() => setScreen(currentCharacter ? "play" : "create")}>이어가기</button>
+            </div>
           </div>
-          <div className="action-grid">
-            <button className="secondary-button" type="button" onClick={() => void loadRecords()}>새로고침</button>
-            <button className="secondary-button" type="button" onClick={() => setScreen(currentCharacter ? "play" : "create")}>진행으로</button>
-          </div>
-          <div className="toss-record-tabs" role="tablist">
+          <div className="record-tabs mb-6" role="tablist">
             <button className={recordsTab === "records" ? "active" : ""} type="button" role="tab" aria-selected={recordsTab === "records"} onClick={() => setRecordsTab("records")}>지난 루트</button>
             <button className={recordsTab === "codex" ? "active" : ""} type="button" role="tab" aria-selected={recordsTab === "codex"} onClick={() => setRecordsTab("codex")}>결말 모음</button>
           </div>
-          {recordsTab === "records" && records.length === 0 && <div className="list-panel"><p className="muted">아직 남겨진 기록이 없습니다.</p></div>}
+          {recordsTab === "records" && records.length === 0 && <div className="pixel-panel border-dashed p-10 text-center"><p className="text-sm text-[#706b62]">아직 저장된 기록이 없습니다.</p><p className="mt-2 text-xs text-[#a9967d]">시뮬레이션을 충분히 진행하면 선택의 결과를 남길 수 있습니다.</p></div>}
           {recordsTab === "records" && records.map((record) => {
             const isExpanded = expandedRecord === record.id;
             const narrative = recordText(record, "longNarrative");
@@ -439,7 +547,7 @@ export function App() {
             const relationshipState = recordText(record, "relationshipState", "관계의 여운");
             return (
             <RecordCardShell
-              className="record-panel overflow-hidden p-0"
+              className="record-card pixel-panel overflow-hidden p-0"
               expanded={isExpanded}
               id={record.id}
               key={record.id}
@@ -466,26 +574,8 @@ export function App() {
             );
           })}
           {recordsTab === "codex" && (
-            <div className="toss-codex">
-              <h3 className="toss-codex-count">{codexState.unlockedCount} / {codexState.totalSlots} 달성</h3>
-              {CATEGORY_ORDER.map((category) => {
-                const categoryState = codexState.byCategory[category];
-                if (!categoryState) return null;
-                return (
-                  <section className="toss-codex-category" key={category}>
-                    <div className="toss-codex-category-title"><h4>{category}</h4><span>({categoryState.unlocked}/{categoryState.total})</span></div>
-                    <div className="toss-codex-grid">
-                      {codexState.slots.filter((item) => item.slot.category === category).map((item) => (
-                        <button className="toss-codex-card" type="button" key={item.slot.id} onClick={() => setSelectedCodexSlot(item.slot)}>
-                          <span className={`toss-codex-art ${item.unlocked ? "unlocked" : "locked"}`}><EndingArt type={item.slot.endingArtType} size={42} locked={!item.unlocked} /></span>
-                          <strong>{item.unlocked ? item.slot.title : "???"}</strong>
-                          <small>{item.unlocked ? `${item.achievementCount}회 달성` : item.slot.categoryHint}</small>
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-                );
-              })}
+            <div className="relative pb-12">
+              <CodexGrid codexState={codexState} onSlotClick={(slot) => setSelectedCodexSlot(slot)} />
               {selectedCodexSlot && selectedCodexState && (
                 <CodexDetailModal
                   achievementCount={selectedCodexState.achievementCount}
@@ -499,7 +589,8 @@ export function App() {
               )}
             </div>
           )}
-        </section>
+          </div>
+        </main>
       )}
     </main>
   );

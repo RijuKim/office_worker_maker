@@ -132,6 +132,11 @@ button {
   line-height: 1.9;
 }
 
+.new-scene-text {
+  font-size: 1.08em;
+  word-break: break-all;
+}
+
 .feedback-pop {
   animation: feedback-pop 720ms steps(4, end);
 }
@@ -1355,6 +1360,277 @@ button:disabled {
   width: 18px;
   height: 14px;
   box-shadow: 18px 0 0 #fff8e8;
+}
+
+/* Deterministic portrait combinations. New names/IDs automatically select
+   one stable hair, outfit, expression, accessory, and pose combination. */
+.pixel-portrait .portrait-hair::before,
+.pixel-portrait .portrait-hair::after,
+.pixel-portrait .portrait-body::before,
+.pixel-portrait .portrait-body::after,
+.pixel-portrait .portrait-accessory::before,
+.pixel-portrait .portrait-accessory::after {
+  content: "";
+  position: absolute;
+  display: block;
+}
+
+.pixel-portrait.hair-short .portrait-hair {
+  height: 14px;
+  clip-path: polygon(0 25%, 18% 25%, 18% 0, 78% 0, 78% 18%, 100% 18%, 100% 100%, 0 100%);
+}
+
+.pixel-portrait.hair-bob .portrait-hair::after {
+  left: -8px;
+  top: 12px;
+  width: 54px;
+  height: 22px;
+  border-left: 8px solid var(--hair-color, #35261c);
+  border-right: 8px solid var(--hair-color, #35261c);
+}
+
+.pixel-portrait.hair-long .portrait-hair::after {
+  left: -9px;
+  top: 14px;
+  width: 56px;
+  height: 38px;
+  border-left: 10px solid var(--hair-color, #35261c);
+  border-right: 10px solid var(--hair-color, #35261c);
+  border-bottom: 7px solid var(--hair-color, #35261c);
+}
+
+.pixel-portrait.hair-side .portrait-hair {
+  clip-path: polygon(0 0, 100% 0, 100% 65%, 65% 65%, 65% 100%, 42% 100%, 42% 58%, 0 58%);
+  transform: translateX(-3px);
+}
+
+.pixel-portrait.hair-spiky .portrait-hair {
+  top: 7px;
+  height: 23px;
+  clip-path: polygon(0 100%, 0 38%, 14% 50%, 20% 0, 36% 42%, 52% 0, 64% 45%, 82% 10%, 86% 52%, 100% 38%, 100% 100%);
+}
+
+.pixel-portrait.hair-tied .portrait-hair::after {
+  right: -18px;
+  top: 8px;
+  width: 16px;
+  height: 22px;
+  background: var(--hair-color, #35261c);
+  box-shadow: 5px 8px 0 var(--hair-color, #35261c);
+}
+
+.pixel-portrait.outfit-shirt .portrait-body::after {
+  left: 18px;
+  top: 0;
+  width: 4px;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.pixel-portrait.outfit-hoodie .portrait-body {
+  clip-path: polygon(10% 0, 90% 0, 100% 26%, 100% 100%, 0 100%, 0 26%);
+}
+
+.pixel-portrait.outfit-hoodie .portrait-body::before {
+  left: 10px;
+  top: 2px;
+  width: 20px;
+  height: 10px;
+  border: 3px solid #0f0b08;
+  border-top: 0;
+}
+
+.pixel-portrait.outfit-blazer .portrait-body::before,
+.pixel-portrait.outfit-blazer .portrait-body::after {
+  top: 0;
+  width: 16px;
+  height: 23px;
+  background: #fff8e8;
+}
+
+.pixel-portrait.outfit-blazer .portrait-body::before {
+  left: 2px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 45% 55%);
+}
+
+.pixel-portrait.outfit-blazer .portrait-body::after {
+  right: 2px;
+  clip-path: polygon(0 0, 100% 0, 55% 55%, 0 100%);
+}
+
+.pixel-portrait.outfit-knit .portrait-body {
+  background: repeating-linear-gradient(90deg, var(--body-color, #d85f87) 0 7px, rgba(255,255,255,.3) 7px 10px);
+}
+
+.pixel-portrait.outfit-jacket .portrait-body::after {
+  left: 19px;
+  top: 0;
+  width: 3px;
+  height: 100%;
+  background: #0f0b08;
+  box-shadow: -12px 8px 0 -1px #fff8e8, 12px 8px 0 -1px #fff8e8;
+}
+
+.pixel-portrait.expression-smile .portrait-mouth {
+  height: 5px;
+  border-right: 3px solid #8a4f2d;
+  border-bottom: 3px solid #8a4f2d;
+  border-left: 3px solid #8a4f2d;
+  background: transparent;
+}
+
+.pixel-portrait.expression-serious .portrait-eye-left { transform: translateY(1px) rotate(8deg); }
+.pixel-portrait.expression-serious .portrait-eye-right { transform: translateY(1px) rotate(-8deg); }
+.pixel-portrait.expression-serious .portrait-mouth { height: 2px; }
+.pixel-portrait.expression-tired .portrait-eye { height: 3px; transform: translateY(3px); }
+.pixel-portrait.expression-tired .portrait-mouth { width: 6px; transform: translateX(1px) rotate(-8deg); }
+
+.pixel-portrait .portrait-accessory {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.pixel-portrait.accessory-glasses .portrait-accessory {
+  left: 20px;
+  top: 33px;
+  width: 12px;
+  height: 9px;
+  border: 2px solid #1f2d47;
+  box-shadow: 15px 0 0 -2px var(--skin-color, #f4c28b), 15px 0 0 0 #1f2d47;
+}
+
+.pixel-portrait.accessory-glasses .portrait-accessory::after {
+  left: 10px;
+  top: 2px;
+  width: 7px;
+  height: 2px;
+  background: #1f2d47;
+}
+
+.pixel-portrait.accessory-hairclip .portrait-accessory {
+  right: 14px;
+  top: 18px;
+  width: 10px;
+  height: 5px;
+  border: 2px solid #0f0b08;
+  background: #f2b84b;
+  transform: rotate(-18deg);
+}
+
+.pixel-portrait.accessory-headphones .portrait-accessory {
+  left: 12px;
+  top: 20px;
+  width: 44px;
+  height: 30px;
+  border: 4px solid #305d73;
+  border-bottom: 0;
+}
+
+.pixel-portrait.accessory-headphones .portrait-accessory::before,
+.pixel-portrait.accessory-headphones .portrait-accessory::after {
+  top: 16px;
+  width: 7px;
+  height: 13px;
+  background: #305d73;
+}
+.pixel-portrait.accessory-headphones .portrait-accessory::before { left: -6px; }
+.pixel-portrait.accessory-headphones .portrait-accessory::after { right: -6px; }
+
+.pixel-portrait.accessory-earring .portrait-accessory {
+  right: 13px;
+  top: 45px;
+  width: 6px;
+  height: 8px;
+  border: 2px solid #0f0b08;
+  background: #f2b84b;
+}
+
+.pixel-portrait.pose-lean-left .portrait-body,
+.pixel-portrait.pose-lean-left .portrait-collar { transform: translateX(-3px); }
+.pixel-portrait.pose-lean-right .portrait-body,
+.pixel-portrait.pose-lean-right .portrait-collar { transform: translateX(3px); }
+
+.pixel-portrait-large.hair-bob .portrait-hair::after {
+  left: -14px;
+  top: 22px;
+  width: 100px;
+  height: 40px;
+  border-width: 0 14px;
+  border-style: solid;
+  border-color: var(--hair-color, #35261c);
+}
+
+.pixel-portrait-large.hair-short .portrait-hair {
+  top: 17px;
+  height: 27px;
+}
+
+.pixel-portrait-large.hair-spiky .portrait-hair {
+  top: 12px;
+  height: 42px;
+}
+
+.pixel-portrait-large.hair-long .portrait-hair::after {
+  left: -16px;
+  top: 28px;
+  width: 104px;
+  height: 70px;
+  border-left-width: 17px;
+  border-right-width: 17px;
+  border-bottom-width: 12px;
+}
+
+.pixel-portrait-large.hair-tied .portrait-hair::after {
+  right: -30px;
+  top: 15px;
+  width: 26px;
+  height: 38px;
+  box-shadow: 8px 12px 0 var(--hair-color, #35261c);
+}
+
+.pixel-portrait-large.accessory-glasses .portrait-accessory {
+  left: 38px;
+  top: 66px;
+  width: 19px;
+  height: 14px;
+  border-width: 3px;
+  box-shadow: 28px 0 0 -3px var(--skin-color, #f4c28b), 28px 0 0 0 #1f2d47;
+}
+
+.pixel-portrait-large.accessory-glasses .portrait-accessory::after {
+  left: 17px;
+  top: 4px;
+  width: 12px;
+  height: 3px;
+}
+
+.pixel-portrait-large.accessory-hairclip .portrait-accessory {
+  right: 25px;
+  top: 34px;
+  width: 17px;
+  height: 8px;
+  border-width: 3px;
+}
+
+.pixel-portrait-large.accessory-headphones .portrait-accessory {
+  left: 21px;
+  top: 39px;
+  width: 84px;
+  height: 54px;
+  border-width: 6px;
+}
+
+.pixel-portrait-large.accessory-earring .portrait-accessory {
+  right: 24px;
+  top: 87px;
+  width: 9px;
+  height: 13px;
+  border-width: 3px;
+}
+
+.pixel-portrait-compact .portrait-accessory {
+  display: none;
 }
 
 @keyframes toss-cloud-drift { to { transform: translateX(500px); } }

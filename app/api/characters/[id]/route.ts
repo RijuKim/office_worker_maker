@@ -59,3 +59,24 @@ export async function GET(request: Request | NextRequest, context: RouteContext)
     },
   });
 }
+
+export async function DELETE(request: Request | NextRequest, context: RouteContext) {
+  const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  const log = logger.withRequestId(requestId);
+  const userId = await requireCurrentUserId();
+
+  if (!userId) {
+    return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
+
+  const { id } = await context.params;
+  const deleted = await prisma.characterRun.deleteMany({ where: { id, userId } });
+
+  if (deleted.count === 0) {
+    log.warn("캐릭터 삭제 실패 - 찾을 수 없음", { userId, characterId: id });
+    return NextResponse.json({ error: "삭제할 진행 정보를 찾을 수 없습니다." }, { status: 404 });
+  }
+
+  log.info("새 시뮬레이션 시작을 위한 기존 캐릭터 삭제", { userId, characterId: id });
+  return NextResponse.json({ deleted: true });
+}

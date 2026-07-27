@@ -133,6 +133,12 @@ button {
   line-height: 1.9;
 }
 
+.new-scene-text {
+  font-size: 1.08em;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
 .create-panel,
 .create-panel h2,
 .create-panel p,
@@ -150,6 +156,14 @@ button {
 .create-panel .create-question {
   color: #2a2018;
   word-break: keep-all;
+}
+
+.create-panel .create-copy p {
+  color: #2a2018;
+}
+
+.create-panel .create-copy p.text-xs {
+  color: #706b62;
 }
 
 
@@ -1435,6 +1449,13 @@ button {
   background: #ffe0a2;
 }
 
+.app-layout .choice-stack button > .choice-label {
+  min-width: 0;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
 .app-layout,
 .app-layout button,
 .app-layout input,
@@ -1478,6 +1499,10 @@ button {
   justify-content: space-between;
   gap: 20px;
   color: #fff3d7;
+}
+
+.app-title-header > .title-row {
+  display: contents;
 }
 
 .app-title {
