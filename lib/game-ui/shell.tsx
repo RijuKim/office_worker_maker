@@ -160,7 +160,7 @@ export function SharedGameChrome({
   }, [menuOpen, closeMenu]);
 
   return (
-    <section className={`hero-panel${productionWeb ? " app-title-header" : ""}`} data-audio-ready={audioReady ? "true" : "false"}>
+    <section className={productionWeb ? "app-title-header" : "hero-panel"} data-audio-ready={audioReady ? "true" : "false"}>
       <div className="title-row">
         <h1 className="app-title">
           <span>일어나보니</span>
@@ -168,7 +168,7 @@ export function SharedGameChrome({
         </h1>
         <button
           ref={menuButtonRef}
-          className={`menu-button${productionWeb ? " chrome-icon-button chrome-menu-button" : ""}`}
+          className={productionWeb ? "chrome-icon-button chrome-menu-button" : "menu-button"}
           type="button"
           aria-label="메뉴"
           aria-expanded={menuOpen}
@@ -177,7 +177,7 @@ export function SharedGameChrome({
           {productionWeb ? <><span /><span /><span /><span className="visually-hidden">메뉴</span></> : "메뉴"}
         </button>
         {menuOpen && (
-          <nav ref={menuRef} className="app-menu-popover menu-popover" aria-label="메뉴">
+          <nav ref={menuRef} className={productionWeb ? "app-menu-popover" : "app-menu-popover menu-popover"} aria-label="메뉴">
             {onOpenProgress && (
               <button
                 type="button"
@@ -228,7 +228,6 @@ export interface SharedOnboardingFlowProps {
   submitDisabled: boolean;
 }
 
-const AGE_OPTIONS = Array.from({ length: 63 }, (_, index) => index + 18);
 const RESIDENCE_OPTIONS = [
   { id: "family_home", label: "본가", description: "익숙한 가족의 생활 소리 속에서 시작합니다." },
   { id: "studio", label: "자취방", description: "작지만 온전히 내 몫인 방에서 시작합니다." },
@@ -277,9 +276,19 @@ export function SharedOnboardingFlow(props: SharedOnboardingFlowProps) {
       {props.step === "age" && (
         <section className="create-step">
           <h2>당신의 나이는 몇 살인가요?</h2>
-          <select aria-label="당신의 나이는 몇 살인가요?" className="text-input" value={props.age} onChange={(event) => props.onAgeChange(Number(event.target.value))}>
-            {AGE_OPTIONS.map((option) => <option key={option} value={option}>{option}세</option>)}
-          </select>
+          <input
+            aria-label="당신의 나이는 몇 살인가요?"
+            className="text-input"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            step="1"
+            type="number"
+            value={props.age || ""}
+            onChange={(event) => {
+              const value = event.target.value;
+              if (/^\d*$/.test(value)) props.onAgeChange(value === "" ? 0 : Number(value));
+            }}
+          />
           <div className="onboarding-actions">
             <button onClick={() => props.onStepChange("name")}>이전</button>
             <button onClick={() => props.onStepChange("residence")}>다음</button>
