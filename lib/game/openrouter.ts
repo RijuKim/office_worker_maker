@@ -545,6 +545,9 @@ async function generateAiEventWithProvider(
       ? (message as Record<string, unknown>).content as string | undefined
       : undefined;
     if (!content) {
+      const messageRecord = message && typeof message === "object"
+        ? message as Record<string, unknown>
+        : null;
       logAiAttempt({
         kind: "json",
         providerId: provider.id,
@@ -553,6 +556,12 @@ async function generateAiEventWithProvider(
         reason: "empty_content",
         providerElapsedMs: Date.now() - startedAt,
         responseJsonMs: Date.now() - startedAt,
+        responseKeys: data ? Object.keys(data) : [],
+        messageKeys: messageRecord ? Object.keys(messageRecord) : [],
+        contentType: typeof messageRecord?.content,
+        contentLength: typeof messageRecord?.content === "string" ? messageRecord.content.length : 0,
+        thinkingLength: typeof messageRecord?.thinking === "string" ? messageRecord.thinking.length : 0,
+        doneReason: typeof data?.done_reason === "string" ? data.done_reason : null,
       });
       return failure("empty_content");
     }
