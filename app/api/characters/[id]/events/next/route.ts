@@ -15,6 +15,7 @@ import { logger } from "@/lib/server/logger";
 type RouteContext = { params: Promise<Record<string, string>> };
 
 export async function POST(request: Request | NextRequest, context: RouteContext) {
+  const routeStartedAt = Date.now();
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   const log = logger.withRequestId(requestId);
   const userId = await requireCurrentUserId();
@@ -24,6 +25,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
 
   const { id } = await context.params;
 
+  const characterLoadStartedAt = Date.now();
   const character = await prisma.characterRun.findFirst({
     where: { id, userId },
     include: {
@@ -48,6 +50,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
       },
     },
   });
+  const characterLoadMs = Date.now() - characterLoadStartedAt;
 
   if (!character) {
     return NextResponse.json({ error: "캐릭터를 찾을 수 없습니다." }, { status: 404 });
@@ -57,6 +60,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
     return NextResponse.json({ error: "캐릭터 데이터가 불완전합니다." }, { status: 500 });
   }
 
+  const authorityStartedAt = Date.now();
   let authorityStore = createPrismaEventAuthorityStore({ client: prisma, characterRunId: id, userId });
   const committedEvent = await authorityStore.getCurrent();
   if (committedEvent) {
@@ -69,6 +73,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
     userId,
     leaseMs: getOpenRouterTimeoutMs() + 5_000,
   });
+  const authorityResolveMs = Date.now() - authorityStartedAt;
   if (generationRole.missing) {
     return NextResponse.json({ error: "캐릭터를 찾을 수 없습니다." }, { status: 404 });
   }
@@ -371,6 +376,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
     fallbackUsed = source === "FALLBACK";
   }
 
+  const commitStartedAt = Date.now();
   let newEvent;
   try {
     generationLease.assertOwned();
@@ -406,6 +412,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
     }
     throw error;
   }
+  const commitMs = Date.now() - commitStartedAt;
   const totalElapsedMs = Date.now() - generationStartedAt;
   log.info("이벤트 생성 완료", {
     userId,
@@ -422,7 +429,11 @@ export async function POST(request: Request | NextRequest, context: RouteContext
     providerId,
     providerFailures,
     providerElapsedMs,
+    characterLoadMs,
+    authorityResolveMs,
+    commitMs,
     totalElapsedMs,
+    routeTotalElapsedMs: Date.now() - routeStartedAt,
     slow: generationSlow || totalElapsedMs > 10_000,
     timeToFinalEventMs: totalElapsedMs,
     lifeStage: selectionLifeStage.lifeStage,

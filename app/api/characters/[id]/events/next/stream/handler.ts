@@ -71,6 +71,7 @@ export function createNextEventStreamPost({
   observeSend,
 }: NextEventStreamRouteDependencies = {}) {
   return async function nextEventStreamPost(request: Request | NextRequest, context: RouteContext) {
+  const routeStartedAt = Date.now();
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   const log = logger.withRequestId(requestId);
   const userId = await requireCurrentUserId();
@@ -108,6 +109,7 @@ export function createNextEventStreamPost({
       try {
         assertConnected();
         send("status", { message: "선택의 시간이 다가오고 있습니다..." });
+        const characterLoadStartedAt = Date.now();
         const character = await prisma.characterRun.findFirst({
           where: { id, userId },
           include: {
@@ -124,6 +126,7 @@ export function createNextEventStreamPost({
             },
           },
         });
+        const characterLoadMs = Date.now() - characterLoadStartedAt;
         assertConnected();
 
         if (!character || !character.hiddenState) {
@@ -131,6 +134,7 @@ export function createNextEventStreamPost({
           return;
         }
 
+        const authorityStartedAt = Date.now();
         let authorityStore = createPrismaEventAuthorityStore({ client: prisma, characterRunId: id, userId });
         const committedEvent = await authorityStore.getCurrent();
         assertConnected();
@@ -145,6 +149,7 @@ export function createNextEventStreamPost({
           userId,
           leaseMs: getOpenRouterTimeoutMs() + 5_000,
         });
+        const authorityResolveMs = Date.now() - authorityStartedAt;
         if (generationRole.missing) {
           assertConnected();
           send("error", { error: "캐릭터를 찾을 수 없습니다." });
@@ -438,6 +443,7 @@ export function createNextEventStreamPost({
         const candidateId = crypto.randomUUID();
         assertConnected();
         generationLease.assertOwned();
+        const commitStartedAt = Date.now();
         const newEvent = await acquireAuthoritativeEvent({
           store: authorityStore,
           generate: async () => {
@@ -471,6 +477,7 @@ export function createNextEventStreamPost({
             assertConnected();
           },
         });
+        const commitMs = Date.now() - commitStartedAt;
         assertConnected();
         // Provider output stays buffered until the candidate is committed.
         // Deliver the complete committed event at once so the client does not
@@ -492,7 +499,11 @@ export function createNextEventStreamPost({
           providerId,
           providerFailures,
           providerElapsedMs,
+          characterLoadMs,
+          authorityResolveMs,
+          commitMs,
           totalElapsedMs,
+          routeTotalElapsedMs: Date.now() - routeStartedAt,
           slow: generationSlow || totalElapsedMs > 10_000,
           providerFirstBodyMs,
           generationCompleteMs,
