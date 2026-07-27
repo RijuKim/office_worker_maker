@@ -20,29 +20,39 @@ type AiProviderOptions = {
   };
 };
 
-const primaryProvider = (): AiProvider => ({
+const openRouterProvider = (): AiProvider => ({
   id: "openrouter",
   label: "OpenRouter DeepSeek V4 Flash",
   baseUrl: "https://openrouter.ai/api/v1",
-  key: process.env.OPENROUTER_API_KEY ?? null,
-  model: process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-v4-flash",
+  key: process.env.OPENROUTER_API_KEY?.trim() || null,
+  model: (process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-v4-flash").trim(),
   headers: {
     "HTTP-Referer": process.env.NEXTAUTH_URL ?? "https://sano-officeworker.vercel.app",
     "X-Title": "Sano Officeworker",
   },
 });
 
-const fallbackProvider = (): AiProvider => ({
+const ollamaProvider = (): AiProvider => ({
   id: "ollama",
   label: "Ollama GPT-OSS",
   baseUrl: "https://ollama.com/v1",
-  key: process.env.OLLAMA_API_KEY ?? null,
-  model: process.env.OLLAMA_MODEL ?? "gpt-oss:20b",
+  key: process.env.OLLAMA_API_KEY?.trim() || null,
+  model: (process.env.OLLAMA_MODEL ?? "gpt-oss:20b").trim(),
 });
 
+function configuredProviders(): { primary: AiProvider; fallback: AiProvider } {
+  const ollamaIsPrimary = process.env.AI_PRIMARY_PROVIDER?.trim().toLowerCase() === "ollama";
+  return ollamaIsPrimary
+    ? { primary: ollamaProvider(), fallback: openRouterProvider() }
+    : { primary: openRouterProvider(), fallback: ollamaProvider() };
+}
+
 const aiProviders = (options: AiProviderOptions = {}) =>
-  options.primaryOnly ? [primaryProvider()] :
-    options.skipPrimary ? [fallbackProvider()] : [primaryProvider(), fallbackProvider()];
+  (() => {
+    const { primary, fallback } = configuredProviders();
+    return options.primaryOnly ? [primary] :
+      options.skipPrimary ? [fallback] : [primary, fallback];
+  })();
 
 // Give the configured providers enough time to finish a complete structured
 // event. Both providers share this total window, after which the route commits

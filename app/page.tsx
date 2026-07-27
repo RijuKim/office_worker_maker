@@ -831,10 +831,10 @@ export default function AppPage() {
       }, { keepalive: true });
       if (!ok) return;
       if (data.result?.stats) {
-        setCurrentChar((char) => char ? { ...char, stats: data.result.stats } : char);
+        setCurrentChar((char) => char ? { ...char, stats: data.result.stats, ...(data.result.relationships ? { relationships: data.result.relationships } : {}) } : char);
+      } else if (data.result?.relationships) {
+        setCurrentChar((char) => char ? { ...char, relationships: data.result.relationships } : char);
       }
-      await loadCharacterEvent(currentChar.id);
-      await loadSpecData(currentChar.id);
       const feedback = {
         choiceLabel: data.result?.choiceLabel ?? selectedChoiceLabel,
         statDelta: data.result?.statDelta ?? {},
