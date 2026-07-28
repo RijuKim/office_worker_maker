@@ -283,8 +283,8 @@ export function PixelPortrait({ name, compact = false, large = false, variant, s
 }
 
 export function normalizeNarrativeBody(body: string): string {
-  if (/\\\\n/.test(body)) {
-    return body.replace(/\\\\n/g, "\n").replace(/\\\\r/g, "\r").replace(/\\\\t/g, "\t");
+  if (/\\n/.test(body)) {
+    return body.replace(/\\n/g, "\n").replace(/\\r/g, "\r").replace(/\\t/g, "\t");
   }
   return body;
 }

@@ -2,8 +2,34 @@ import { describe, expect, it } from "vitest";
 
 import { parseAiEventContentDetailed } from "@/lib/game/openrouter";
 import { normalizeRelationshipName } from "@/lib/game/npcs";
+import { normalizeNarrativeBody } from "@/lib/game-ui/App";
 
 const validBody = "당신은 늦은 오후 도서관 창가에서 오래 미뤄 둔 지원서를 펼쳤다. 빗소리가 유리창을 두드리고, 낯선 제안이 도착한다. 선택에는 분명한 비용과 다음 장면으로 이어질 약속이 함께 놓여 있다.";
+
+describe("normalizeNarrativeBody", () => {
+  it("converts literal one-backslash \\n to actual newlines", () => {
+    const input = "첫 문장입니다.\\n\\n두 번째 문장입니다.\\n\\n세 번째 문장입니다.";
+    const result = normalizeNarrativeBody(input);
+    expect(result).toBe("첫 문장입니다.\n\n두 번째 문장입니다.\n\n세 번째 문장입니다.");
+    expect(result).toContain("\n\n");
+  });
+
+  it("leaves ordinary bodies without backslash-n unchanged", () => {
+    const result = normalizeNarrativeBody(validBody);
+    expect(result).toBe(validBody);
+    expect(result).not.toContain("\n");
+  });
+
+  it("leaves bodies with actual newlines unchanged", () => {
+    const input = "첫 문장입니다.\n\n두 번째 문장입니다.";
+    const result = normalizeNarrativeBody(input);
+    expect(result).toBe(input);
+  });
+
+  it("handles empty string", () => {
+    expect(normalizeNarrativeBody("")).toBe("");
+  });
+});
 
 const validEvent = {
   title: "비 오는 날의 제안",
@@ -194,6 +220,30 @@ describe("parseAiEventContentDetailed with relationship name normalization", () 
       expect(relDelta).toBeDefined();
       expect(relDelta![0].name).toBe("서연");
       expect(relDelta![0].trust).toBe(5);
+    }
+  });
+
+  it("preserves 2-3 choices with label, summary, statDelta, and choice count when filtering unsafe relationship delta", () => {
+    const rawJson = '{"title":"비 오는 날의 제안","body":"당신은 늦은 오후 도서관 창가에서 오래 미뤄 둔 지원서를 펼쳤다. 빗소리가 유리창을 두드리고, 낯선 제안이 도착한다. 선택에는 분명한 비용과 다음 장면으로 이어질 약속이 함께 놓여 있다.","tags":["진로"],"choices":[{"id":"a","label":"알바 동료와 이야기한다","summary":"당신은 알바 동료와 이야기했다.","statDelta":{"mental":1},"relationshipDelta":[{"name":"알바 동료","trust":5}]},{"id":"b","label":"혼자 있다","summary":"당신은 혼자 시간을 보냈다.","statDelta":{"mental":-1}},{"id":"c","label":"서연에게 연락한다","summary":"당신은 서연에게 연락했다.","statDelta":{"charm":1},"relationshipDelta":[{"name":"서연","trust":3}]}]}';
+    const result = parseAiEventContentDetailed(rawJson);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.event.choices.length).toBe(3);
+      const choiceA = result.event.choices[0];
+      expect(choiceA.label).toBe("알바 동료와 이야기한다");
+      expect(choiceA.summary).toBe("당신은 알바 동료와 이야기했다.");
+      expect(choiceA.statDelta.mental).toBe(1);
+      expect(choiceA.relationshipDelta).toEqual([]);
+      const choiceB = result.event.choices[1];
+      expect(choiceB.label).toBe("혼자 있다");
+      expect(choiceB.summary).toBe("당신은 혼자 시간을 보냈다.");
+      expect(choiceB.statDelta.mental).toBe(-1);
+      expect(choiceB.relationshipDelta).toEqual([]);
+      const choiceC = result.event.choices[2];
+      expect(choiceC.label).toBe("서연에게 연락한다");
+      expect(choiceC.summary).toBe("당신은 서연에게 연락했다.");
+      expect(choiceC.statDelta.charm).toBe(1);
+      expect(choiceC.relationshipDelta).toEqual([{ name: "서연", trust: 3 }]);
     }
   });
 });

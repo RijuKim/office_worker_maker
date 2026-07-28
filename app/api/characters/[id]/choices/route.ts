@@ -141,18 +141,23 @@ export async function POST(request: Request | NextRequest, context: RouteContext
   );
   const existingRelationshipNames = new Set(character.relationships.map((rel: { name: string }) => rel.name));
   const newRelationships = choice.relationshipDelta
-    .filter((rel) => !existingRelationshipNames.has(rel.name))
     .map((rel) => {
-      const normalizedName = normalizeRelationshipName(rel.name) ?? rel.name;
-      return {
-        characterRunId: id,
-        name: normalizedName,
-        role: inferRelationshipRole(normalizedName, activeEvent.title),
-        trust: Math.max(-100, Math.min(100, rel.trust >= 0 ? 35 + rel.trust : rel.trust)),
-        status: rel.status ?? "acquaintance",
-        tags: inferRelationshipTags(normalizedName, activeEvent.title),
-      };
-    });
+      const normalizedName = normalizeRelationshipName(rel.name);
+      if (!normalizedName) return null;
+      return { ...rel, name: normalizedName };
+    })
+    .filter((rel): rel is { name: string; trust: number; status?: RelationshipStatus } =>
+      rel !== null && !existingRelationshipNames.has(rel.name),
+    )
+    .filter((rel, index, self) => self.findIndex((r) => r.name === rel.name) === index)
+    .map((rel) => ({
+      characterRunId: id,
+      name: rel.name,
+      role: inferRelationshipRole(rel.name, activeEvent.title),
+      trust: Math.max(-100, Math.min(100, rel.trust >= 0 ? 35 + rel.trust : rel.trust)),
+      status: rel.status ?? "acquaintance",
+      tags: inferRelationshipTags(rel.name, activeEvent.title),
+    }));
   const resolvedFlagDelta = resolveCareerGateFlagDelta({
     flagDelta: choice.flagDelta,
     stats: updatedStats,
