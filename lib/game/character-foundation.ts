@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import type { CharacterCreateInput } from "@/lib/game/validation";
 import type { PublicStatKey } from "@/lib/game/validation";
 import { buildInitialLifeStageFlags, deriveLifeStageState } from "@/lib/game/life-stage";
-import { selectStarterNpcs } from "@/lib/game/npcs";
+import { selectStarterCandidates, selectStarterNpcs, selectStarterPair } from "@/lib/game/npcs";
 
 export type NormalizedCharacterCreateInput = CharacterCreateInput & {
   major: string;
@@ -185,8 +185,8 @@ function residenceLabel(residence: CharacterCreateInput["residence"]) {
 export function buildInitialHiddenState(input: Pick<NormalizedCharacterCreateInput, "age" | "major" | "residence" | "preferredStats" | "startGradeYear"> & { seed?: string }) {
   const characterProfile = buildCharacterProfile(input);
   const starterSeed = input.seed ?? crypto.randomUUID();
-  const starters = selectStarterNpcs(starterSeed, 2);
-  const starterNpc = starters[0];
+  const [starterNpc] = selectStarterPair(starterSeed);
+  const starterCandidates = selectStarterCandidates(starterSeed, 7);
   const openThreads = [
     "첫 학기의 리듬을 잡아야 한다",
     `${starterNpc.name}의 제안이 무엇인지 아직 모른다`,
@@ -223,6 +223,7 @@ export function buildInitialHiddenState(input: Pick<NormalizedCharacterCreateInp
       preferredStats: input.preferredStats,
       characterProfile,
       storyArc,
+      starterCandidates,
       ...buildInitialLifeStageFlags({ currentGradeYear: input.startGradeYear, major: input.major }),
     },
   } satisfies Prisma.HiddenStateCreateWithoutCharacterRunInput;
@@ -292,13 +293,21 @@ function applyProfileStatModifiers(
 
 export function buildStarterRelationships(seed?: string) {
   const starterSeed = seed ?? crypto.randomUUID();
-  const starters = selectStarterNpcs(starterSeed, 2);
-  return starters.map((npc) => ({
-    name: npc.name,
-    role: npc.role,
-    trust: 46 + Math.floor(Math.random() * 15),
-    tags: npc.tags.slice(0, 3),
-  })) satisfies Prisma.RelationshipCreateWithoutCharacterRunInput[];
+  const [senior, peer] = selectStarterPair(starterSeed);
+  return [
+    {
+      name: senior.name,
+      role: senior.role,
+      trust: 46,
+      tags: senior.tags.slice(0, 3),
+    },
+    {
+      name: peer.name,
+      role: peer.role,
+      trust: 52,
+      tags: peer.tags.slice(0, 3),
+    },
+  ] satisfies Prisma.RelationshipCreateWithoutCharacterRunInput[];
 }
 
 export function buildFirstEvent(input: NormalizedCharacterCreateInput & { seed?: string }) {
@@ -310,8 +319,7 @@ export function buildFirstEvent(input: NormalizedCharacterCreateInput & { seed?:
   const prefersPractical = input.preferredStats.includes("practical") || input.preferredStats.includes("wealth");
 
   const starterSeed = input.seed ?? crypto.randomUUID();
-  const starters = selectStarterNpcs(starterSeed, 2);
-  const [starterA, starterB] = starters;
+  const [starterA, starterB] = selectStarterPair(starterSeed);
 
   const firstEventScenes: Array<{
     title: string;

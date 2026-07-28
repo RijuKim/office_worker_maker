@@ -252,6 +252,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
       allowedCategories: diversityGuidance.allowedCategories,
       careerNarrative: summarizeCareerNarrativeForPrompt(careerNarrative),
       avoidPeople: diversityGuidance.avoidPeople,
+      starterCandidates: (currentFlags.starterCandidates as { name: string; role: string }[] | undefined) ?? [],
     };
     const providerStartedAt = Date.now();
     let aiResult: Awaited<ReturnType<typeof generateAiEvent>> | {

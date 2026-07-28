@@ -183,7 +183,7 @@ CRITICAL - Event diversity rules:
 
 CRITICAL - Relationship and NPC continuity rules:
 11. The "관계" field lists the protagonist's current relationships with concrete canonical names. These are PERSISTED GAME STATE. Every event that involves a named person must use their exact persisted name. Never invent generic role labels (e.g. "동아리 친구", "같은 과 동기") as relationship names.
-12. When introducing a new social contact, prefer names from the safe canonical roster (지민, 소연, 상혁, 도윤, 민하, 유진, 미영, 은지, 재호, 서연, 현우, 명수, 노인, 혜진). Do not invent generic default names like 수아 or 새롭게 만난 친구.
+12. When introducing a new social contact, prefer names from the safe canonical candidates supplied in the "안전후보" field. Do not invent generic default names like 수아 or 새롭게 만난 친구.
 13. Dangerous NPCs (재석, 수진, 준호, 비밀(여/남), 미정) with dangerLevel >= 2 must ONLY appear in explicit crime, risk, or underworld contexts. They must never be proposed as ordinary starter friends, mentors, or social contacts.
 14. If a persisted relationship with a specific name exists (e.g. 수아), that relationship may continue naturally. The restriction is against the AI inventing default names, not against legitimate continuity.
 `;
@@ -215,6 +215,7 @@ export type AiEventPromptState = {
   allowedCategories?: string[];
   careerNarrative?: unknown;
   avoidPeople?: string[];
+  starterCandidates?: { name: string; role: string }[];
 };
 
 export function buildUserPrompt(state: AiEventPromptState): string {
@@ -254,6 +255,9 @@ export function buildUserPrompt(state: AiEventPromptState): string {
       role,
       state: relationshipTrustBand(trust),
     })))}`,
+    ...(state.starterCandidates && state.starterCandidates.length > 0
+      ? [`안전후보=${JSON.stringify(state.starterCandidates)}`]
+      : []),
   ];
 
   const activeParts = [

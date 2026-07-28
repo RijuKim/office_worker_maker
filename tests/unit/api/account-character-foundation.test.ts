@@ -194,6 +194,7 @@ describe("account and character API foundation", () => {
           create: vi.fn(async ({ data }) => {
             expect(data).toEqual(
               expect.objectContaining({
+                id: expect.any(String),
                 userId: "user-1",
                 name: "한서윤",
                 age: 21,
@@ -209,6 +210,9 @@ describe("account and character API foundation", () => {
                       lifeStage: { id: "college_mid" },
                       academicTerm: expect.objectContaining({ gradeYear: 2, semester: 1, label: "2학년 1학기" }),
                       graduation: { state: "normal" },
+                      starterCandidates: expect.arrayContaining([
+                        expect.objectContaining({ name: expect.any(String), role: expect.any(String) }),
+                      ]),
                     }),
                   }),
                 },
@@ -223,7 +227,7 @@ describe("account and character API foundation", () => {
           }),
         },
         relationship: {
-          create: vi.fn(async () => ({ id: "rel-1" })),
+          createMany: vi.fn(async () => ({ count: 2 })),
         },
         event: {
           create: vi.fn(async ({ data }) => {
@@ -271,7 +275,7 @@ describe("account and character API foundation", () => {
         update: vi.fn(async () => created),
       },
       relationship: {
-        create: vi.fn(async () => ({ id: "rel-1" })),
+        createMany: vi.fn(async () => ({ count: 2 })),
       },
       event: { create: vi.fn(async () => ({ id: "event-1" })) },
     }));

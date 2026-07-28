@@ -13,6 +13,7 @@ import {
   pickRandomMajor,
   serializeCharacterRun,
 } from "@/lib/game/character-foundation";
+import { selectStarterCandidates } from "@/lib/game/npcs";
 import { characterCreateSchema } from "@/lib/game/validation";
 
 const includeCharacterDetails = {
@@ -100,9 +101,12 @@ export async function POST(request: Request | NextRequest) {
     startGradeYear: parsed.data.startGradeYear ?? pickRandomGradeYear(parsed.data.age),
   };
 
+  const characterId = crypto.randomUUID();
+
   const character = await prisma.$transaction(async (tx) => {
     const created = await tx.characterRun.create({
       data: {
+        id: characterId,
         userId,
         name: createInput.name,
         age: createInput.age,
@@ -114,7 +118,7 @@ export async function POST(request: Request | NextRequest) {
           create: buildInitialStats(createInput.preferredStats, createInput),
         },
         hiddenState: {
-          create: buildInitialHiddenState({ ...createInput, seed: createInput.name }),
+          create: buildInitialHiddenState({ ...createInput, seed: characterId }),
         },
       },
       include: {
@@ -124,19 +128,19 @@ export async function POST(request: Request | NextRequest) {
       },
     });
 
-    const starterRelationships = buildStarterRelationships(createInput.name);
-    for (const rel of starterRelationships) {
-      await tx.relationship.create({
-        data: {
+    const starterRelationships = buildStarterRelationships(characterId);
+    if (starterRelationships.length > 0) {
+      await tx.relationship.createMany({
+        data: starterRelationships.map((rel) => ({
           ...rel,
           characterRunId: created.id,
-        },
+        })),
       });
     }
 
     const firstEvent = await tx.event.create({
       data: {
-        ...buildFirstEvent({ ...createInput, seed: createInput.name }),
+        ...buildFirstEvent({ ...createInput, seed: characterId }),
         characterRunId: created.id,
       },
     });

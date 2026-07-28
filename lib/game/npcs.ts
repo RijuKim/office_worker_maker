@@ -106,6 +106,63 @@ export function selectStarterNpcs(seed: string, count: number): NpcProfile[] {
   return shuffled.slice(0, count);
 }
 
+/**
+ * Select exactly `count` compact candidate entries (name/role pairs) from the
+ * safe (dangerLevel === 0) canonical pool using a deterministic seed.
+ * Returns 6-8 entries. Used to supply the AI prompt with a short dynamic
+ * roster instead of the full hardcoded list, computed locally from the
+ * character UUID with no DB or network call.
+ */
+export function selectStarterCandidates(seed: string, count: number): { name: string; role: string }[] {
+  const safePool = NPC_POOL.filter((npc) => npc.dangerLevel === 0);
+  if (safePool.length < count) {
+    throw new Error(
+      `Safe NPC pool has only ${safePool.length} entries, but ${count} were requested.`,
+    );
+  }
+  const numericSeed = hashSeed(seed);
+  const shuffled = seededShuffle(safePool, numericSeed);
+  return shuffled.slice(0, count).map((npc) => ({
+    name: npc.name,
+    role: npc.role,
+  }));
+}
+
+/**
+ * Role labels that fit a "senior/mentor" first-event scene context.
+ */
+const SENIOR_ROLE_KEYWORDS = ["선배", "교수", "부장", "점장", "리더", "할아버지"];
+
+/**
+ * Role labels that fit a "peer/friend" first-event scene context.
+ */
+const PEER_ROLE_KEYWORDS = ["동료", "친구", "동기", "후배", "원", "트레이너"];
+
+/**
+ * Select exactly two safe NPCs for starter relationships, ensuring one is
+ * senior/mentor-role compatible and one is peer/friend-role compatible.
+ * Uses the same deterministic seed as selectStarterNpcs.
+ */
+export function selectStarterPair(seed: string): [NpcProfile, NpcProfile] {
+  const safePool = NPC_POOL.filter((npc) => npc.dangerLevel === 0);
+  if (safePool.length < 2) {
+    throw new Error(
+      `Safe NPC pool has only ${safePool.length} entries, but 2 were requested.`,
+    );
+  }
+  const numericSeed = hashSeed(seed);
+  const shuffled = seededShuffle(safePool, numericSeed);
+
+  const senior = shuffled.find((npc) =>
+    SENIOR_ROLE_KEYWORDS.some((kw) => npc.role.includes(kw)),
+  ) ?? shuffled[0];
+  const peer = shuffled.find((npc) =>
+    npc.name !== senior.name && PEER_ROLE_KEYWORDS.some((kw) => npc.role.includes(kw)),
+  ) ?? shuffled.find((npc) => npc.name !== senior.name) ?? shuffled[1];
+
+  return [senior, peer];
+}
+
 export function pickNpcs(
   existingRelationships: { name: string; role: string; tags?: string[] }[],
   count: number,
