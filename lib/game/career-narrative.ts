@@ -268,7 +268,16 @@ function deterministicShuffle<T>(values: readonly T[], seed: string) {
   for (let index = result.length - 1; index > 0; index -= 1) {
     hi = splitmix32(hi ^ lo);
     lo = splitmix32(lo ^ hi);
-    const target = hi % (index + 1);
+    // Unbiased range reduction: reject values that would introduce modulo bias
+    const n = index + 1;
+    const limit = 0x100000000 - (0x100000000 % n);
+    let target = hi;
+    while (target >= limit) {
+      hi = splitmix32(hi ^ lo);
+      lo = splitmix32(lo ^ hi);
+      target = hi;
+    }
+    target = target % n;
     [result[index], result[target]] = [result[target], result[index]];
   }
   return result;

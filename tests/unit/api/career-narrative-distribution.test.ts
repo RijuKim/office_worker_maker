@@ -94,4 +94,50 @@ describe("organization distribution across seeds", () => {
     expect(ORGANIZATIONS).toHaveLength(16);
     expect(ORGANIZATIONS.some((org) => org.id === "hanbit-medical")).toBe(true);
   });
+
+  it("selects multiple distinct companies as first organization across 500 UUID-like seeds", () => {
+    // Real character IDs are UUIDs (Prisma @default(uuid())). This test uses
+    // UUID-formatted seeds to match production character ID distribution.
+    const SEED_COUNT = 500;
+    const firstOrgIds = new Set<string>();
+    const firstOrgCounts: Record<string, number> = {};
+
+    for (const seed of seedSequence(SEED_COUNT)) {
+      const state = normalizeCareerNarrativeState(null, {
+        storySeed: seed,
+        major: "방사선학과",
+        coreEventCount: 0,
+      });
+      const firstId = state.organizations[0].id;
+      firstOrgIds.add(firstId);
+      firstOrgCounts[firstId] = (firstOrgCounts[firstId] ?? 0) + 1;
+    }
+
+    // At least 12 of 16 possible companies must appear as first pick
+    expect(firstOrgIds.size).toBeGreaterThanOrEqual(12);
+
+    // No single company should be first in more than 15% of runs
+    for (const count of Object.values(firstOrgCounts)) {
+      expect(count / SEED_COUNT).toBeLessThan(0.15);
+    }
+  });
+
+  it("selects all 16 organizations across 500 UUID-like seeds", () => {
+    const SEED_COUNT = 500;
+    const seenOrgIds = new Set<string>();
+
+    for (const seed of seedSequence(SEED_COUNT)) {
+      const state = normalizeCareerNarrativeState(null, {
+        storySeed: seed,
+        major: "방사선학과",
+        coreEventCount: 0,
+      });
+      for (const org of state.organizations) {
+        seenOrgIds.add(org.id);
+      }
+    }
+
+    // All 16 organizations must appear in at least one run's selection
+    expect(seenOrgIds.size).toBe(ORGANIZATIONS.length);
+  });
 });
