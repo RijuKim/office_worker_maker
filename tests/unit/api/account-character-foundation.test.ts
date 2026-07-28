@@ -33,6 +33,7 @@ import { GET as listCharacters, POST as createCharacter } from "@/app/api/charac
 import { POST as signup } from "@/app/api/auth/signup/route";
 import { GET as getMe } from "@/app/api/me/route";
 import { buildCharacterProfile, buildInitialHiddenState, buildInitialStats, pickRandomGradeYear, randomMajors } from "@/lib/game/character-foundation";
+import { NPC_POOL, selectStarterPair } from "@/lib/game/npcs";
 
 function jsonRequest(body: unknown) {
   return new Request("http://localhost/api/test", {
@@ -363,5 +364,74 @@ describe("account and character API foundation", () => {
     expect(response.status).toBe(200);
     expect(body.user.email).toBe("player@example.com");
     expect(body.aiUsage).toEqual({ date: "2026-07-06", count: 7, limit: null, remaining: null });
+  });
+
+  it("uses a preassigned CharacterRun UUID as seed for starter selection, not the protagonist name", async () => {
+    sessionMock.requireCurrentUserId.mockResolvedValueOnce("user-1");
+    const fixedUuid = "aaaaaaaa-1111-1111-1111-111111111111";
+    const cryptoSpy = vi.spyOn(crypto, "randomUUID").mockReturnValue(fixedUuid);
+
+    const created = characterRecord({ id: fixedUuid });
+    let capturedCharacterId: string | undefined;
+    let capturedRelationships: Array<{ name: string; role: string }> | undefined;
+    let capturedHiddenState: unknown;
+
+    prismaMock.$transaction.mockImplementationOnce(async (callback) =>
+      callback({
+        characterRun: {
+          create: vi.fn(async ({ data }) => {
+            capturedCharacterId = data.id;
+            capturedHiddenState = data.hiddenState;
+            return { id: fixedUuid };
+          }),
+          update: vi.fn(async () => created),
+        },
+        relationship: {
+          createMany: vi.fn(async ({ data }) => {
+            capturedRelationships = data.map((r: { name: string; role: string }) => ({ name: r.name, role: r.role }));
+            return { count: data.length };
+          }),
+        },
+        event: {
+          create: vi.fn(async ({ data }) => {
+            return { id: "event-1" };
+          }),
+        },
+      }),
+    );
+
+    const response = await createCharacter(
+      jsonRequest({ name: "한서윤", age: 21, residence: "studio", preferredStats: ["academic", "mental"], startGradeYear: 2, major: "사회학과" }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    // characterRun.create receives the fixed UUID
+    expect(capturedCharacterId).toBe(fixedUuid);
+
+    // hiddenState starter/open-thread data derives from that UUID
+    const hiddenFlags = (capturedHiddenState as { create: { eventFlags: Record<string, unknown> } }).create.eventFlags;
+    const storyArc = hiddenFlags.storyArc as { openThreads: string[] };
+    const starterCandidates = hiddenFlags.starterCandidates as { name: string; role: string }[];
+    expect(storyArc.openThreads.length).toBeGreaterThanOrEqual(2);
+    expect(starterCandidates.length).toBeGreaterThanOrEqual(6);
+    expect(starterCandidates.length).toBeLessThanOrEqual(8);
+
+    // relationship.createMany uses the same selected pair
+    expect(capturedRelationships).toHaveLength(2);
+    expect(capturedRelationships![0].name).not.toBe(capturedRelationships![1].name);
+    // Both relationship names are from the safe canonical pool
+    const safeNames = NPC_POOL.filter((n) => n.dangerLevel === 0).map((n) => n.name);
+    expect(safeNames).toContain(capturedRelationships![0].name);
+    expect(safeNames).toContain(capturedRelationships![1].name);
+
+    // First event relationship names match the selected pair, not the protagonist name
+    const [senior, peer] = selectStarterPair(fixedUuid);
+    expect(capturedRelationships).toEqual([
+      { name: senior.name, role: senior.role },
+      { name: peer.name, role: peer.role },
+    ]);
+
+    cryptoSpy.mockRestore();
   });
 });

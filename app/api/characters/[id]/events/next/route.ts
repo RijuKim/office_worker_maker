@@ -7,6 +7,7 @@ import { deriveLifeStageState } from "@/lib/game/life-stage";
 import { normalizeCareerNarrativeState, summarizeCareerNarrativeForPrompt } from "@/lib/game/career-narrative";
 import { buildDiversityCategoryGuidance, eventMatchesCategory, normalizeEventCategory, selectStoryCategoryPalette } from "@/lib/game/event-diversity";
 import { checkDailyAiLimit, generateAiEvent, getOpenRouterTimeoutMs, incrementAiUsage } from "@/lib/game/openrouter";
+import { NPC_POOL, selectStarterCandidates } from "@/lib/game/npcs";
 import { recordEventQualityLog } from "@/lib/server/event-quality-log";
 import { acquireAuthoritativeEvent, createPrismaEventAuthorityStore, EventAuthorityLostError, resolveEventGenerationRole, startEventGenerationHeartbeat, toPublicEvent } from "@/lib/server/event-authority";
 import { prisma } from "@/lib/server/prisma";
@@ -252,7 +253,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
       allowedCategories: diversityGuidance.allowedCategories,
       careerNarrative: summarizeCareerNarrativeForPrompt(careerNarrative),
       avoidPeople: diversityGuidance.avoidPeople,
-      starterCandidates: (currentFlags.starterCandidates as { name: string; role: string }[] | undefined) ?? [],
+      starterCandidates: validateStarterCandidates(currentFlags.starterCandidates, character.id),
     };
     const providerStartedAt = Date.now();
     let aiResult: Awaited<ReturnType<typeof generateAiEvent>> | {
@@ -467,6 +468,29 @@ export async function POST(request: Request | NextRequest, context: RouteContext
   } finally {
     await generationLease.stop();
   }
+}
+
+/**
+ * Validate starterCandidates from hidden state before passing to the AI prompt.
+ * Accepts only an array of 6-8 objects with non-empty string name/role that
+ * match safe canonical NPC entries. If invalid, deterministically recomputes
+ * 7 candidates from character.id locally (no extra DB/network call).
+ */
+function validateStarterCandidates(raw: unknown, characterId: string): { name: string; role: string }[] {
+  if (!Array.isArray(raw)) return selectStarterCandidates(characterId, 7);
+  if (raw.length < 6 || raw.length > 8) return selectStarterCandidates(characterId, 7);
+  const safeNames = new Set(NPC_POOL.filter((n) => n.dangerLevel === 0).map((n) => n.name));
+  const allValid = raw.every(
+    (item) =>
+      typeof item === "object" && item !== null &&
+      typeof (item as Record<string, unknown>).name === "string" &&
+      (item as Record<string, unknown>).name !== "" &&
+      typeof (item as Record<string, unknown>).role === "string" &&
+      (item as Record<string, unknown>).role !== "" &&
+      safeNames.has((item as Record<string, unknown>).name as string),
+  );
+  if (!allValid) return selectStarterCandidates(characterId, 7);
+  return raw as { name: string; role: string }[];
 }
 
 function canUseAiForLifeStage(lifeStage: string, academicStatus: string) {
