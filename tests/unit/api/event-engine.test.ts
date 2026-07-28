@@ -8,7 +8,7 @@ describe("STATIC_EVENTS", () => {
       expect(event.title).toBeTruthy();
       expect(event.body).toBeTruthy();
       expect(event.choices.length).toBeGreaterThanOrEqual(2);
-      expect(event.choices.length).toBeLessThanOrEqual(4);
+      expect(event.choices.length).toBeLessThanOrEqual(3);
       expect(event.tags.length).toBeGreaterThanOrEqual(1);
     }
   });
@@ -208,11 +208,11 @@ describe("selectNextEvent", () => {
     expect(result.event.body).not.toMatch(/강의실|동아리|수강/);
   });
 
-  it("uses five large story arcs across the run", () => {
+  it("uses five compact story arcs across the 24-event run", () => {
     expect(getStoryArc(0).title).toBe("첫 학기와 생활 기반");
-    expect(getStoryArc(4).title).toBe("소속과 첫 약속");
-    expect(getStoryArc(7).title).toBe("압박과 유혹");
-    expect(getStoryArc(10).title).toBe("선택의 청구서");
-    expect(getStoryArc(14).title).toBe("졸업 직전의 방향");
+    expect(getStoryArc(3).title).toBe("소속과 첫 약속");
+    expect(getStoryArc(6).title).toBe("압박과 유혹");
+    expect(getStoryArc(9).title).toBe("선택의 청구서");
+    expect(getStoryArc(12).title).toBe("졸업 직전의 방향");
   });
 });

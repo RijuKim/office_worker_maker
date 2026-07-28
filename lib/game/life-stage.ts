@@ -26,7 +26,7 @@ export type AcademicStatus = "ENROLLED" | "LEAVE" | "DROPPED_OUT" | "GRADUATED";
 export type GradeYear = 1 | 2 | 3 | 4;
 export type Semester = 1 | 2;
 
-export const CORE_EVENTS_PER_SEMESTER = 5;
+export const CORE_EVENTS_PER_SEMESTER = 3;
 
 export type AcademicTerm = {
   gradeYear: GradeYear;
@@ -577,8 +577,8 @@ function shouldRequireExtraSemester(
     state.academicPlan.retakePressure === true ||
     state.academicPlan.scholarshipWarning === true;
 
-  return (stats?.academic !== undefined && stats.academic <= 4) ||
-    (stats?.practical !== undefined && stats.practical <= 4) ||
+  return (stats?.academic !== undefined && stats.academic <= 3) ||
+    (stats?.practical !== undefined && stats.practical <= 3) ||
     hasRequirementBlocker;
 }
 

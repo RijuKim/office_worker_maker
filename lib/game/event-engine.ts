@@ -58,11 +58,11 @@ interface ConditionalEvent extends StaticEvent {
 type StoryArcId = "settling" | "commitment" | "pressure" | "consequence" | "future";
 
 export const STORY_ARCS: { id: StoryArcId; title: string; phase: string; eventRange: [number, number]; openThread: string }[] = [
-  { id: "settling", title: "첫 학기와 생활 기반", phase: "발단", eventRange: [0, 3], openThread: "수업, 주거, 돈, 첫 관계의 리듬을 잡아야 한다" },
-  { id: "commitment", title: "소속과 첫 약속", phase: "전개", eventRange: [4, 6], openThread: "동아리, 알바, 연구실, 스터디 중 하나가 생활의 중심이 된다" },
-  { id: "pressure", title: "압박과 유혹", phase: "위기", eventRange: [7, 9], openThread: "돈과 평판, 가족 압박, 위험한 제안이 같은 시기에 겹친다" },
-  { id: "consequence", title: "선택의 청구서", phase: "절정", eventRange: [10, 13], openThread: "이전 선택이 사람과 사건을 통해 되돌아온다" },
-  { id: "future", title: "졸업 직전의 방향", phase: "결말", eventRange: [14, 24], openThread: "중도 이탈을 피했다면 마지막 관문을 거쳐 선택의 결과로 수렴한다" },
+  { id: "settling", title: "첫 학기와 생활 기반", phase: "발단", eventRange: [0, 2], openThread: "수업, 주거, 돈, 첫 관계의 리듬을 잡아야 한다" },
+  { id: "commitment", title: "소속과 첫 약속", phase: "전개", eventRange: [3, 5], openThread: "동아리, 알바, 연구실, 스터디 중 하나가 생활의 중심이 된다" },
+  { id: "pressure", title: "압박과 유혹", phase: "위기", eventRange: [6, 8], openThread: "돈과 평판, 가족 압박, 위험한 제안이 같은 시기에 겹친다" },
+  { id: "consequence", title: "선택의 청구서", phase: "절정", eventRange: [9, 11], openThread: "이전 선택이 사람과 사건을 통해 되돌아온다" },
+  { id: "future", title: "졸업 직전의 방향", phase: "결말", eventRange: [12, 24], openThread: "중도 이탈을 피했다면 마지막 관문을 거쳐 선택의 결과로 수렴한다" },
 ];
 
 export const STATIC_EVENTS: StaticEvent[] = [

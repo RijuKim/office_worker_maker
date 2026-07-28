@@ -247,7 +247,7 @@ describe("AI event diagnostics", () => {
     for (const required of ["title", "body", "tags", "choices", "id", "label", "summary", "statDelta", "relationshipDelta"]) {
       expect(instructions).toContain(`\"${required}\"`);
     }
-    expect(instructions).toContain("2-4 complete objects");
+    expect(instructions).toContain("2-3 complete objects");
     expect(instructions).toContain("single JSON object");
     expect(JSON.stringify(request)).not.toContain("choice-only");
   });

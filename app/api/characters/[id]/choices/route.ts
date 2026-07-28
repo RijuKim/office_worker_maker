@@ -16,6 +16,7 @@ import {
   getRelationshipEndingType,
 } from "@/lib/game/life-stage";
 import { generateAiEnding } from "@/lib/game/openrouter";
+import { shouldCreateFinalEnding as shouldCreateFinalEndingFn } from "@/lib/game/ending-rules";
 import { advanceCareerNarrativeState, normalizeCareerNarrativeState } from "@/lib/game/career-narrative";
 import { gateConcreteResultFields } from "@/lib/game/result-gating";
 import {
@@ -238,12 +239,11 @@ export async function POST(request: Request | NextRequest, context: RouteContext
   const previousGradeYear = character.currentGradeYear ?? character.startGradeYear;
   const nextGradeYear = lifeStageTransition.state.term.gradeYear;
   const nextAge = character.age + Math.max(0, nextGradeYear - previousGradeYear);
-  const shouldCreateFinalEnding = !endingType && (
-    (lifeStageTransition.state.lifeStage === "post_graduation" &&
-     lifeStageTransition.state.graduation === "graduated" &&
-     coreEventCount >= 36) ||
-    (coreEventCount >= 40 && lifeStageTransition.state.lifeStage !== "college_early")
-  );
+  const shouldCreateFinalEnding = !endingType && shouldCreateFinalEndingFn({
+    coreEventCount,
+    lifeStage: lifeStageTransition.state.lifeStage,
+    graduation: lifeStageTransition.state.graduation,
+  });
   const endingRecord = endingType ? await buildImmediateBadEndingRecord({
     userId,
     characterRunId: id,

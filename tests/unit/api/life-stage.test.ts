@@ -59,7 +59,7 @@ describe("deriveLifeStageState", () => {
     expect(state.lifeStage).toBe("college_mid");
     expect(state.term).toEqual({ gradeYear: 2, semester: 2, label: "2학년 2학기" });
     expect(state.graduation).toBe("normal");
-    expect(state.stageEventCount).toBe(0);
+    expect(state.stageEventCount).toBe(2);
     expect(state.academicPlan).toMatchObject({
       major: "경영학",
       majorChanged: false,
@@ -130,34 +130,34 @@ describe("applyLifeStageTransition", () => {
     expect(result.reasons).toEqual(["no_transition"]);
   });
 
-  it("does not advance the semester after exactly four resolved core events", () => {
+  it("does not advance the semester after exactly two resolved core events", () => {
     const result = applyLifeStageTransition({
       currentGradeYear: 1,
       academicStatus: "ENROLLED",
-      coreEventCount: 3,
+      coreEventCount: 1,
       eventFlags: {
         lifeStage: { id: "college_early" },
         academicTerm: { gradeYear: 1, semester: 1 },
-        stageEventCount: 3,
+        stageEventCount: 1,
       },
       stats: { health: 6, mental: 6, reputation: 5 },
       burnoutRisk: 10,
     });
 
     expect(result.state.term).toEqual({ gradeYear: 1, semester: 1, label: "1학년 1학기" });
-    expect(result.state.stageEventCount).toBe(4);
+    expect(result.state.stageEventCount).toBe(2);
     expect(result.reasons).toEqual(["no_transition"]);
   });
 
-  it("advances semester after five resolved core events in the current semester", () => {
+  it("advances semester after three resolved core events in the current semester", () => {
     const result = applyLifeStageTransition({
       currentGradeYear: 1,
       academicStatus: "ENROLLED",
-      coreEventCount: 4,
+      coreEventCount: 2,
       eventFlags: {
         lifeStage: { id: "college_early" },
         academicTerm: { gradeYear: 1, semester: 1 },
-        stageEventCount: 4,
+        stageEventCount: 2,
       },
       stats: { health: 6, mental: 6, reputation: 5 },
       burnoutRisk: 10,
@@ -173,11 +173,11 @@ describe("applyLifeStageTransition", () => {
     const result = applyLifeStageTransition({
       currentGradeYear: 1,
       academicStatus: "ENROLLED",
-      coreEventCount: 9,
+      coreEventCount: 5,
       eventFlags: {
         lifeStage: { id: "college_early" },
         academicTerm: { gradeYear: 1, semester: 2 },
-        stageEventCount: 4,
+        stageEventCount: 2,
       },
       stats: { health: 6, mental: 6, reputation: 5 },
       burnoutRisk: 10,
@@ -228,14 +228,14 @@ describe("applyLifeStageTransition", () => {
     const result = applyLifeStageTransition({
       currentGradeYear: 4,
       academicStatus: "ENROLLED",
-      coreEventCount: 39,
+      coreEventCount: 23,
       eventFlags: {
         lifeStage: { id: "college_late" },
         academicTerm: { gradeYear: 4, semester: 2 },
         graduation: { state: "normal" },
-        stageEventCount: 4,
+        stageEventCount: 2,
       },
-      stats: { academic: 4, practical: 7, health: 6, mental: 6, reputation: 6 },
+      stats: { academic: 3, practical: 7, health: 6, mental: 6, reputation: 6 },
       burnoutRisk: 10,
     });
 
@@ -244,22 +244,22 @@ describe("applyLifeStageTransition", () => {
     expect(result.reasons).toEqual(["extra_semester_required"]);
   });
 
-  it("does not route blocked late-stage play to an extra semester after only four events", () => {
+  it("does not route blocked late-stage play to an extra semester after only two events", () => {
     const result = applyLifeStageTransition({
       currentGradeYear: 4,
       academicStatus: "ENROLLED",
-      coreEventCount: 38,
+      coreEventCount: 22,
       eventFlags: {
         lifeStage: { id: "college_late" },
         academicTerm: { gradeYear: 4, semester: 2 },
         graduation: { state: "normal" },
-        stageEventCount: 3,
+        stageEventCount: 1,
       },
       stats: { academic: 4, practical: 7, health: 6, mental: 6, reputation: 6 },
       burnoutRisk: 10,
     });
 
-    expect(result.state.stageEventCount).toBe(4);
+    expect(result.state.stageEventCount).toBe(2);
     expect(result.state.graduation).toBe("normal");
     expect(result.reasons).toEqual(["no_transition"]);
   });
@@ -268,12 +268,12 @@ describe("applyLifeStageTransition", () => {
     const result = applyLifeStageTransition({
       currentGradeYear: 4,
       academicStatus: "ENROLLED",
-      coreEventCount: 39,
+      coreEventCount: 23,
       eventFlags: {
         lifeStage: { id: "college_late" },
         academicTerm: { gradeYear: 4, semester: 2 },
         graduation: { state: "normal" },
-        stageEventCount: 4,
+        stageEventCount: 2,
       },
       stats: { academic: 7, practical: 7, health: 6, mental: 6, reputation: 6 },
       burnoutRisk: 10,
@@ -287,22 +287,22 @@ describe("applyLifeStageTransition", () => {
     })).toBe(true);
   });
 
-  it("does not open the graduation gate after only four late-stage events", () => {
+  it("does not open the graduation gate after only two late-stage events", () => {
     const result = applyLifeStageTransition({
       currentGradeYear: 4,
       academicStatus: "ENROLLED",
-      coreEventCount: 38,
+      coreEventCount: 22,
       eventFlags: {
         lifeStage: { id: "college_late" },
         academicTerm: { gradeYear: 4, semester: 2 },
         graduation: { state: "normal" },
-        stageEventCount: 3,
+        stageEventCount: 1,
       },
       stats: { academic: 7, practical: 7, health: 6, mental: 6, reputation: 6 },
       burnoutRisk: 10,
     });
 
-    expect(result.state.stageEventCount).toBe(4);
+    expect(result.state.stageEventCount).toBe(2);
     expect(result.state.graduation).toBe("normal");
     expect(result.reasons).toEqual(["no_transition"]);
   });

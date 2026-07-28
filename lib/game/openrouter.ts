@@ -103,7 +103,7 @@ function getAiEventMaxTokens(providerId: AiProvider["id"]): number {
 
 const aiEventSchema = z.object({
   title: z.string().min(1).max(100),
-  body: z.string().min(100).max(5200),
+  body: z.string().min(100).max(5200), // validated range is wider than the 200-350 guidance so fallback events still pass
   choices: z
     .array(
       z.object({
@@ -127,7 +127,7 @@ const aiEventSchema = z.object({
       }),
     )
     .min(2)
-    .max(4),
+    .max(3),
   tags: z.array(z.string()).min(1).max(5),
 });
 
@@ -156,7 +156,7 @@ const allowedStats = ["academic", "practical", "health", "mental", "wealth", "re
 
 const SYSTEM_PROMPT = `You are a Korean college-life text-adventure writer.
 
-Return ONLY valid JSON in a single JSON object with "title", "body", "tags", and "choices". "choices" must contain 2-4 complete objects, and each choice must include "id", "label", "summary", "statDelta", and "relationshipDelta". Keep the event in Korean, in "당신은" voice. Write 2-3 short paragraphs with a blank line between paragraphs, splitting naturally when the scene, action, or reaction changes. Use 4-7 sentences total and roughly 350-650 Korean characters for the body; even a short event must not be one unbroken paragraph. Make it one small incident inside the larger story arc. Prefer concrete action and dialogue over repeated explanation.
+Return ONLY valid JSON in a single JSON object with "title", "body", "tags", and "choices". "choices" must contain 2-3 complete objects, and each choice must include "id", "label", "summary", "statDelta", and "relationshipDelta". Keep the event in Korean, in "당신은" voice. Write normally two short paragraphs with a blank line between them, splitting naturally when the scene, action, or reaction changes. Use 3-5 sentences total and roughly 200-350 Korean characters for the body. Make it one small incident inside the larger story arc. Prefer concrete action and dialogue over repeated explanation.
 
 Keep continuity with recent choices, relationships, open threads, and stats. Avoid repeating closed proposals or stale scenes. Use only the public stats in statDelta, keep health and mental decreases at -1 or above, and make at least one choice clearly risky with a downside. Choice labels should be natural actions. Summaries must start with "당신은".
 
@@ -213,9 +213,9 @@ export type AiEventPromptState = {
 export function buildUserPrompt(state: AiEventPromptState): string {
   const semesterLabel = state.academicTerm ?? `${state.gradeYear ?? "?"}학년`;
   const totalSemesters = 8;
-  const eventsPerSemester = 5;
+  const eventsPerSemester = 3;
   const currentSemester = Math.min(Math.floor(state.coreEventCount / eventsPerSemester) + 1, totalSemesters);
-  const progressRatio = state.coreEventCount / 40;
+  const progressRatio = state.coreEventCount / 24;
 
   let toneGuidance = "";
   if (progressRatio < 0.15) {
