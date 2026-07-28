@@ -184,6 +184,10 @@ export async function POST(request: Request | NextRequest, context: RouteContext
       people: readRelationshipNames(history.relationshipDelta),
     })),
     previousChoiceSummary,
+    careerOrganizations: careerNarrative.organizations.map((org: { name: string }) => org.name),
+    activeJobCompany: character.jobApplications
+      .filter((app: { isActive: boolean }) => app.isActive)
+      .map((app: { companyName: string }) => app.companyName)[0] ?? null,
   };
   const usedEventTitles = character.eventHistory
     .map((h: { event?: { title?: string } }) => h.event?.title)

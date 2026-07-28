@@ -241,6 +241,7 @@ describe("evaluateEventQuality lifecycle closure", () => {
           { title: "지원서 수정", body: "한빛의료기기 지원서를 고쳤다.", tags: ["취업", "회사"] },
         ],
         careerOrganizations: ["한빛의료기기", "삼송전자"],
+        activeJobCompany: "한빛의료기기",
       },
     });
 
@@ -500,6 +501,30 @@ describe("evaluateEventQuality lifecycle closure", () => {
       expect(verdict.reasons).toContain("low_diversity_score");
     });
 
+    it("applies a single penalty for one recent organization occurrence, not double", () => {
+      const verdict = evaluateEventQuality({
+        source: "AI",
+        candidate: {
+          title: "한빛의료기기 사내 행사",
+          body: "한빛의료기기에서 열리는 산업 세미나에 참석해 최신 의료기기 트렌드를 듣는다.",
+          tags: ["진로", "경험"],
+          choices: baseChoices,
+        },
+        context: {
+          academicStatus: "ENROLLED",
+          recentEvents: [
+            { title: "한빛의료기기 서류", body: "한빛의료기기에 서류를 제출했다.", tags: ["취업", "서류"] },
+          ],
+          careerOrganizations: ["한빛의료기기", "삼송전자"],
+        },
+      });
+
+      // Single recent occurrence → penalty = 1 * 15 = 15, no strong repeat → score = 100 - 15 = 85
+      // If the duplicate block were present, penalty would be 15 + 15 = 30 → score = 70
+      expect(verdict.diversityScore).toBe(85);
+      expect(verdict.status).toBe("pass");
+    });
+
     it("passes a different organization that was not recently mentioned", () => {
       const verdict = evaluateEventQuality({
         source: "AI",
@@ -536,13 +561,16 @@ describe("evaluateEventQuality lifecycle closure", () => {
           academicStatus: "ENROLLED",
           recentSummaries: ["한빛의료기기 서류 지원을 마치고 결과를 기다렸다."],
           recentEvents: [
-            { title: "한빛의료기기 서류", body: "한빛의료기기에 서류를 제출했다.", tags: ["취업", "서류"] },
+            { title: "한빛의료기기 서류 지원", body: "한빛의료기기 채용 서류를 제출했다.", tags: ["취업", "회사", "서류"] },
+            { title: "지원서 수정", body: "한빛의료기기 지원서를 고쳤다.", tags: ["취업", "회사"] },
           ],
           careerOrganizations: ["한빛의료기기", "삼송전자"],
+          activeJobCompany: "한빛의료기기",
         },
       });
 
       expect(verdict.status).toBe("pass");
+      expect(verdict.diversityScore).toBe(100);
       expect(verdict.continuityExemptions).toContain("job_application");
     });
 
@@ -557,11 +585,12 @@ describe("evaluateEventQuality lifecycle closure", () => {
         },
         context: {
           academicStatus: "ENROLLED",
-          recentSummaries: ["회사 서류 지원을 마치고 결과를 기다렸다."],
+          recentSummaries: ["한빛의료기기 서류 지원을 마치고 결과를 기다렸다."],
           recentEvents: [
-            { title: "회사 서류 지원", body: "채용 서류를 제출했다.", tags: ["취업", "회사", "서류"] },
+            { title: "한빛의료기기 서류", body: "한빛의료기기에 서류를 제출했다.", tags: ["취업", "서류"] },
           ],
           careerOrganizations: ["한빛의료기기", "삼송전자"],
+          activeJobCompany: "한빛의료기기",
         },
       });
 

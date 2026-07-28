@@ -469,7 +469,6 @@ function detectContinuityExemptions(input: EvaluateEventQualityInput, choices: E
       exemptions.push("job_application");
     }
   }
-  }
   if (specProgressPattern.test(text) && specProgressPattern.test(recentText)) {
     exemptions.push("spec_progression");
   }
@@ -495,6 +494,7 @@ function scoreDiversity(input: EvaluateEventQualityInput, continuityExemptions: 
   const recentEvents = input.context?.recentEvents?.slice(0, EVENT_QUALITY_DEFAULTS.recentEventLookback) ?? [];
   const candidateText = eventText(input.candidate);
   const candidateActivities = activityKeywords(candidateText);
+  const activeCompany = input.context?.activeJobCompany;
   let penalty = 0;
 
   for (const tag of candidateTags) {
@@ -517,9 +517,11 @@ function scoreDiversity(input: EvaluateEventQualityInput, continuityExemptions: 
 
   // Organization-name repetition penalty: penalize when the candidate event
   // mentions an organization name that also appears in recent events.
+  // Skip the active job application company to allow genuine stage progression.
   const orgNames = input.context?.careerOrganizations ?? [];
   for (const orgName of orgNames) {
     if (!candidateText.includes(orgName)) continue;
+    if (activeCompany && orgName === activeCompany) continue;
     const recentCount = recentEvents.filter((event) => recentEventText(event).includes(orgName)).length;
     penalty += recentCount * 15;
     const strongCount = recentEvents
