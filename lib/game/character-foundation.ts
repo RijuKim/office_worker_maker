@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import type { CharacterCreateInput } from "@/lib/game/validation";
 import type { PublicStatKey } from "@/lib/game/validation";
 import { buildInitialLifeStageFlags, deriveLifeStageState } from "@/lib/game/life-stage";
+import { selectStarterNpcs } from "@/lib/game/npcs";
 
 export type NormalizedCharacterCreateInput = CharacterCreateInput & {
   major: string;
@@ -181,8 +182,15 @@ function residenceLabel(residence: CharacterCreateInput["residence"]) {
   return "자취방";
 }
 
-export function buildInitialHiddenState(input: Pick<NormalizedCharacterCreateInput, "age" | "major" | "residence" | "preferredStats" | "startGradeYear">) {
+export function buildInitialHiddenState(input: Pick<NormalizedCharacterCreateInput, "age" | "major" | "residence" | "preferredStats" | "startGradeYear"> & { seed?: string }) {
   const characterProfile = buildCharacterProfile(input);
+  const starterSeed = input.seed ?? crypto.randomUUID();
+  const starters = selectStarterNpcs(starterSeed, 2);
+  const starterNpc = starters[0];
+  const openThreads = [
+    "첫 학기의 리듬을 잡아야 한다",
+    `${starterNpc.name}의 제안이 무엇인지 아직 모른다`,
+  ];
   const storyArc = {
     title: "첫 학기와 보이지 않는 제안",
     premise: "당신은 평범한 대학 생활을 시작했지만, 작은 선택들이 인턴, 휴학, 관계, 취업 준비로 이어지는 이상하게 선명한 흐름 속에 놓인다.",
@@ -197,7 +205,7 @@ export function buildInitialHiddenState(input: Pick<NormalizedCharacterCreateInp
     ],
     tension: 2,
     foreshadowing: ["단체 채팅에 올라온 인턴 이야기", "처음 보는 듯 익숙한 아침의 위화감"],
-    openThreads: ["첫 학기의 리듬을 잡아야 한다", "지민 선배의 제안이 무엇인지 아직 모른다"],
+    openThreads,
   };
 
   return {
@@ -282,30 +290,28 @@ function applyProfileStatModifiers(
   }
 }
 
-export function buildStarterRelationships() {
-  return [
-    {
-      name: "지민 선배",
-      role: "동아리 선배",
-      trust: 46,
-      tags: ["선배", "동아리", "인턴정보"],
-    },
-    {
-      name: "민하",
-      role: "동기",
-      trust: 52,
-      tags: ["친구", "수업메이트"],
-    },
-  ] satisfies Prisma.RelationshipCreateWithoutCharacterRunInput[];
+export function buildStarterRelationships(seed?: string) {
+  const starterSeed = seed ?? crypto.randomUUID();
+  const starters = selectStarterNpcs(starterSeed, 2);
+  return starters.map((npc) => ({
+    name: npc.name,
+    role: npc.role,
+    trust: 46 + Math.floor(Math.random() * 15),
+    tags: npc.tags.slice(0, 3),
+  })) satisfies Prisma.RelationshipCreateWithoutCharacterRunInput[];
 }
 
-export function buildFirstEvent(input: NormalizedCharacterCreateInput) {
+export function buildFirstEvent(input: NormalizedCharacterCreateInput & { seed?: string }) {
   const residence = residenceLabel(input.residence);
   const isOlder = input.age >= 24;
   const isYounger = input.age <= 20;
   const prefersAcademic = input.preferredStats.includes("academic");
   const prefersSocial = input.preferredStats.includes("charm") || input.preferredStats.includes("reputation");
   const prefersPractical = input.preferredStats.includes("practical") || input.preferredStats.includes("wealth");
+
+  const starterSeed = input.seed ?? crypto.randomUUID();
+  const starters = selectStarterNpcs(starterSeed, 2);
+  const [starterA, starterB] = starters;
 
   const firstEventScenes: Array<{
     title: string;
@@ -331,7 +337,7 @@ export function buildFirstEvent(input: NormalizedCharacterCreateInput) {
           label: "단체 채팅에 올라온 선배의 인턴 이야기에 답장을 보낸다.",
           summary: "당신은 선배에게 인턴 정보를 물어보며 실무 감각을 넓혔다.",
           statDelta: { practical: 5, reputation: 1, mental: -3, health: -1 },
-          relationshipDelta: [{ name: "소연", trust: 3 }],
+          relationshipDelta: [{ name: starterA.name, trust: 3 }],
           flagDelta: { internshipCuriosity: true },
         },
         {
@@ -347,7 +353,7 @@ export function buildFirstEvent(input: NormalizedCharacterCreateInput) {
           label: "전시 독서모임 전단을 챙겨 학교 밖 모임에 신청한다.",
           summary: "당신은 전시 독서모임에 신청하며 학교 밖 생활권을 만들기 시작했다.",
           statDelta: { charm: 3, reputation: 1, mental: 1, wealth: -3 },
-          relationshipDelta: [{ name: "서윤", trust: 3 }],
+          relationshipDelta: [{ name: starterB.name, trust: 3 }],
           flagDelta: { outsideClubIntroduced: true },
         },
       ],
@@ -364,7 +370,7 @@ export function buildFirstEvent(input: NormalizedCharacterCreateInput) {
           label: "먼저 웃으며 인사하고 말을 건다.",
           summary: "당신은 밝은 인상으로 첫인상을 남겼다.",
           statDelta: { charm: 4, reputation: 2, mental: -1, health: -1 },
-          relationshipDelta: [{ name: "민하", trust: 3 }],
+          relationshipDelta: [{ name: starterA.name, trust: 3 }],
           flagDelta: { firstImpression: "friendly" },
         },
         {
@@ -407,7 +413,7 @@ ${prefersAcademic ? "당신은 이미 교재를 펼쳐 예습한 부분을 훑�
           label: "옆자리 사람들과 자연스럽게 인사를 나눈다.",
           summary: "당신은 같은 수업을 듣는 사람들과 관계를 만들었다.",
           statDelta: { charm: 3, reputation: 1, mental: 1, academic: -1 },
-          relationshipDelta: [{ name: "태수", trust: 3 }],
+          relationshipDelta: [{ name: starterB.name, trust: 3 }],
           flagDelta: { firstClass: "social" },
         },
         {
@@ -442,7 +448,7 @@ ${prefersPractical ? "지갑을 열어보니 이번 달 생활비를 어떻게 �
           label: "낯선 사람들의 테이블에 합류해 이야기한다.",
           summary: "당신은 새로운 사람들과 식사하며 인맥을 넓혔다.",
           statDelta: { charm: 4, reputation: 2, health: -1, wealth: -5 },
-          relationshipDelta: [{ name: "태수", trust: 3 }],
+          relationshipDelta: [{ name: starterB.name, trust: 3 }],
           flagDelta: { firstLunch: "social" },
         },
         {

@@ -222,6 +222,9 @@ describe("account and character API foundation", () => {
             return created;
           }),
         },
+        relationship: {
+          create: vi.fn(async () => ({ id: "rel-1" })),
+        },
         event: {
           create: vi.fn(async ({ data }) => {
             expect(data).toEqual(
@@ -266,6 +269,9 @@ describe("account and character API foundation", () => {
           return { id: "char-1" };
         }),
         update: vi.fn(async () => created),
+      },
+      relationship: {
+        create: vi.fn(async () => ({ id: "rel-1" })),
       },
       event: { create: vi.fn(async () => ({ id: "event-1" })) },
     }));

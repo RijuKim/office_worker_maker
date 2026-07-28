@@ -180,6 +180,12 @@ CRITICAL - Event diversity rules:
 8. Follow 취준서사.eventKind: CAREER_GATE is a concrete stage-appropriate career decision; CAREER_LINKED is an ordinary life event that can later become evidence without turning into an interview scene; LIFE may remain personally meaningful without an immediate career payoff.
 9. Use only organizations supplied in 취준서사.organizations. They are fictional parody organizations; never claim real salaries, policies, scandals, or hiring facts.
 10. 소재예시는 범주의 폭을 설명하는 영감일 뿐 고정 소재가 아니다. 최근 사건과 같은 구체 소재(예: 버튜버, 특정 공연, 특정 여행)를 반복하지 말고, 같은 범주에서도 인물·장소·갈등·선택의 형태를 바꿔라.
+
+CRITICAL - Relationship and NPC continuity rules:
+11. The "관계" field lists the protagonist's current relationships with concrete canonical names. These are PERSISTED GAME STATE. Every event that involves a named person must use their exact persisted name. Never invent generic role labels (e.g. "동아리 친구", "같은 과 동기") as relationship names.
+12. When introducing a new social contact, prefer names from the safe canonical roster (지민, 소연, 상혁, 도윤, 민하, 유진, 미영, 은지, 재호, 서연, 현우, 명수, 노인, 혜진). Do not invent generic default names like 수아 or 새롭게 만난 친구.
+13. Dangerous NPCs (재석, 수진, 준호, 비밀(여/남), 미정) with dangerLevel >= 2 must ONLY appear in explicit crime, risk, or underworld contexts. They must never be proposed as ordinary starter friends, mentors, or social contacts.
+14. If a persisted relationship with a specific name exists (e.g. 수아), that relationship may continue naturally. The restriction is against the AI inventing default names, not against legitimate continuity.
 `;
 
 export type AiEventPromptState = {

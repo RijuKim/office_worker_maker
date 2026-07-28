@@ -8,6 +8,7 @@ import {
   buildFirstEvent,
   buildInitialHiddenState,
   buildInitialStats,
+  buildStarterRelationships,
   pickRandomGradeYear,
   pickRandomMajor,
   serializeCharacterRun,
@@ -113,7 +114,7 @@ export async function POST(request: Request | NextRequest) {
           create: buildInitialStats(createInput.preferredStats, createInput),
         },
         hiddenState: {
-          create: buildInitialHiddenState(createInput),
+          create: buildInitialHiddenState({ ...createInput, seed: createInput.name }),
         },
       },
       include: {
@@ -123,9 +124,19 @@ export async function POST(request: Request | NextRequest) {
       },
     });
 
+    const starterRelationships = buildStarterRelationships(createInput.name);
+    for (const rel of starterRelationships) {
+      await tx.relationship.create({
+        data: {
+          ...rel,
+          characterRunId: created.id,
+        },
+      });
+    }
+
     const firstEvent = await tx.event.create({
       data: {
-        ...buildFirstEvent(createInput),
+        ...buildFirstEvent({ ...createInput, seed: createInput.name }),
         characterRunId: created.id,
       },
     });

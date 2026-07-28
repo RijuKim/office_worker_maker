@@ -46,6 +46,66 @@ export const NPC_POOL: NpcProfile[] = [
   { name: "혜진", role: "스터디 리더", greeting: "00, 이번 주 스터디 준비됐어? 내가 자료 좀 더 보내줄게.", personality: "철저하고 계획적인", backstory: "공기업 스터디를 이끄는 리더로 자기 관리가 철저하고 주변에도 엄격하지만 꽤 믿을 수 있는 사람", tags: ["공기업", "스터디", "계획적", "취업"], thread: "public_sector", dangerLevel: 0 },
 ];
 
+/**
+ * Deterministic seeded PRNG (mulberry32).
+ * Returns a function that produces pseudo-random numbers in [0, 1).
+ */
+function createSeededRandom(seed: number): () => number {
+  let state = seed | 0;
+  return () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return (t ^ (t >>> 14)) >>> 0;
+  };
+}
+
+/**
+ * Convert a string seed to a numeric hash (Fowler-Noll-Vo-1a 32-bit).
+ */
+function hashSeed(seed: string): number {
+  let hash = 2166136261 >>> 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (Math.imul(hash, 16777619) ^ seed.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+/**
+ * Deterministic shuffle using a seeded PRNG.
+ */
+function seededShuffle<T>(arr: T[], seed: number): T[] {
+  const result = [...arr];
+  const rand = createSeededRandom(seed);
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = rand() % (i + 1);
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+/**
+ * Select exactly `count` distinct safe (dangerLevel === 0) NPCs from the
+ * canonical pool using a deterministic seed. The same seed always returns
+ * the same ordered pair. Different seeds distribute across the safe pool.
+ *
+ * Never returns dangerLevel >= 2 NPCs. If the safe pool has fewer than
+ * `count` entries, throws an error (should never happen with the current
+ * NPC_POOL which has 12+ safe NPCs).
+ */
+export function selectStarterNpcs(seed: string, count: number): NpcProfile[] {
+  const safePool = NPC_POOL.filter((npc) => npc.dangerLevel === 0);
+  if (safePool.length < count) {
+    throw new Error(
+      `Safe NPC pool has only ${safePool.length} entries, but ${count} were requested. ` +
+      "Add more dangerLevel === 0 NPCs to NPC_POOL.",
+    );
+  }
+  const numericSeed = hashSeed(seed);
+  const shuffled = seededShuffle(safePool, numericSeed);
+  return shuffled.slice(0, count);
+}
+
 export function pickNpcs(
   existingRelationships: { name: string; role: string; tags?: string[] }[],
   count: number,
