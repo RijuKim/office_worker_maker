@@ -16,7 +16,7 @@ export async function completeRealOnboarding(
   await page.getByRole("button", { name: "시작하기", exact: true }).click();
   await page.getByLabel("당신의 이름은 무엇인가요?").fill(name);
   await page.getByRole("button", { name: "다음", exact: true }).click();
-  await page.getByLabel("당신의 나이는 몇 살인가요?").selectOption(age);
+  await page.getByLabel("당신의 나이는 몇 살인가요?").fill(age);
   await page.getByRole("button", { name: "다음", exact: true }).click();
   await page.getByRole("button", { name: new RegExp(`^${residenceLabel}`) }).click();
   await page.getByRole("button", { name: "다음", exact: true }).click();
