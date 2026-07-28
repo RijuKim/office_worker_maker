@@ -46,9 +46,15 @@ describe("replay balance acceptance", () => {
     expect(shouldCreateFinalEnding({ coreEventCount: 24, lifeStage: "college_late", graduation: "normal" })).toBe(true);
   });
 
-  it("relaxes score-based extra semesters while preserving explicit blockers", () => {
-    expect(requiresExtraSemester(gradeFourState, { academic: 4, practical: 4 }, {})).toBe(false);
+  it("requires extra semester when both academic and practical are <=4; preserves explicit blockers", () => {
+    // Both <=4 triggers extra semester
+    expect(requiresExtraSemester(gradeFourState, { academic: 4, practical: 4 }, {})).toBe(true);
     expect(requiresExtraSemester(gradeFourState, { academic: 3, practical: 4 }, {})).toBe(true);
+    // One stat >4 while other is low does NOT trigger
+    expect(requiresExtraSemester(gradeFourState, { academic: 3, practical: 7 }, {})).toBe(false);
+    // Both >4 does NOT trigger
+    expect(requiresExtraSemester(gradeFourState, { academic: 5, practical: 5 }, {})).toBe(false);
+    // Explicit blocker still forces extra semester regardless of scores
     expect(requiresExtraSemester(gradeFourState, { academic: 8, practical: 8 }, {
       graduation: { requirementsPending: true },
     })).toBe(true);

@@ -229,17 +229,18 @@ describe("evaluateEventQuality lifecycle closure", () => {
       source: "AI",
       candidate: {
         title: "채용 인성검사 안내",
-        body: "지난 서류 지원을 통과한 회사가 다음 단계로 인성검사 일정을 보낸다.",
+        body: "지난 서류 지원을 통과한 한빛의료기기가 다음 단계로 인성검사 일정을 보낸다.",
         tags: ["취업", "회사", "서류"],
         choices: validChoices,
       },
       context: {
         academicStatus: "ENROLLED",
-        recentSummaries: ["회사 서류 지원을 마치고 결과를 기다렸다."],
+        recentSummaries: ["한빛의료기기 서류 지원을 마치고 결과를 기다렸다."],
         recentEvents: [
-          { title: "회사 서류 지원", body: "채용 서류를 제출했다.", tags: ["취업", "회사", "서류"] },
-          { title: "지원서 수정", body: "회사 지원서를 고쳤다.", tags: ["취업", "회사"] },
+          { title: "한빛의료기기 서류 지원", body: "한빛의료기기 채용 서류를 제출했다.", tags: ["취업", "회사", "서류"] },
+          { title: "지원서 수정", body: "한빛의료기기 지원서를 고쳤다.", tags: ["취업", "회사"] },
         ],
+        careerOrganizations: ["한빛의료기기", "삼송전자"],
       },
     });
 
@@ -467,5 +468,105 @@ describe("evaluateEventQuality lifecycle closure", () => {
 
     expect(verdict.status).toBe("pass");
     expect(verdict.continuityExemptions).toContain("lifecycle_closure");
+  });
+
+  describe("organization-name repetition penalty", () => {
+    const baseChoices = [
+      { id: "a", label: "참석한다.", summary: "당신은 세미나에 참석했다.", statDelta: { practical: 1 }, relationshipDelta: [] },
+      { id: "b", label: "다른 일정을 확인한다.", summary: "당신은 다른 일정을 확인했다.", statDelta: { academic: 1 }, relationshipDelta: [] },
+    ];
+
+    it("penalizes repeated 한빛의료기기 mentions in recent events", () => {
+      const verdict = evaluateEventQuality({
+        source: "AI",
+        candidate: {
+          title: "한빛의료기기 사내 행사",
+          body: "한빛의료기기에서 열리는 산업 세미나에 참석해 최신 의료기기 트렌드를 듣는다.",
+          tags: ["진로", "경험"],
+          choices: baseChoices,
+        },
+        context: {
+          academicStatus: "ENROLLED",
+          recentEvents: [
+            { title: "한빛의료기기 서류", body: "한빛의료기기에 서류를 제출했다.", tags: ["취업", "서류"] },
+            { title: "한빛의료기기 인성검사", body: "한빛의료기기 인성검사를 봤다.", tags: ["취업", "검사"] },
+          ],
+          careerOrganizations: ["한빛의료기기", "삼송전자"],
+        },
+      });
+
+      expect(verdict.status).toBe("fail");
+      expect(verdict.diversityScore).toBeLessThan(EVENT_QUALITY_DEFAULTS.hardRetryThreshold);
+      expect(verdict.reasons).toContain("low_diversity_score");
+    });
+
+    it("passes a different organization that was not recently mentioned", () => {
+      const verdict = evaluateEventQuality({
+        source: "AI",
+        candidate: {
+          title: "삼송전자 지원",
+          body: "삼송전자 채용 공고를 보고 지원서를 작성한다.",
+          tags: ["진로", "도전"],
+          choices: baseChoices,
+        },
+        context: {
+          academicStatus: "ENROLLED",
+          recentEvents: [
+            { title: "한빛의료기기 서류", body: "한빛의료기기에 서류를 제출했다.", tags: ["취업", "서류"] },
+            { title: "한빛의료기기 인성검사", body: "한빛의료기기 인성검사를 봤다.", tags: ["취업", "검사"] },
+          ],
+          careerOrganizations: ["한빛의료기기", "삼송전자"],
+        },
+      });
+
+      expect(verdict.status).toBe("pass");
+      expect(verdict.continuityExemptions).not.toContain("job_application");
+    });
+
+    it("allows active application stage progression for the same company", () => {
+      const verdict = evaluateEventQuality({
+        source: "AI",
+        candidate: {
+          title: "한빛의료기기 최종 면접",
+          body: "한빛의료기기에서 최종 면접 일정을 보내왔다. 지원서를 통과해 다음 단계로 넘어간 것이다.",
+          tags: ["취업", "면접"],
+          choices: baseChoices,
+        },
+        context: {
+          academicStatus: "ENROLLED",
+          recentSummaries: ["한빛의료기기 서류 지원을 마치고 결과를 기다렸다."],
+          recentEvents: [
+            { title: "한빛의료기기 서류", body: "한빛의료기기에 서류를 제출했다.", tags: ["취업", "서류"] },
+          ],
+          careerOrganizations: ["한빛의료기기", "삼송전자"],
+        },
+      });
+
+      expect(verdict.status).toBe("pass");
+      expect(verdict.continuityExemptions).toContain("job_application");
+    });
+
+    it("rejects generic job process without shared organization name", () => {
+      const verdict = evaluateEventQuality({
+        source: "AI",
+        candidate: {
+          title: "면접 준비",
+          body: "면접 일정이 잡혀서 준비를 시작한다.",
+          tags: ["취업", "면접"],
+          choices: baseChoices,
+        },
+        context: {
+          academicStatus: "ENROLLED",
+          recentSummaries: ["회사 서류 지원을 마치고 결과를 기다렸다."],
+          recentEvents: [
+            { title: "회사 서류 지원", body: "채용 서류를 제출했다.", tags: ["취업", "회사", "서류"] },
+          ],
+          careerOrganizations: ["한빛의료기기", "삼송전자"],
+        },
+      });
+
+      expect(verdict.continuityExemptions).not.toContain("job_application");
+      expect(verdict.status).toBe("pass");
+    });
   });
 });

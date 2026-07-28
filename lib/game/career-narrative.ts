@@ -70,10 +70,10 @@ const GENERAL_CANDIDATES = [
 ] as const;
 
 export function careerPhaseForEventCount(coreEventCount: number): CareerPhase {
-  if (coreEventCount < 8) return "EXPLORATION";
-  if (coreEventCount < 16) return "PREPARATION";
-  if (coreEventCount < 24) return "EXPERIENCE";
-  if (coreEventCount < 32) return "APPLICATION";
+  if (coreEventCount < 6) return "EXPLORATION";
+  if (coreEventCount < 12) return "PREPARATION";
+  if (coreEventCount < 18) return "EXPERIENCE";
+  if (coreEventCount < 24) return "APPLICATION";
   return "CONVERGENCE";
 }
 

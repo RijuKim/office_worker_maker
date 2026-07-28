@@ -74,6 +74,10 @@ export type EvaluateEventQualityInput = {
     recentSummaries?: string[];
     recentEvents?: RecentEvent[];
     previousChoiceSummary?: string | null;
+    /** Organization names from career narrative, used for repeat detection. */
+    careerOrganizations?: string[];
+    /** The company name of the currently active job application, if any. */
+    activeJobCompany?: string | null;
   };
 };
 
@@ -456,7 +460,15 @@ function detectContinuityExemptions(input: EvaluateEventQualityInput, choices: E
   const exemptions: string[] = [];
   const recentText = recentContextText(input);
   if (jobProcessPattern.test(text) && jobProcessPattern.test(recentText)) {
-    exemptions.push("job_application");
+    // Exempt only when the candidate event mentions the currently active
+    // application's company — genuine stage progression for the same company.
+    // A generic job-process match without an active-company match is not
+    // exempt from repetition penalties.
+    const activeCompany = input.context?.activeJobCompany;
+    if (activeCompany && text.includes(activeCompany) && recentText.includes(activeCompany)) {
+      exemptions.push("job_application");
+    }
+  }
   }
   if (specProgressPattern.test(text) && specProgressPattern.test(recentText)) {
     exemptions.push("spec_progression");
@@ -501,6 +513,19 @@ function scoreDiversity(input: EvaluateEventQualityInput, continuityExemptions: 
       .slice(0, EVENT_QUALITY_DEFAULTS.strongRepeatLookback)
       .filter((event) => activityKeywords(recentEventText(event)).includes(activity)).length;
     if (strongCount >= 2) penalty += 10;
+  }
+
+  // Organization-name repetition penalty: penalize when the candidate event
+  // mentions an organization name that also appears in recent events.
+  const orgNames = input.context?.careerOrganizations ?? [];
+  for (const orgName of orgNames) {
+    if (!candidateText.includes(orgName)) continue;
+    const recentCount = recentEvents.filter((event) => recentEventText(event).includes(orgName)).length;
+    penalty += recentCount * 15;
+    const strongCount = recentEvents
+      .slice(0, EVENT_QUALITY_DEFAULTS.strongRepeatLookback)
+      .filter((event) => recentEventText(event).includes(orgName)).length;
+    if (strongCount >= 2) penalty += 15;
   }
 
   if (recentEvents.slice(0, EVENT_QUALITY_DEFAULTS.strongRepeatLookback).some((event) => sameProposalPattern(candidateText, recentEventText(event)))) {

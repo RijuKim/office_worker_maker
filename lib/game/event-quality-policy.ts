@@ -27,6 +27,7 @@ export type EventQualityRuntimeContext = {
     ? Context extends { recentEvents?: infer RecentEvents } ? RecentEvents : never
     : never;
   previousChoiceSummary?: string | null;
+  careerOrganizations?: string[];
 };
 
 export type QualityEvaluation = {

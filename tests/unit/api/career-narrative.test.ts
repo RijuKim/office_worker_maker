@@ -8,19 +8,38 @@ import {
 } from "@/lib/game/career-narrative";
 
 describe("career narrative", () => {
-  it("moves through five career phases across forty events", () => {
+  it("moves through five career phases across twenty-four events", () => {
     expect(careerPhaseForEventCount(0)).toBe("EXPLORATION");
-    expect(careerPhaseForEventCount(8)).toBe("PREPARATION");
-    expect(careerPhaseForEventCount(16)).toBe("EXPERIENCE");
-    expect(careerPhaseForEventCount(24)).toBe("APPLICATION");
-    expect(careerPhaseForEventCount(32)).toBe("CONVERGENCE");
+    expect(careerPhaseForEventCount(6)).toBe("PREPARATION");
+    expect(careerPhaseForEventCount(12)).toBe("EXPERIENCE");
+    expect(careerPhaseForEventCount(18)).toBe("APPLICATION");
+    expect(careerPhaseForEventCount(24)).toBe("CONVERGENCE");
   });
 
-  it("keeps the intended career gate, linked, and life cadence", () => {
+  it("keeps the intended career gate, linked, and life cadence over an 8-event modulo", () => {
     const kinds = Array.from({ length: 8 }, (_, index) => careerEventKindForCount(index));
     expect(kinds.filter((kind) => kind === "CAREER_GATE")).toHaveLength(3);
     expect(kinds.filter((kind) => kind === "CAREER_LINKED")).toHaveLength(3);
     expect(kinds.filter((kind) => kind === "LIFE")).toHaveLength(2);
+  });
+
+  it("distributes event kinds evenly across a 24-event run", () => {
+    const kinds = Array.from({ length: 24 }, (_, index) => careerEventKindForCount(index));
+    expect(kinds.filter((kind) => kind === "CAREER_GATE")).toHaveLength(9);
+    expect(kinds.filter((kind) => kind === "CAREER_LINKED")).toHaveLength(9);
+    expect(kinds.filter((kind) => kind === "LIFE")).toHaveLength(6);
+  });
+
+  it("assigns correct phase at each 24-event boundary", () => {
+    expect(careerPhaseForEventCount(0)).toBe("EXPLORATION");
+    expect(careerPhaseForEventCount(5)).toBe("EXPLORATION");
+    expect(careerPhaseForEventCount(6)).toBe("PREPARATION");
+    expect(careerPhaseForEventCount(11)).toBe("PREPARATION");
+    expect(careerPhaseForEventCount(12)).toBe("EXPERIENCE");
+    expect(careerPhaseForEventCount(17)).toBe("EXPERIENCE");
+    expect(careerPhaseForEventCount(18)).toBe("APPLICATION");
+    expect(careerPhaseForEventCount(23)).toBe("APPLICATION");
+    expect(careerPhaseForEventCount(24)).toBe("CONVERGENCE");
   });
 
   it("creates a stable organization and career pool per character", () => {

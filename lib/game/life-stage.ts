@@ -577,8 +577,8 @@ function shouldRequireExtraSemester(
     state.academicPlan.retakePressure === true ||
     state.academicPlan.scholarshipWarning === true;
 
-  return (stats?.academic !== undefined && stats.academic <= 3) ||
-    (stats?.practical !== undefined && stats.practical <= 3) ||
+  return (stats?.academic !== undefined && stats.practical !== undefined &&
+    stats.academic <= 4 && stats.practical <= 4) ||
     hasRequirementBlocker;
 }
 

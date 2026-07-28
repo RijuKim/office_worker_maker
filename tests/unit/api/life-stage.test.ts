@@ -235,7 +235,7 @@ describe("applyLifeStageTransition", () => {
         graduation: { state: "normal" },
         stageEventCount: 2,
       },
-      stats: { academic: 3, practical: 7, health: 6, mental: 6, reputation: 6 },
+      stats: { academic: 3, practical: 3, health: 6, mental: 6, reputation: 6 },
       burnoutRisk: 10,
     });
 
