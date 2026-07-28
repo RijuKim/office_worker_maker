@@ -39,7 +39,7 @@ export type CareerNarrativeState = {
   lastGate?: string | null;
 };
 
-const ORGANIZATIONS: CareerOrganization[] = [
+export const ORGANIZATIONS: CareerOrganization[] = [
   { id: "samsong-electronics", name: "삼송전자", sector: "전자·반도체", companyType: "대기업", traits: ["높은 보상", "강한 경쟁", "체계적인 교육"], roles: ["헬스케어 사업", "품질관리", "일반 사무"], preferredTraits: ["문제 해결", "프로젝트", "기술 이해"] },
   { id: "sk-hynichip", name: "에스케이하이칩", sector: "반도체", companyType: "대기업", traits: ["기술 중심", "교대 가능성", "빠른 성장"], roles: ["품질", "안전", "기술지원"], preferredTraits: ["실무", "협업", "정확성"] },
   { id: "hyunjae-motors", name: "현재자동차", sector: "자동차·모빌리티", companyType: "대기업", traits: ["전국 사업장", "제조 현장", "직무 이동"], roles: ["품질", "산업안전", "서비스 기획"], preferredTraits: ["현장 대응", "조율", "분석"] },
@@ -241,12 +241,34 @@ function updatePriorities(current: CareerNarrativeState["priorities"], summary: 
   };
 }
 
+/** SplitMix32 — a well-known 32-bit PRNG.  All operations stay within the
+ * 32-bit integer range so JavaScript arithmetic is exact. */
+function splitmix32(state: number) {
+  state = (state + 0x9e3779b9) | 0;
+  let z = state;
+  z = Math.imul(z ^ (z >>> 16), 0x85ebca6b);
+  z = Math.imul(z ^ (z >>> 13), 0xc2b2ae35);
+  return (z ^ (z >>> 16)) >>> 0;
+}
+
+/** Deterministic Fisher–Yates shuffle using SplitMix32 PRNG with two
+ * interleaved state words so that seeds differing by a single character
+ * produce completely different permutations. */
 function deterministicShuffle<T>(values: readonly T[], seed: string) {
   const result = [...values];
-  let state = [...seed].reduce((hash, char) => ((hash * 33) ^ char.charCodeAt(0)) >>> 0, 5381);
+  // Hash the seed into two independent 32-bit seeds via different algorithms:
+  //   lo — FNV-1a, hi — PJW (a.k.a. ELF hash)
+  let lo = [...seed].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 0x1000193) >>> 0, 0x811c9dc5);
+  let hi = [...seed].reduce((h, c) => ((h << 4) + c.charCodeAt(0) + ((h & 0xf0000000) >>> 24)) >>> 0, 0x6b8b4567);
+  // Additional mixing pass over reversed seed to spread short seeds
+  for (let i = seed.length - 1; i >= 0; i--) {
+    lo = splitmix32(lo ^ seed.charCodeAt(i));
+    hi = splitmix32(hi ^ seed.charCodeAt(i));
+  }
   for (let index = result.length - 1; index > 0; index -= 1) {
-    state = ((state * 1664525) + 1013904223) >>> 0;
-    const target = state % (index + 1);
+    hi = splitmix32(hi ^ lo);
+    lo = splitmix32(lo ^ hi);
+    const target = hi % (index + 1);
     [result[index], result[target]] = [result[target], result[index]];
   }
   return result;
