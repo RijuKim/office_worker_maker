@@ -90,8 +90,8 @@ async function createDeterministicRun(page: Page) {
   await page.getByRole("button", { name: "다음", exact: true }).click();
   await page.getByRole("button", { name: /자취방/ }).click();
   await page.getByRole("button", { name: "다음", exact: true }).click();
-  await page.getByRole("button", { name: "실무", exact: true }).click();
-  await page.getByRole("button", { name: "멘탈", exact: true }).click();
+  await page.getByRole("button", { name: "실무" }).click();
+  await page.getByRole("button", { name: "멘탈" }).click();
   await page.getByRole("button", { name: "눈을 뜬다", exact: true }).click();
 }
 

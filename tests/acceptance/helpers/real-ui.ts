@@ -20,8 +20,8 @@ export async function completeRealOnboarding(
   await page.getByRole("button", { name: "다음", exact: true }).click();
   await page.getByRole("button", { name: new RegExp(`^${residenceLabel}`) }).click();
   await page.getByRole("button", { name: "다음", exact: true }).click();
-  await page.getByRole("button", { name: abilities[0], exact: true }).click();
-  await page.getByRole("button", { name: abilities[1], exact: true }).click();
+  await page.getByRole("button", { name: abilities[0] }).click();
+  await page.getByRole("button", { name: abilities[1] }).click();
   await page.getByRole("button", { name: "눈을 뜬다", exact: true }).click();
 
   const response = await responsePromise;

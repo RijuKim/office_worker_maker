@@ -98,11 +98,11 @@ test.describe("Web visual acceptance — onboarding", () => {
     await expect(page.getByText("0/2", { exact: false })).toBeVisible();
     await expect(page.getByRole("button", { name: "눈을 뜬다", exact: true })).toBeDisabled();
 
-    await page.getByRole("button", { name: "실무", exact: true }).click();
+    await page.getByRole("button", { name: "실무" }).click();
     await expect(page.getByText("1/2", { exact: false })).toBeVisible();
     await expect(page.getByRole("button", { name: "눈을 뜬다", exact: true })).toBeDisabled();
 
-    await page.getByRole("button", { name: "멘탈", exact: true }).click();
+    await page.getByRole("button", { name: "멘탈" }).click();
     await expect(page.getByText("2/2", { exact: false })).toBeVisible();
     await expect(page.getByRole("button", { name: "눈을 뜬다", exact: true })).toBeEnabled();
     await assertNoOverflow(page);
@@ -289,8 +289,8 @@ test.describe("Web visual acceptance — screenshots", () => {
       await captureScreenshot(page, "onboarding-abilities", viewport, EVIDENCE_DIR);
 
       // Play surface with event
-      await page.getByRole("button", { name: "실무", exact: true }).click();
-      await page.getByRole("button", { name: "멘탈", exact: true }).click();
+      await page.getByRole("button", { name: "실무" }).click();
+      await page.getByRole("button", { name: "멘탈" }).click();
       await page.getByRole("button", { name: "눈을 뜬다", exact: true }).click();
       await expect(page.locator(".event-panel h2")).toHaveText(sharedEvent.title);
       await captureScreenshot(page, "gameplay-event", viewport, EVIDENCE_DIR);

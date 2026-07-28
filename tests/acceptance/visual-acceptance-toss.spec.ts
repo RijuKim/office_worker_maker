@@ -273,8 +273,8 @@ test.describe("Toss visual acceptance — screenshots", () => {
     await captureScreenshot(page, "toss-onboarding-abilities", { width: 390, height: 844 }, EVIDENCE_DIR);
 
     // Play surface with event
-    await page.getByRole("button", { name: "실무", exact: true }).click();
-    await page.getByRole("button", { name: "멘탈", exact: true }).click();
+    await page.getByRole("button", { name: "실무" }).click();
+    await page.getByRole("button", { name: "멘탈" }).click();
     await page.getByRole("button", { name: "눈을 뜬다", exact: true }).click();
     await expect(page.locator(".event-panel h2")).toHaveText(sharedEvent.title);
     await captureScreenshot(page, "toss-gameplay-event", { width: 390, height: 844 }, EVIDENCE_DIR);
