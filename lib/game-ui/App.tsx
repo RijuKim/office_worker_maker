@@ -282,6 +282,13 @@ export function PixelPortrait({ name, compact = false, large = false, variant, s
   );
 }
 
+export function normalizeNarrativeBody(body: string): string {
+  if (/\\\\n/.test(body)) {
+    return body.replace(/\\\\n/g, "\n").replace(/\\\\r/g, "\r").replace(/\\\\t/g, "\t");
+  }
+  return body;
+}
+
 function statDeltaText(delta: SharedStats) {
   const entries = Object.entries(delta).filter(([, value]) => value !== 0);
   if (entries.length === 0) return "변화 없음";
@@ -426,7 +433,7 @@ export function PlaySurface({
                   <h2 className="text-xl font-black leading-tight text-[#2a241e]">{currentEvent.title}</h2>
                 </div>
                 <div className={`novel-text text-lg tracking-normal max-[900px]:text-[16px] ${currentEvent.source === "AI" ? "new-scene-text" : ""}`}>
-                  {currentEvent.body.split(/\n\s*\n|\n/).map((paragraph) => paragraph.trim()).filter(Boolean).map((paragraph, index) => (
+                  {normalizeNarrativeBody(currentEvent.body).split(/\n\s*\n|\n/).map((paragraph) => paragraph.trim()).filter(Boolean).map((paragraph, index) => (
                     <p className="mt-3 first:mt-0" key={index}>{paragraph}</p>
                   ))}
                 </div>

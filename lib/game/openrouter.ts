@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { logger } from "@/lib/server/logger";
 import { eventCategoryExamples } from "@/lib/game/event-diversity";
+import { normalizeRelationshipName } from "@/lib/game/npcs";
 
 type AiProvider = {
   id: "ollama" | "openrouter";
@@ -1003,14 +1004,35 @@ export type AiEventParseResult =
   | { success: true; event: AiEventResponse }
   | { success: false; reason: AiEventParseFailureReason; issues: string[] };
 
+function repairProviderContent(content: string): string {
+  const trimmed = content.trim();
+  if (trimmed.startsWith('"')) {
+    try {
+      const unwrapped = JSON.parse(trimmed);
+      if (typeof unwrapped === "string" && /^\s*[{[]/.test(unwrapped.trim())) {
+        return unwrapped;
+      }
+    } catch {
+      /* not a JSON-string wrapper */
+    }
+  }
+
+  return content;
+}
+
 export function parseAiEventContentDetailed(content: string): AiEventParseResult {
+  const repaired = repairProviderContent(content);
   let raw: unknown;
   try {
-    raw = extractJson(content);
+    raw = extractJson(repaired);
   } catch {
     return { success: false, reason: "malformed_json", issues: ["json"] };
   }
-  const validated = aiEventSchema.safeParse(normalizeAiEvent(raw));
+  const normalized = normalizeAiEvent(raw);
+  // After normalization, repair literal escaped newlines in string values
+  // that survived JSON parsing (e.g. body containing literal \\n sequences).
+  const repairedNormalized = repairNarrativeEscapes(normalized);
+  const validated = aiEventSchema.safeParse(repairedNormalized);
   if (validated.success) return { success: true, event: validated.data };
   const issues = validated.error.issues.map((issue) => issue.path.join(".") || "event");
   const choiceIssues = validated.error.issues.filter((issue) => issue.path[0] === "choices");
@@ -1020,6 +1042,47 @@ export function parseAiEventContentDetailed(content: string): AiEventParseResult
   else if (choiceIssues.some((issue) => issue.path.some((part) => part === "label" || part === "summary" || part === "id"))) reason = "choice_field";
   else if (choiceIssues.length > 0) reason = "choice_schema";
   return { success: false, reason, issues };
+}
+
+function repairNarrativeEscapes(raw: unknown): unknown {
+  if (typeof raw !== "object" || raw === null) return raw;
+  const obj = raw as Record<string, unknown>;
+
+  const repairString = (value: unknown): unknown => {
+    if (typeof value !== "string") return value;
+    if (/\\n/.test(value)) {
+      return value
+        .replace(/\\n/g, "\n")
+        .replace(/\\r/g, "\r")
+        .replace(/\\t/g, "\t");
+    }
+    return value;
+  };
+
+  const result: Record<string, unknown> = { ...obj };
+  if (typeof result.body === "string") {
+    result.body = repairString(result.body);
+  }
+  if (typeof result.title === "string") {
+    result.title = repairString(result.title);
+  }
+  if (Array.isArray(result.choices)) {
+    result.choices = result.choices.map((choice: unknown) => {
+      if (typeof choice !== "object" || choice === null) return choice;
+      const c = choice as Record<string, unknown>;
+      return {
+        ...c,
+        label: repairString(c.label),
+        summary: repairString(c.summary),
+      };
+    });
+  }
+  if (Array.isArray(result.tags)) {
+    result.tags = result.tags.map((tag: unknown) =>
+      typeof tag === "string" ? repairString(tag) : tag,
+    );
+  }
+  return result;
 }
 
 export async function generateAiEnding(state: {
@@ -1404,10 +1467,12 @@ function normalizeRelationshipDelta(raw: unknown) {
     .map((item) => {
       const rel = readRecord(item);
       if (!rel || typeof rel.name !== "string") return null;
+      const normalizedName = normalizeRelationshipName(rel.name);
+      if (!normalizedName) return null;
       const trust = Number(rel.trust ?? rel.delta ?? rel.change);
       if (!Number.isFinite(trust)) return null;
       return {
-        name: rel.name,
+        name: normalizedName,
         trust: Math.max(-30, Math.min(30, Math.round(trust))),
         ...(typeof rel.status === "string" && ["acquaintance", "friend", "crush", "dating", "ex"].includes(rel.status)
           ? { status: rel.status as "acquaintance" | "friend" | "crush" | "dating" | "ex" }

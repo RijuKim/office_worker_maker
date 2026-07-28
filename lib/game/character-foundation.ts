@@ -331,7 +331,7 @@ export function buildFirstEvent(input: NormalizedCharacterCreateInput) {
           label: "단체 채팅에 올라온 선배의 인턴 이야기에 답장을 보낸다.",
           summary: "당신은 선배에게 인턴 정보를 물어보며 실무 감각을 넓혔다.",
           statDelta: { practical: 5, reputation: 1, mental: -3, health: -1 },
-          relationshipDelta: [{ name: "채용설명회 조교", trust: 3 }],
+          relationshipDelta: [{ name: "소연", trust: 3 }],
           flagDelta: { internshipCuriosity: true },
         },
         {
@@ -364,7 +364,7 @@ export function buildFirstEvent(input: NormalizedCharacterCreateInput) {
           label: "먼저 웃으며 인사하고 말을 건다.",
           summary: "당신은 밝은 인상으로 첫인상을 남겼다.",
           statDelta: { charm: 4, reputation: 2, mental: -1, health: -1 },
-          relationshipDelta: [{ name: "같은 과 동기", trust: 3 }],
+          relationshipDelta: [{ name: "민하", trust: 3 }],
           flagDelta: { firstImpression: "friendly" },
         },
         {
@@ -407,7 +407,7 @@ ${prefersAcademic ? "당신은 이미 교재를 펼쳐 예습한 부분을 훑�
           label: "옆자리 사람들과 자연스럽게 인사를 나눈다.",
           summary: "당신은 같은 수업을 듣는 사람들과 관계를 만들었다.",
           statDelta: { charm: 3, reputation: 1, mental: 1, academic: -1 },
-          relationshipDelta: [{ name: "옆자리 동기", trust: 3 }],
+          relationshipDelta: [{ name: "태수", trust: 3 }],
           flagDelta: { firstClass: "social" },
         },
         {
@@ -442,7 +442,7 @@ ${prefersPractical ? "지갑을 열어보니 이번 달 생활비를 어떻게 �
           label: "낯선 사람들의 테이블에 합류해 이야기한다.",
           summary: "당신은 새로운 사람들과 식사하며 인맥을 넓혔다.",
           statDelta: { charm: 4, reputation: 2, health: -1, wealth: -5 },
-          relationshipDelta: [{ name: "점심 모임 사람들", trust: 3 }],
+          relationshipDelta: [{ name: "태수", trust: 3 }],
           flagDelta: { firstLunch: "social" },
         },
         {

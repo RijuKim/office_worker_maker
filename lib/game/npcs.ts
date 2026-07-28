@@ -99,3 +99,68 @@ export function pickNpcDangerous(relationships: { name: string }[]): NpcProfile 
   if (dangerous.length === 0) return null;
   return dangerous[Math.floor(Math.random() * dangerous.length)];
 }
+
+/**
+ * Known generic role labels that AI providers sometimes emit as relationship
+ * names instead of canonical NPC names. Maps each to the best matching
+ * canonical NPC name from the pool, or null if no match exists.
+ */
+const GENERIC_ROLE_LABELS: Record<string, string | null> = {
+  "동아리 친구": "은지",
+  "같은 과 동기": "민하",
+  "옆자리 동기": "태수",
+  "점심 모임 사람들": "태수",
+  "채용설명회 조교": "소연",
+  "동아리 선배": "지민",
+  "취업 선배": "유진",
+  "고민 상담소 선배": "미영",
+  "동아리 부장": "은지",
+  "동아리 후배": "재호",
+  "학생회장": "동규",
+  "편의점 점장": "명수",
+  "도서관 할아버지": "노인",
+  "스터디 리더": "혜진",
+  "헬스장 트레이너": "현우",
+  "문학 동아리원": "서연",
+  "팀플 동료": "도윤",
+  "조교 선배": "소연",
+  "다단계 권유자": "준호",
+  "도박 클럽 리크루터": "수진",
+  "유흥업소 사장": "재석",
+  "대출 권유자": "미정",
+  "의문의 제안자": "비밀(여/남)",
+};
+
+/**
+ * Normalize a relationship name from an AI provider response.
+ *
+ * If the name matches a known generic role label, maps it to the canonical
+ * named NPC. If the name is not a known NPC and looks like a generic role
+ * description (contains Korean role markers like "친구", "동기", "사람",
+ * "선배", "조교", "부장", "회장", "점장", "트레이너", "리더", "원", "권유자",
+ * "사장", "제안자"), returns null to indicate the delta should be omitted.
+ *
+ * Otherwise returns the name as-is (it's either a known NPC or a plausible
+ * new character name).
+ */
+export function normalizeRelationshipName(name: string): string | null {
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+
+  // Check exact match against generic role labels
+  const mapped = GENERIC_ROLE_LABELS[trimmed];
+  if (mapped !== undefined) return mapped;
+
+  // Check if any NPC name is contained within or matches the label
+  const knownNpc = NPC_POOL.find(
+    (npc) => trimmed.includes(npc.name) || npc.name.includes(trimmed),
+  );
+  if (knownNpc) return knownNpc.name;
+
+  // Check if the name looks like a generic role description
+  const genericRolePattern =
+    /(?:친구|동기|사람들|선배|조교|부장|회장|점장|트레이너|리더|원$|권유자|사장|제안자|교수|후배|동료|담당|매니저|직원|인턴|사원|팀원|회원|멤버)/;
+  if (genericRolePattern.test(trimmed)) return null;
+
+  return trimmed;
+}
