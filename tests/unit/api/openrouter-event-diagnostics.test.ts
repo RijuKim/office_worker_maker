@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  generateAiEnding,
   generateAiEvent,
   generateAiEventStream,
+  getAiEndingTimeoutMs,
   getOllamaEventMaxTokens,
   getOpenRouterMaxTokens,
   getOpenRouterTimeoutMs,
@@ -27,6 +29,8 @@ describe("AI event diagnostics", () => {
     delete process.env.OLLAMA_API_KEY;
     delete process.env.OPENROUTER_TIMEOUT_MS;
     delete process.env.OLLAMA_EVENT_MAX_TOKENS;
+    delete process.env.AI_ENDING_TIMEOUT_MS;
+    delete process.env.AI_PRIMARY_PROVIDER;
     vi.useRealTimers();
   });
 
@@ -65,6 +69,68 @@ describe("AI event diagnostics", () => {
     ["4001", 1_600],
   ])("parses Ollama event token budget %s as %i", (raw, expected) => {
     expect(getOllamaEventMaxTokens(raw)).toBe(expected);
+  });
+
+  it.each([
+    [undefined, 120_000],
+    ["invalid", 120_000],
+    ["29999", 120_000],
+    ["30000", 30_000],
+    ["120000", 120_000],
+    ["240000", 240_000],
+    ["240001", 120_000],
+  ])("parses ending timeout %s as %i", (raw, expected) => {
+    expect(getAiEndingTimeoutMs(raw)).toBe(expected);
+  });
+
+  it("gives Ollama enough output budget and preserves every event in the ending prompt", async () => {
+    process.env.AI_PRIMARY_PROVIDER = "ollama";
+    process.env.OLLAMA_API_KEY = "test-key";
+    const eventHistory = Array.from({ length: 24 }, (_, index) => ({
+      title: `${index + 1}번째 선택`,
+      summary: `당신은 ${index + 1}번째 갈림길에서 스스로 결정을 내렸다.`,
+      statDelta: index === 0 ? { academic: 1 } : {},
+      relationshipDelta: [],
+      flagDelta: index === 23 ? { finalThread: "resolved" } : {},
+    }));
+    const validEnding = {
+      title: "남겨 둔 불빛",
+      summary: "당신은 여러 갈림길에서 내린 결정을 이어 자신만의 일을 만들었고, 곁에 남은 사람들과 생활의 속도를 다시 조율했다. 오래 미뤄 둔 약속과 몸의 신호도 외면하지 않으며 다음 계절을 맞았다.",
+      longNarrative: "당신은 졸업 뒤에도 이전 선택들을 잊지 않았다. ".repeat(45),
+      careerPath: "기획자",
+      jobRole: "서비스 기획",
+      destinationName: "새길연구소",
+      salaryBand: "안정적",
+      workplaceTone: ["자율", "협업"],
+      satisfaction: 74,
+      growthPotential: 81,
+      workLifeBalance: 68,
+      healthState: "회복 중",
+      relationshipState: "서로의 거리를 존중하는 관계",
+      tags: ["선택", "성장"],
+    };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      choices: [{ message: { content: JSON.stringify(validEnding) } }],
+    }), { status: 200 }));
+
+    const result = await generateAiEnding({
+      name: "서윤", age: 24, major: "사회학과",
+      stats: { academic: 7, practical: 6, health: 5, mental: 5, wealth: 4, reputation: 6, charm: 5 },
+      hiddenState: { eventFlags: { careerState: { evidence: [] } } },
+      relationships: [{ name: "민서", role: "친구", trust: 7, tags: [] }],
+      eventHistory,
+      finalChoiceSummary: "당신은 마지막 제안을 받아들였다.",
+    });
+
+    expect(result).toMatchObject({ success: true, providerId: "ollama" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(request.max_tokens).toBe(2_800);
+    const prompt = request.messages[1].content as string;
+    expect(prompt).toContain('"order":1');
+    expect(prompt).toContain('"title":"1번째 선택"');
+    expect(prompt).toContain('"order":24');
+    expect(prompt).toContain('"title":"24번째 선택"');
   });
 
   it("classifies malformed JSON separately", () => {

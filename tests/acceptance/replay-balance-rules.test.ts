@@ -94,4 +94,28 @@ describe("replay balance acceptance", () => {
     expect(prompt).toContain("사건=5");
     expect(prompt).toContain("가이드=전개:");
   });
+
+  it("does not feed category keyword examples back to the event model", () => {
+    const prompt = buildUserPrompt({
+      name: "서윤",
+      major: "사회학과",
+      gradeYear: 2,
+      age: 22,
+      coreEventCount: 7,
+      recentSummaries: ["당신은 이전 선택을 마쳤다."],
+      usedEventTitles: ["이전 사건"],
+      stats: {},
+      relationships: [],
+      storyArc: {},
+      targetCategory: "돈/소비",
+      allowedCategories: ["돈/소비", "건강/운동", "동아리/모임"],
+    });
+
+    expect(prompt).not.toContain("소재예시=");
+    expect(prompt).not.toContain("중고거래");
+    expect(prompt).not.toContain("헬스");
+    expect(prompt).not.toContain("실험설계");
+    expect(prompt).not.toContain("알바, 동아리, 시험");
+    expect(prompt).toContain("구체소재는 최근 사건과 겹치지 않게 새로 발명");
+  });
 });

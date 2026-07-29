@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 import { logger } from "@/lib/server/logger";
-import { eventCategoryExamples } from "@/lib/game/event-diversity";
 import { normalizeRelationshipName } from "@/lib/game/npcs";
 
 type AiProvider = {
@@ -71,6 +70,9 @@ const DEFAULT_AI_MAX_TOKENS = 1_400;
 const MIN_AI_MAX_TOKENS = 400;
 const MAX_AI_MAX_TOKENS = 4_000;
 const DEFAULT_OLLAMA_EVENT_TOKENS = 1_600;
+const DEFAULT_ENDING_TIMEOUT_MS = 120_000;
+const DEFAULT_OLLAMA_ENDING_TOKENS = 2_800;
+const DEFAULT_OPENROUTER_ENDING_TOKENS = 3_200;
 
 export function getOpenRouterTimeoutMs(raw = process.env.OPENROUTER_TIMEOUT_MS): number {
   if (raw === undefined || !/^\d+$/.test(raw.trim())) return DEFAULT_AI_TIMEOUT_MS;
@@ -94,6 +96,16 @@ export function getOllamaEventMaxTokens(raw = process.env.OLLAMA_EVENT_MAX_TOKEN
   return parsed >= MIN_AI_MAX_TOKENS && parsed <= MAX_AI_MAX_TOKENS
     ? parsed
     : DEFAULT_OLLAMA_EVENT_TOKENS;
+}
+
+export function getAiEndingTimeoutMs(raw = process.env.AI_ENDING_TIMEOUT_MS): number {
+  if (raw === undefined || !/^\d+$/.test(raw.trim())) return DEFAULT_ENDING_TIMEOUT_MS;
+  const parsed = Number(raw);
+  return parsed >= 30_000 && parsed <= 240_000 ? parsed : DEFAULT_ENDING_TIMEOUT_MS;
+}
+
+function getAiEndingMaxTokens(providerId: AiProvider["id"]) {
+  return providerId === "ollama" ? DEFAULT_OLLAMA_ENDING_TOKENS : DEFAULT_OPENROUTER_ENDING_TOKENS;
 }
 
 function getAiEventMaxTokens(providerId: AiProvider["id"]): number {
@@ -179,7 +191,7 @@ CRITICAL - Event diversity rules:
 7. Stay inside "이번이야기영역". These are the recurring themes selected for this protagonist; deepen and cross them rather than sampling every possible life category.
 8. Follow 취준서사.eventKind: CAREER_GATE is a concrete stage-appropriate career decision; CAREER_LINKED is an ordinary life event that can later become evidence without turning into an interview scene; LIFE may remain personally meaningful without an immediate career payoff.
 9. Use only organizations supplied in 취준서사.organizations. They are fictional parody organizations; never claim real salaries, policies, scandals, or hiring facts.
-10. 소재예시는 범주의 폭을 설명하는 영감일 뿐 고정 소재가 아니다. 최근 사건과 같은 구체 소재(예: 버튜버, 특정 공연, 특정 여행)를 반복하지 말고, 같은 범주에서도 인물·장소·갈등·선택의 형태를 바꿔라.
+10. Category labels describe only the life area, never a preferred plot. Invent the concrete activity, object, location, pressure, and conflict independently. Do not collapse a category into one stereotyped motif, and do not repeat the recent event's central motif under a renamed title.
 11. "사용제목"에 있는 제목은 절대 다시 사용하지 마라. 최근 사건과 핵심 활동이나 갈등이 같으면 제목만 바꾸지 말고 사건 자체를 바꿔라.
 
 CRITICAL - Relationship and NPC continuity rules:
@@ -233,15 +245,15 @@ export function buildUserPrompt(state: AiEventPromptState): string {
 
   let toneGuidance = "";
   if (progressRatio < 0.15) {
-    toneGuidance = "발단: 가벼운 일상, 학교 탐색, 작은 선택.";
+    toneGuidance = "발단: 새로운 생활의 가능성을 열고 작은 선택으로 성향을 드러낸다.";
   } else if (progressRatio < 0.35) {
-    toneGuidance = "전개: 알바, 동아리, 시험, 관계의 미묘한 변화.";
+    toneGuidance = "전개: 앞선 선택의 여파를 확장하고 관계나 목표에 변화를 만든다.";
   } else if (progressRatio < 0.55) {
-    toneGuidance = "위기: 돈, 진로, 관계, 가족 압박과 위험한 제안.";
+    toneGuidance = "위기: 쌓인 선택들이 충돌하며 포기하기 어려운 대가를 요구한다.";
   } else if (progressRatio < 0.75) {
     toneGuidance = "절정: 이전 선택의 결과와 구체적인 대가.";
   } else {
-    toneGuidance = "결말: 진로, 관계, 학사의 방향이 수렴.";
+    toneGuidance = "결말: 지금까지의 선택과 열린 갈등이 서로 다른 삶의 방향으로 수렴한다.";
   }
 
   const contextParts = [
@@ -253,7 +265,7 @@ export function buildUserPrompt(state: AiEventPromptState): string {
     `닫힘=${buildResolvedOfferPrompt(state.eventFlags)}`,
     `이번이야기영역=${state.allowedCategories?.join(",") || "자유"}`,
     `취준서사=${JSON.stringify(state.careerNarrative ?? {})}`,
-    `스토리모드=${state.targetCategory ? "새영역확장" : "기존선택연결"}|이번사건필수주제=${state.targetCategory ?? "자유"}|소재예시=${state.targetCategory ? eventCategoryExamples(state.targetCategory).join(",") : "최근 선택·관계·열린 갈등 중 하나의 구체적 결과"}`,
+    `스토리모드=${state.targetCategory ? "새영역확장" : "기존선택연결"}|이번사건필수주제=${state.targetCategory ?? "자유"}|구체소재는 최근 사건과 겹치지 않게 새로 발명`,
     `회피=${state.avoidCategories?.join(",") || "없음"}|보조후보=${state.preferCategories?.join(",") || "없음"}|회피인물=${state.avoidPeople?.join(",") || "없음"}`,
     `스탯=${JSON.stringify(state.stats)}`,
     `관계=${JSON.stringify(state.relationships.map(({ name, role, trust }) => ({
@@ -947,7 +959,7 @@ function buildAiEventRequestBody(state: AiEventPromptState, provider: AiProvider
       stream: false,
       think: "low",
       options: {
-        temperature: 0.2,
+        temperature: 0.45,
         num_predict: getAiEventMaxTokens(provider.id),
       },
     };
@@ -986,7 +998,7 @@ For streaming responsiveness, output the JSON object in this field order exactly
       stream: true,
       think: "low",
       options: {
-        temperature: 0.2,
+        temperature: 0.45,
         num_predict: getAiEventMaxTokens(provider.id),
       },
     };
@@ -1120,7 +1132,11 @@ export async function generateAiEnding(state: {
     const result = await generateAiEndingWithProvider(provider, state);
     if (result.success) return result;
     lastFailure = result;
-    console.warn("AI ending provider failed", { provider: provider.label, reason: result.reason });
+    console.warn("AI ending provider failed", {
+      provider: provider.label,
+      reason: result.reason,
+      issues: result.issues,
+    });
   }
 
   return lastFailure;
@@ -1144,7 +1160,9 @@ async function generateAiEndingWithProvider(
   if (!provider.key) return { success: false, reason: "no_key" };
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), getOpenRouterTimeoutMs());
+  const timeoutMs = getAiEndingTimeoutMs();
+  const maxTokens = getAiEndingMaxTokens(provider.id);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(provider.baseUrl + "/chat/completions", {
@@ -1188,7 +1206,7 @@ If the character has a relationship life state (single, dating, cohabitation, ma
 공개 스탯 질적 요약: ${buildQualitativeStatsPrompt(state.stats)}
 숨은 상태: ${JSON.stringify(state.hiddenState)}
 관계도: ${JSON.stringify(state.relationships)}
-전체 사건 기록: ${JSON.stringify(state.eventHistory)}
+전체 사건 기록(시간순, 하나도 생략하지 않음): ${JSON.stringify(buildEndingEventLedger(state.eventHistory))}
 마지막 선택: ${state.finalChoiceSummary}
 ${state.relationshipLife ? `관계 생활 상태: ${state.relationshipLife.relationshipLife}${state.relationshipLife.parenting.hasChildren ? `, 자녀: ${state.relationshipLife.parenting.childCount}명 (${state.relationshipLife.parenting.parentingStage})` : ""}` : ""}
 
@@ -1196,32 +1214,72 @@ JSON fields: title, summary, longNarrative, careerPath, jobRole, destinationName
             },
           ],
           response_format: { type: "json_object" },
-          max_tokens: 4000,
+          max_tokens: maxTokens,
           temperature: 0.9,
         }),
       signal: controller.signal,
     });
 
-    if (response.status === 429) return { success: false, reason: "rate_limited" };
-    if (!response.ok) return { success: false, reason: "api_error" };
+    if (response.status === 429) return { success: false, reason: "rate_limited", issues: ["http_429"] };
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => "");
+      logger.warn("ai_ending_provider_http_failure", {
+        providerId: provider.id,
+        providerLabel: provider.label,
+        model: provider.model,
+        status: response.status,
+        timeoutMs,
+        maxTokens,
+        responsePreview: responseText.slice(0, 300),
+      });
+      return { success: false, reason: "api_error", issues: [`http_${response.status}`] };
+    }
 
     const data = await response.json();
     const content = data?.choices?.[0]?.message?.content;
-    if (!content) return { success: false, reason: "invalid_response" };
+    if (!content) return { success: false, reason: "invalid_response", issues: ["empty_content"] };
 
     const parsed = extractJson(content);
     const validated = aiEndingSchema.safeParse(normalizeAiEnding(parsed, state));
-    if (!validated.success) return { success: false, reason: "invalid_response" };
+    if (!validated.success) {
+      const issues = validated.error.issues.map((issue) => issue.path.join(".") || "ending");
+      logger.warn("ai_ending_schema_failure", {
+        providerId: provider.id,
+        providerLabel: provider.label,
+        issues,
+        contentLength: content.length,
+      });
+      return { success: false, reason: "invalid_response", issues };
+    }
 
     return { success: true, ending: validated.data, providerId: provider.id, providerLabel: provider.label };
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
-      return { success: false, reason: "timeout" };
+      return { success: false, reason: "timeout", issues: [`timeout_${timeoutMs}ms`] };
     }
     return { success: false, reason: "api_error" };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function buildEndingEventLedger(
+  eventHistory: { title: string; summary: string; statDelta: unknown; relationshipDelta: unknown; flagDelta: unknown }[],
+) {
+  return eventHistory.map((event, index) => ({
+    order: index + 1,
+    title: event.title,
+    choice: event.summary,
+    ...(hasMeaningfulEndingValue(event.statDelta) ? { statChange: event.statDelta } : {}),
+    ...(hasMeaningfulEndingValue(event.relationshipDelta) ? { relationshipChange: event.relationshipDelta } : {}),
+    ...(hasMeaningfulEndingValue(event.flagDelta) ? { consequence: event.flagDelta } : {}),
+  }));
+}
+
+function hasMeaningfulEndingValue(value: unknown) {
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object" && value !== null) return Object.keys(value).length > 0;
+  return value !== null && value !== undefined;
 }
 
 function normalizeAiEnding(raw: unknown, state: { name: string; major: string; stats: Record<string, number>; finalChoiceSummary: string }) {
