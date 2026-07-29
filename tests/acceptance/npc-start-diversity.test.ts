@@ -151,6 +151,25 @@ describe("NPC start diversity acceptance", () => {
     }
   });
 
+  it("distributes identical profiles across all opening scenes by character seed", () => {
+    const titles = new Map<string, number>();
+    for (const seed of seeds) {
+      const event = buildFirstEvent({
+        seed,
+        name: "같은이름",
+        age: 21,
+        major: "컴퓨터공학",
+        residence: "dorm",
+        preferredStats: ["academic", "practical"],
+        startGradeYear: 1,
+      });
+      titles.set(event.title, (titles.get(event.title) ?? 0) + 1);
+    }
+
+    expect(titles.size).toBe(4);
+    expect(Math.max(...titles.values())).toBeLessThan(40);
+  });
+
   it("buildUserPrompt includes 안전후보 with 6-8 compact name/role pairs, no danger NPCs, no hardcoded roster", () => {
     const seed = "prompt-candidate-test";
     const candidates = selectStarterCandidates(seed, 7);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { buildBurnoutEvent, getStoryArc, isEventAllowedForLifeStage, pickRandomStaticEvent, selectNextEvent, STATIC_EVENTS } from "@/lib/game/event-engine";
+import { normalizeStatDeltas } from "@/lib/game/game-rules";
+import { buildBurnoutEvent, CONDITIONAL_STATIC_EVENTS, getStoryArc, isEventAllowedForLifeStage, pickRandomStaticEvent, selectNextEvent, STATIC_EVENTS } from "@/lib/game/event-engine";
 
 describe("STATIC_EVENTS", () => {
   it("has events with valid structure", () => {
@@ -10,6 +11,15 @@ describe("STATIC_EVENTS", () => {
       expect(event.choices.length).toBeGreaterThanOrEqual(2);
       expect(event.choices.length).toBeLessThanOrEqual(3);
       expect(event.tags.length).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it("caps mental loss for every fixed event choice at application time", () => {
+    for (const event of [...STATIC_EVENTS, ...CONDITIONAL_STATIC_EVENTS]) {
+      for (const choice of event.choices) {
+        const mental = normalizeStatDeltas(choice.statDelta).mental ?? 0;
+        expect(mental, `${event.title}/${choice.id}`).toBeGreaterThanOrEqual(-1);
+      }
     }
   });
 });

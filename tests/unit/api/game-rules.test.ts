@@ -53,18 +53,18 @@ describe("applyStatDeltas", () => {
     expect(result.health).toBe(7);
   });
 
-  it("limits health loss to one point per choice", () => {
+  it("limits health and mental loss to one point per choice", () => {
     const result = applyStatDeltas({ health: 8, mental: 8 }, { health: -5, mental: -5 });
     expect(result.health).toBe(7);
-    expect(result.mental).toBe(5);
+    expect(result.mental).toBe(7);
   });
 });
 
 describe("normalizeStatDeltas", () => {
-  it("caps health loss while preserving other deltas", () => {
+  it("caps health and mental loss while preserving other deltas", () => {
     expect(normalizeStatDeltas({ health: -5, mental: -4, academic: 2 })).toEqual({
       health: -1,
-      mental: -4,
+      mental: -1,
       academic: 2,
     });
   });

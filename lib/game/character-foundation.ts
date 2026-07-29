@@ -472,7 +472,9 @@ ${prefersPractical ? "지갑을 열어보니 이번 달 생활비를 어떻게 �
     },
   ];
 
-  const sceneIndex = (input.name.length + input.age + input.startGradeYear + input.preferredStats.length) % firstEventScenes.length;
+  // Character UUID is intentionally part of the selection. Using only profile
+  // fields made players who chose the same age/grade see the same opening.
+  const sceneIndex = stableSeedIndex(starterSeed, firstEventScenes.length);
   const scene = firstEventScenes[sceneIndex];
 
   return {
@@ -484,6 +486,14 @@ ${prefersPractical ? "지갑을 열어보니 이번 달 생활비를 어떻게 �
     tags: scene.tags as unknown as Prisma.InputJsonValue,
     safetyChecked: true,
   } satisfies Prisma.EventCreateWithoutCharacterRunInput;
+}
+
+function stableSeedIndex(seed: string, size: number) {
+  let hash = 2166136261 >>> 0;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (Math.imul(hash, 16777619) ^ seed.charCodeAt(index)) >>> 0;
+  }
+  return hash % size;
 }
 
 export function serializeCharacterRun(character: {
