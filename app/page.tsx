@@ -848,9 +848,20 @@ export default function AppPage() {
       setCurrentEvent(null);
       if (data.result?.endingTriggered) {
         setPendingNext(false);
-        setLatestRecordId(data.result?.endingRecordId ?? null);
+        const endingRecordId = data.result?.endingRecordId ?? null;
+        setLatestRecordId(endingRecordId);
         setEndingNotice("선택의 결과가 기록되었습니다. 선택의 결과 기록에서 확인할 수 있습니다.");
         playFeedbackCue("ending");
+        const recordsResponse = await doFetch("/api/records");
+        if (recordsResponse.ok) {
+          const nextRecords = recordsResponse.data.records ?? [];
+          setRecords(nextRecords);
+          const recordToOpen = endingRecordId
+            ?? (typeof nextRecords[0]?.id === "string" ? nextRecords[0].id : null);
+          setExpandedRecord(recordToOpen);
+        }
+        setRecordsTab("records");
+        setScreen("records");
       } else {
         playFeedbackCue(getChoiceFeedbackTone(feedback) === "warning" ? "warning" : "success");
         setPendingNext(false);
@@ -1133,7 +1144,7 @@ export default function AppPage() {
             <div className="record-actions flex items-center gap-4 max-[720px]:mt-4">
               <button className="record-action" onClick={loadRecords} type="button">새로고침</button>
               <button className="record-action" onClick={runCompleted ? requestNewSimulation : () => { setScreen("play"); }} type="button">
-                {runCompleted ? "새로 시작" : "이어가기"}
+                {runCompleted ? "새로 시작하기" : "이어가기"}
               </button>
             </div>
           </div>

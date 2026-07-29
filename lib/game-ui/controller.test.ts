@@ -94,6 +94,8 @@ function createApiStubs() {
         statDelta: { mental: 1 },
         relationshipDelta: [{ name: "지민", trust: 4 }],
         summary: "차분하게 대응했다.",
+        endingTriggered: false,
+        endingRecordId: undefined as string | undefined,
       },
     },
   }));
@@ -135,6 +137,38 @@ function createApiStubs() {
 }
 
 describe("game controller", () => {
+  it("loads and opens the generated record immediately after the final choice", async () => {
+    const host = makeHost();
+    const stubs = createApiStubs();
+    stubs.choose.mockResolvedValueOnce({
+      ok: true as const,
+      status: 200,
+      data: {
+        result: {
+          endingTriggered: true,
+          endingRecordId: "record-1",
+          stats: { academic: 5, practical: 6, health: 6, mental: 8 },
+          statDelta: { mental: 0 },
+          relationshipDelta: [],
+          summary: "당신은 마지막 선택을 내렸다.",
+        },
+      },
+    });
+    const controller = createGameController({ host, apiFactory: () => stubs.api });
+
+    await controller.bootstrap();
+    await controller.resumeRun("run-1");
+    await controller.choose(0);
+
+    expect(stubs.records).toHaveBeenCalledOnce();
+    expect(stubs.nextEventStream).not.toHaveBeenCalled();
+    expect(controller.getState()).toMatchObject({
+      screen: "records",
+      selectedRecordId: "record-1",
+      records: [{ id: "record-1", title: "첫 기록" }],
+    });
+  });
+
   it("starts from the routed share detail without bootstrapping a session", () => {
     const host = makeHost({
       routing: { initialIntent: { kind: "share", recordId: "record-42" } },

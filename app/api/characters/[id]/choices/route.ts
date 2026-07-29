@@ -20,6 +20,7 @@ import { shouldCreateFinalEnding as shouldCreateFinalEndingFn } from "@/lib/game
 import { advanceCareerNarrativeState, normalizeCareerNarrativeState } from "@/lib/game/career-narrative";
 import { gateConcreteResultFields } from "@/lib/game/result-gating";
 import { normalizeRelationshipName } from "@/lib/game/npcs";
+import { buildLongFallbackEnding, sanitizeResultText } from "@/lib/game/ending-copy";
 import {
   evaluateCodingTest,
   evaluateDocumentStage,
@@ -1016,7 +1017,7 @@ async function buildFinalEndingRecord(input: {
     userId: input.userId,
     characterRunId: input.characterRunId,
     title: sanitizeResultText(generated?.title) ?? `${input.characterName}의 선택의 결과`,
-    summary: sanitizeResultText(generated?.summary) ?? `${input.characterName}은 ${input.coreEventCount}개의 사건과 마지막 관문을 지나 ${careerPath} 방향으로 나아갔습니다.`,
+    summary: sanitizeResultText(generated?.summary) ?? `${input.characterName}은 ${input.summary} 그 선택을 계기로 ${careerPath}의 삶을 시작했습니다.`,
     longNarrative: sanitizeResultText(generated?.longNarrative) ?? buildLongFallbackEnding(input.characterName, input.major, careerPath, input.stats, input.summary, relationshipState, input.eventHistory),
     careerPath,
     jobRole: gate?.status === "passed" ? concreteResult.jobRole : null,
@@ -1087,18 +1088,6 @@ function toPercentScore(value: number) {
   return Math.max(0, Math.min(100, Math.round(value * 10)));
 }
 
-function sanitizeResultText(value: unknown) {
-  if (typeof value !== "string") return null;
-  return value
-    .replace(/배드엔딩/g, "중도 결과")
-    .replace(/일반엔딩/g, "선택의 결과")
-    .replace(/AI엔딩/g, "선택의 결과")
-    .replace(/엔딩/g, "결과")
-    .replace(/(학점|학업|지식|실무|실무력|건강|멘탈|정신|자산|돈|평판|명성|매력|네트워크|관계|academic|practical|health|mental|wealth|reputation|charm|network)\s*(?:수치|점수|스탯|stat)?\s*(?:은|는|이|가|의)?\s*[:：]?\s*(?:10|[0-9])\b/gi, "$1")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-}
-
 function sanitizeTags(value: unknown, fallback: string[]) {
   const tags = Array.isArray(value) && value.length > 0 ? value.filter((tag) => typeof tag === "string") : fallback;
   return tags.map((tag) => sanitizeResultText(tag) ?? tag).slice(0, 10);
@@ -1117,34 +1106,4 @@ function serializeRelationships(relationships: { name: string; role: string; tru
     trust: rel.trust,
     tags: Array.isArray(rel.tags) ? rel.tags.filter((tag) => typeof tag === "string") : [],
   }));
-}
-
-function buildLongFallbackEnding(
-  name: string,
-  major: string,
-  careerPath: string,
-  stats: Record<string, number>,
-  finalChoiceSummary: string,
-  relationshipState: string,
-  eventHistory: { event: { title: string }; summary: string }[] = [],
-) {
-  const publicStrength = stats.academic >= stats.practical ? "당신은 책상 앞에서 오래 버티는 법을 알았다" : "당신은 현장에서 몸으로 익히는 속도가 빨랐다";
-  const rememberedEvents = eventHistory
-    .slice(-4)
-    .map((history) => `${history.event.title}에서 ${history.summary}`)
-    .join(" ");
-  const memoryLine = rememberedEvents || "몇 개의 선택은 기록보다 오래 몸에 남았다.";
-  const reversal = stats.reputation < 5
-    ? "그러나 평판은 이상한 방식으로 뒤따라왔다. 한때 사소하게 넘겼던 말과 관계의 균열은, 가장 중요한 추천과 면접의 계절에 다시 고개를 들었다"
-    : stats.health < 5
-      ? "그러나 몸은 뒤늦게 청구서를 내밀었다. 커리어가 막 속도를 내기 시작할 때마다 당신은 쉬어야 했고, 쉬는 동안 다른 사람들은 한 발씩 앞서 나갔다"
-      : stats.mental < 5
-        ? "그러나 마음은 쉽게 회복되지 않았다. 남들이 보기에는 멀쩡한 성취도 당신에게는 늘 다음 실패를 미루는 임시방편처럼 느껴졌다"
-        : "그러나 삶은 단순한 보상처럼 흘러가지 않았다. 잘한 선택도 대가를 남겼고, 피한 선택도 언젠가는 다른 얼굴로 돌아왔다";
-
-  return `${name}의 이야기는 ${major}의 강의실에서 끝나지 않았다. 당신은 여러 사건을 지나 ${careerPath}라는 이름의 다음 문을 열었고, 그 문 안에는 생각보다 좁은 복도와 밝은 창문이 함께 있었다. ${memoryLine} ${publicStrength}. 그래서 처음에는 꽤 잘해냈다. 보고서는 깔끔했고, 면접에서는 침착했으며, 사람들이 놓치는 작은 흐름을 읽어내는 날도 있었다. ${finalChoiceSummary} 그 마지막 선택은 당신을 당장 유명하게 만들지는 않았지만, 이후 몇 년 동안 반복해서 떠오르는 기준점이 되었다.
-
-${reversal}. 당신은 한때 성공이 직선이라고 믿었지만, 실제의 커리어는 더 지저분하고 더 오래 걸리는 문장에 가까웠다. 누군가와의 관계가 예상 밖의 도움으로 돌아오기도 했고, 반대로 잘못 틀어진 사람이 당신의 길목에서 차가운 얼굴로 서 있기도 했다. 사랑에 가까웠던 마음은 생활 앞에서 작아졌고, 미움에 가까웠던 관계는 오히려 당신을 더 단단하게 만들었다.
-
-몇 년 뒤 당신은 처음 상상했던 모습과는 다른 표정으로 살고 있었다. 돈을 아주 많이 벌지는 못했을 수도 있고, 반대로 꽤 안정적인 직함을 얻었으면서도 밤마다 조용히 무너졌을 수도 있다. 중요한 것은 당신이 그 모든 결과를 하나의 숫자로 설명할 수 없다는 점이었다. ${relationshipState}이라는 결론 속에서, 당신은 얻은 것과 잃은 것을 모두 기억하는 사람이 되었다. 그래서 이 기록은 완벽한 성공도 완전한 실패도 아니다. 다만 당신이 치른 비용과 끝내 남긴 가능성이, 오래된 노트의 마지막 장처럼 조용히 접혀 있을 뿐이다.`;
 }

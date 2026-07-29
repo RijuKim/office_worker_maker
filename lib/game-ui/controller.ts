@@ -393,11 +393,16 @@ export function createGameController(options: GameControllerOptions): GameContro
     });
 
     if (choiceResult?.endingTriggered) {
+      const recordsResult = await currentApi.records();
       update({
         loadingTask: null,
         currentEvent: null,
         screen: "records",
         selectedRecordId: choiceResult.endingRecordId ?? null,
+        ...(recordsResult.ok ? { records: recordsResult.data.records ?? [] } : {}),
+        ...(!recordsResult.ok ? {
+          error: resolveApiError(recordsResult, "기록을 불러오지 못했습니다.") ?? "기록을 불러오지 못했습니다.",
+        } : { error: "" }),
       });
       return;
     }
