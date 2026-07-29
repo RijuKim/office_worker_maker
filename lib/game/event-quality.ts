@@ -244,12 +244,19 @@ export function evaluateEventQuality(input: EvaluateEventQualityInput): EventQua
   if (choices.some(hasForbiddenOrdinaryStatDrop) && input.source === "AI") {
     reasons.push("health_mental_delta_violation");
   }
-  if (isClosedThreadRepeat(text, lifecycle)) reasons.push("closed_thread_repeat");
 
   if (isLifecycleClosureConsequence(text, lifecycle)) {
     continuityExemptions.push("lifecycle_closure");
   }
   continuityExemptions.push(...detectContinuityExemptions(input, choices, text));
+
+  if (input.source === "AI" && !continuityExemptions.includes("lifecycle_closure")) {
+    const balance = assessOrdinaryMentalChoiceBalance(choices as { statDelta?: Record<string, unknown> }[]);
+    if (!balance.valid) {
+      reasons.push("mental_loss_cadence_violation");
+    }
+  }
+  if (isClosedThreadRepeat(text, lifecycle)) reasons.push("closed_thread_repeat");
 
   const diversityScore = scoreDiversity(input, continuityExemptions);
   if (diversityScore < EVENT_QUALITY_DEFAULTS.hardRetryThreshold) {
@@ -268,6 +275,50 @@ export function evaluateEventQuality(input: EvaluateEventQualityInput): EventQua
     retryRecommended: status === "fail" && input.source === "AI",
     fallbackRecommended: status === "fail" && input.source !== "FORCED",
   };
+}
+
+/**
+ * Assess whether an ordinary (non-crisis) event's choices respect the
+ * mental-loss cadence: at most one mental-decreasing choice and at least
+ * one non-loss choice among 2-3 choices.
+ */
+export function assessOrdinaryMentalChoiceBalance(
+  choices: { statDelta?: Record<string, unknown> }[],
+): { valid: boolean; mentalLossChoices: number; nonLossChoices: number } {
+  const mentalLossChoices = choices.filter((c) => {
+    const mental = (c.statDelta as Record<string, number> | undefined)?.mental;
+    return typeof mental === "number" && mental < 0;
+  }).length;
+  const nonLossChoices = choices.filter((c) => {
+    const mental = (c.statDelta as Record<string, number> | undefined)?.mental;
+    return typeof mental !== "number" || mental >= 0;
+  }).length;
+  return {
+    valid: mentalLossChoices <= 1 && nonLossChoices >= 1,
+    mentalLossChoices,
+    nonLossChoices,
+  };
+}
+
+/**
+ * Check whether a company name can be narrated as the current workplace
+ * given the character's active application and closed-company state.
+ * - An active application for the same company → allowed (continuity).
+ * - A closed (rejected/departed) company → not allowed as current employer.
+ * - A candidate-only company (no active app, no closed state) → allowed
+ *   as a mention/candidate, not as current employer.
+ */
+export function isCurrentCompanyNarrativeAllowed(input: {
+  mentionedCompany: string;
+  activeCompany: string | null;
+  closedCompanies: string[];
+  candidateOnly?: boolean;
+}): boolean {
+  const { mentionedCompany, activeCompany, closedCompanies, candidateOnly } = input;
+  if (closedCompanies.includes(mentionedCompany)) return false;
+  if (activeCompany === mentionedCompany) return true;
+  if (candidateOnly) return true;
+  return false;
 }
 
 export function stripNumericStatExposure(text: string): string {

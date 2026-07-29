@@ -84,6 +84,56 @@ export function careerEventKindForCount(coreEventCount: number): CareerEventKind
   return "LIFE";
 }
 
+export function getMajorCareerAffinity(major: string, careerName: string): number {
+  const isRadiology = major.includes("방사선");
+  const isBusiness = major.includes("경영") || major.includes("경제") || major.includes("회계");
+  const isEngineering = major.includes("공학") || major.includes("컴퓨터") || major.includes("전자");
+  const isHumanities = major.includes("문학") || major.includes("역사") || major.includes("철학") || major.includes("심리");
+  const isSocial = major.includes("사회") || major.includes("행정") || major.includes("정치");
+  const isEducation = major.includes("교육");
+  const isArt = major.includes("예술") || major.includes("디자인") || major.includes("음악");
+
+  const careerKeywords: [string, string[], number][] = [
+    ["임상", ["방사선"], 3],
+    ["방사선", ["방사선"], 3],
+    ["의료기기", ["방사선", "공학"], 3],
+    ["보건", ["방사선", "사회", "교육"], 2],
+    ["안전", ["방사선", "사회", "교육"], 2],
+    ["헬스테크", ["방사선", "공학"], 3],
+    ["의료영상", ["방사선", "공학"], 3],
+    ["의료", ["방사선"], 2],
+    ["콘텐츠", ["문학", "예술"], 2],
+    ["마케팅", ["경영", "문학", "사회"], 2],
+    ["기획", ["경영", "문학", "사회"], 2],
+    ["기업", ["경영", "사회", "문학", "공학"], 1],
+    ["회사", ["경영", "사회", "문학", "공학"], 1],
+    ["연구", ["공학", "문학", "사회"], 2],
+    ["대학원", ["공학", "문학", "사회"], 2],
+    ["해외", ["경영", "문학", "공학"], 1],
+    ["외국계", ["경영", "문학", "공학"], 1],
+    ["공공", ["사회", "교육"], 2],
+    ["행정", ["사회", "경영"], 2],
+    ["교육", ["교육"], 3],
+    ["교사", ["교육"], 3],
+    ["개발", ["공학"], 3],
+    ["엔지니어", ["공학"], 3],
+  ];
+
+  let score = 0;
+  for (const [keyword, majors, weight] of careerKeywords) {
+    if (!careerName.includes(keyword)) continue;
+    if (isRadiology && majors.includes("방사선")) score = Math.max(score, weight);
+    if (isBusiness && majors.includes("경영")) score = Math.max(score, weight);
+    if (isEngineering && majors.includes("공학")) score = Math.max(score, weight);
+    if (isHumanities && majors.includes("문학")) score = Math.max(score, weight);
+    if (isSocial && majors.includes("사회")) score = Math.max(score, weight);
+    if (isEducation && majors.includes("교육")) score = Math.max(score, weight);
+    if (isArt && majors.includes("예술")) score = Math.max(score, weight);
+  }
+
+  return score;
+}
+
 export function normalizeCareerNarrativeState(
   raw: unknown,
   input: { storySeed: string; major: string; coreEventCount: number },
@@ -178,9 +228,23 @@ function selectOrganizations(seed: string, limit: number) {
 
 function selectCandidates(seed: string, major: string): CareerCandidate[] {
   const shuffled = deterministicShuffle(GENERAL_CANDIDATES, `${seed}:${major}`);
-  const clinical = major.includes("방사선") ? GENERAL_CANDIDATES[0] : null;
-  const selected = [...(clinical ? [clinical] : []), ...shuffled.filter((candidate) => candidate !== clinical)].slice(0, 5);
-  return selected.map(([id, name], index) => ({ id, name, interest: 35 - index * 3, fit: clinical?.[0] === id ? 45 : 25, evidence: [] }));
+  const scored = shuffled.map(([id, name]) => ({
+    id,
+    name,
+    affinity: getMajorCareerAffinity(major, name),
+  })).sort((a, b) => b.affinity - a.affinity);
+  const selected = scored.slice(0, 4);
+  const crossMajor = scored.find((c) => c.affinity <= 0);
+  if (crossMajor && !selected.includes(crossMajor)) {
+    selected.push(crossMajor);
+  }
+  return selected.map(({ id, name, affinity }, index) => ({
+    id,
+    name,
+    interest: 35 - index * 3,
+    fit: 25 + affinity * 5,
+    evidence: [],
+  }));
 }
 
 function inferCareerEvidence(input: { eventTitle: string; eventTags: string[]; choiceSummary: string; statDelta: Record<string, number> }): CareerEvidence[] {
