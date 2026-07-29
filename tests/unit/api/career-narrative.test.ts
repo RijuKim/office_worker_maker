@@ -63,4 +63,38 @@ describe("career narrative", () => {
     expect(next.evidence.some((evidence) => evidence.type === "DIGITAL_CONTENT")).toBe(true);
     expect(next.candidates.some((candidate) => candidate.id === "content" && candidate.evidence.length > 0)).toBe(true);
   });
+
+  it("repeated cross-major evidence can override initial major affinity in rank", () => {
+    // Major: 방사선학과 → initial top candidates are medical-device, clinical, health-tech (affinity 3)
+    // content (의료·디지털 콘텐츠) starts with affinity 0 — a cross-major candidate
+    // Repeated DIGITAL_CONTENT evidence is uniquely relevant to content ("온라인 창작", "사용자 이해")
+    // and should eventually push content above the initially major-aligned candidates
+    const state = normalizeCareerNarrativeState(null, { storySeed: "test-rank-override", major: "방사선학과", coreEventCount: 0 });
+
+    // Record initial ranks
+    const initialContentRank = state.candidates.findIndex((c) => c.id === "content");
+    const initialMedDevRank = state.candidates.findIndex((c) => c.id === "medical-device");
+    // content is not in initial 5 (it's unlocked by DIGITAL_CONTENT evidence)
+    expect(initialContentRank).toBe(-1);
+    expect(initialMedDevRank).toBe(0);
+
+    // Apply DIGITAL_CONTENT evidence repeatedly — uniquely relevant to content
+    let s = state;
+    for (let i = 0; i < 6; i++) {
+      s = advanceCareerNarrativeState(s, {
+        eventTitle: "첫 버튜버 라이브",
+        eventTags: ["온라인 창작", "콘텐츠"],
+        choiceSummary: "당신은 방송을 이어가며 시청자의 질문을 설명했다.",
+        statDelta: { practical: 2, reputation: 1 },
+        nextCoreEventCount: 1,
+      });
+    }
+
+    // content should now be ranked above medical-device
+    const finalContentRank = s.candidates.findIndex((c) => c.id === "content");
+    const finalMedDevRank = s.candidates.findIndex((c) => c.id === "medical-device");
+    expect(finalContentRank).toBeGreaterThanOrEqual(0);
+    expect(finalMedDevRank).toBeGreaterThanOrEqual(0);
+    expect(finalContentRank).toBeLessThan(finalMedDevRank);
+  });
 });

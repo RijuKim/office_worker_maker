@@ -286,9 +286,7 @@ function evidenceTraits(type: string, delta: Record<string, number>) {
     type === "COMMUNICATION" ? ["고객 대응", "설명력"] :
     type === "PRACTICAL_EXPERIENCE" ? ["실무", "현장 대응"] :
     type === "ACADEMIC_EXPERIENCE" ? ["학업", "정확성"] : ["책임감", "회복"];
-  if ((delta.practical ?? 0) > 0) traits.push("문제 해결");
-  if ((delta.reputation ?? 0) > 0) traits.push("관계");
-  return [...new Set(traits)];
+  return traits;
 }
 
 function candidateTraitMatch(id: string, trait: string) {
