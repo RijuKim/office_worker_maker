@@ -233,10 +233,20 @@ function selectCandidates(seed: string, major: string): CareerCandidate[] {
     name,
     affinity: getMajorCareerAffinity(major, name),
   })).sort((a, b) => b.affinity - a.affinity);
+  // Always select 5 candidates: top 4 by affinity plus at least one cross-major
   const selected = scored.slice(0, 4);
   const crossMajor = scored.find((c) => c.affinity <= 0);
   if (crossMajor && !selected.includes(crossMajor)) {
     selected.push(crossMajor);
+  }
+  // If we still don't have 5 (e.g. no cross-major found), add the next available
+  if (selected.length < 5) {
+    for (const c of scored) {
+      if (!selected.includes(c)) {
+        selected.push(c);
+        if (selected.length >= 5) break;
+      }
+    }
   }
   return selected.map(({ id, name, affinity }, index) => ({
     id,

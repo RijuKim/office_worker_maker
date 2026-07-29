@@ -189,6 +189,9 @@ export async function POST(request: Request | NextRequest, context: RouteContext
     activeJobCompany: character.jobApplications
       .filter((app: { isActive: boolean }) => app.isActive)
       .map((app: { companyName: string }) => app.companyName)[0] ?? null,
+    closedCompanies: character.jobApplications
+      .filter((app: { isActive: boolean }) => !app.isActive)
+      .map((app: { companyName: string }) => app.companyName),
   };
   const usedEventTitles = character.eventHistory
     .map((h: { event?: { title?: string } }) => h.event?.title)

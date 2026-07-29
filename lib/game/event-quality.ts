@@ -78,6 +78,8 @@ export type EvaluateEventQualityInput = {
     careerOrganizations?: string[];
     /** The company name of the currently active job application, if any. */
     activeJobCompany?: string | null;
+    /** Company names that have been rejected/departed/closed. */
+    closedCompanies?: string[];
   };
 };
 
@@ -250,12 +252,16 @@ export function evaluateEventQuality(input: EvaluateEventQualityInput): EventQua
   }
   continuityExemptions.push(...detectContinuityExemptions(input, choices, text));
 
-  if (input.source === "AI" && !continuityExemptions.includes("lifecycle_closure")) {
-    const balance = assessOrdinaryMentalChoiceBalance(choices as { statDelta?: Record<string, unknown> }[]);
-    if (!balance.valid) {
-      reasons.push("mental_loss_cadence_violation");
+  // Company continuity: check that the event doesn't narrate a closed/rejected
+  // company as the current workplace. This is a hard failure for AI events.
+  if (input.source === "AI" && input.context?.closedCompanies && input.context.closedCompanies.length > 0) {
+    const closedCompanies = input.context.closedCompanies;
+    const mentionedClosed = closedCompanies.filter((company) => text.includes(company));
+    if (mentionedClosed.length > 0) {
+      reasons.push("closed_company_narration");
     }
   }
+
   if (isClosedThreadRepeat(text, lifecycle)) reasons.push("closed_thread_repeat");
 
   const diversityScore = scoreDiversity(input, continuityExemptions);

@@ -28,6 +28,8 @@ export type EventQualityRuntimeContext = {
     : never;
   previousChoiceSummary?: string | null;
   careerOrganizations?: string[];
+  activeJobCompany?: string | null;
+  closedCompanies?: string[];
 };
 
 export type QualityEvaluation = {
@@ -44,7 +46,17 @@ export function evaluateCandidateEvent(
   const verdict = evaluateEventQuality({
     source,
     candidate,
-    context,
+    context: {
+      academicStatus: context.academicStatus,
+      lifeStage: context.lifeStage,
+      eventFlags: context.eventFlags,
+      recentSummaries: context.recentSummaries,
+      recentEvents: context.recentEvents,
+      previousChoiceSummary: context.previousChoiceSummary,
+      careerOrganizations: context.careerOrganizations,
+      activeJobCompany: context.activeJobCompany,
+      closedCompanies: context.closedCompanies,
+    },
   });
 
   return {

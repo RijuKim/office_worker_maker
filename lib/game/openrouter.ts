@@ -186,6 +186,10 @@ CRITICAL - Relationship and NPC continuity rules:
 12. When introducing a new social contact, prefer names from the safe canonical candidates supplied in the "안전후보" field. Do not invent generic default names like 수아 or 새롭게 만난 친구.
 13. Dangerous NPCs (재석, 수진, 준호, 비밀(여/남), 미정) with dangerLevel >= 2 must ONLY appear in explicit crime, risk, or underworld contexts. They must never be proposed as ordinary starter friends, mentors, or social contacts.
 14. If a persisted relationship with a specific name exists (e.g. 수아), that relationship may continue naturally. The restriction is against the AI inventing default names, not against legitimate continuity.
+
+CRITICAL - Company continuity rules:
+15. The "지원" field lists active job applications. A company with an active application may appear as the current workplace or in stage-progression events. A company that was rejected, declined, lost to a competitor, or departed must NOT be narrated as the current workplace without explicit later re-entry. If no active application exists, do not invent current employment — mention candidates or offers instead.
+16. Ordinary (non-crisis) events must have at most one mental-decreasing choice and at least one non-loss choice among 2-3 choices. This is enforced by the system, not a suggestion.
 `;
 
 export type AiEventPromptState = {
@@ -1422,13 +1426,49 @@ function normalizeAiEvent(raw: unknown) {
     Array.isArray(event.options) ? event.options :
     Array.isArray(event.actions) ? event.actions :
     [];
+  const choices = rawChoices.map((choice) => normalizeChoice(choice)) as Array<{
+    id: string;
+    label: string;
+    summary: string;
+    statDelta: Record<string, number>;
+    relationshipDelta: { name: string; trust: number; status?: string }[];
+  }>;
+  const mentalLossIndices = choices
+    .map((c, i) => {
+      const delta = c.statDelta;
+      return (delta && typeof delta.mental === "number" && delta.mental < 0) ? i : -1;
+    })
+    .filter((i) => i >= 0);
+  if (mentalLossIndices.length > 1) {
+    for (let k = 1; k < mentalLossIndices.length; k++) {
+      const idx = mentalLossIndices[k];
+      const delta = choices[idx].statDelta;
+      if (delta && typeof delta.mental === "number") {
+        choices[idx] = { ...choices[idx], statDelta: { ...delta, mental: 0 } };
+      }
+    }
+  }
+  const nonLossCount = choices.filter((c) => {
+    const delta = c.statDelta;
+    return !delta || typeof delta.mental !== "number" || delta.mental >= 0;
+  }).length;
+  if (nonLossCount < 1 && choices.length > 0) {
+    const firstLoss = choices.findIndex((c) => {
+      const delta = c.statDelta;
+      return delta && typeof delta.mental === "number" && delta.mental < 0;
+    });
+    if (firstLoss >= 0) {
+      const delta = choices[firstLoss].statDelta;
+      choices[firstLoss] = { ...choices[firstLoss], statDelta: { ...delta, mental: 0 } };
+    }
+  }
   return {
     title: event.title,
     body: typeof event.body === "string" ? event.body :
       typeof event.description === "string" ? event.description :
       event.narrative,
     tags: event.tags,
-    choices: rawChoices.map((choice) => normalizeChoice(choice)),
+    choices,
   };
 }
 
