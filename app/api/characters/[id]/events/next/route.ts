@@ -257,6 +257,9 @@ export async function POST(request: Request | NextRequest, context: RouteContext
       careerNarrative: summarizeCareerNarrativeForPrompt(careerNarrative),
       avoidPeople: diversityGuidance.avoidPeople,
       starterCandidates: validateStarterCandidates(currentFlags.starterCandidates, character.id),
+      closedCompanies: character.jobApplications
+        .filter((app: { isActive: boolean }) => !app.isActive)
+        .map((app: { companyName: string }) => app.companyName),
     };
     const providerStartedAt = Date.now();
     let aiResult: Awaited<ReturnType<typeof generateAiEvent>> | {

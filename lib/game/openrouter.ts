@@ -220,6 +220,7 @@ export type AiEventPromptState = {
   careerNarrative?: unknown;
   avoidPeople?: string[];
   starterCandidates?: { name: string; role: string }[];
+  closedCompanies?: string[];
 };
 
 export function buildUserPrompt(state: AiEventPromptState): string {
@@ -270,6 +271,7 @@ export function buildUserPrompt(state: AiEventPromptState): string {
     (state.specs ?? []).length > 0 ? `스펙=${JSON.stringify(state.specs)}` : "",
     (state.jobApplications ?? []).some((app) => app.isActive) ? `지원=${JSON.stringify((state.jobApplications ?? []).filter((app) => app.isActive))}` : "",
     (state.careerPaths ?? []).length > 0 ? `진로=${JSON.stringify(state.careerPaths)}` : "",
+    (state.closedCompanies ?? []).length > 0 ? `거절/퇴사회사=${JSON.stringify(state.closedCompanies)}` : "",
     buildCareerDiversityPrompt(state),
   ].filter(Boolean);
 
@@ -1418,7 +1420,7 @@ function extractChatToken(payload: unknown) {
   return null;
 }
 
-function normalizeAiEvent(raw: unknown) {
+export function normalizeAiEvent(raw: unknown) {
   if (typeof raw !== "object" || raw === null) return raw;
   const container = raw as Record<string, unknown>;
   const event = readRecord(container.event) ?? readRecord(container.storyEvent) ?? container;

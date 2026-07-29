@@ -256,7 +256,14 @@ export function evaluateEventQuality(input: EvaluateEventQualityInput): EventQua
   // company as the current workplace. This is a hard failure for AI events.
   if (input.source === "AI" && input.context?.closedCompanies && input.context.closedCompanies.length > 0) {
     const closedCompanies = input.context.closedCompanies;
-    const mentionedClosed = closedCompanies.filter((company) => text.includes(company));
+    const activeCompany = input.context.activeJobCompany ?? null;
+    const mentionedClosed = closedCompanies.filter((company) => {
+      return !isCurrentCompanyNarrativeAllowed({
+        mentionedCompany: company,
+        activeCompany,
+        closedCompanies,
+      });
+    });
     if (mentionedClosed.length > 0) {
       reasons.push("closed_company_narration");
     }
