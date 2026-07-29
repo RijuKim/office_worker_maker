@@ -253,8 +253,8 @@ export function evaluateEventQuality(input: EvaluateEventQualityInput): EventQua
   continuityExemptions.push(...detectContinuityExemptions(input, choices, text));
 
   // Company continuity: check that the event doesn't narrate a closed/rejected
-  // company as the current workplace. This is a hard failure for AI events.
-  if (input.source === "AI" && input.context?.closedCompanies && input.context.closedCompanies.length > 0) {
+  // company as the current workplace. This is a hard failure for AI and FALLBACK events.
+  if ((input.source === "AI" || input.source === "FALLBACK") && input.context?.closedCompanies && input.context.closedCompanies.length > 0) {
     const closedCompanies = input.context.closedCompanies;
     const activeCompany = input.context.activeJobCompany ?? null;
     const mentionedClosed = closedCompanies.filter((company) => {
@@ -328,8 +328,9 @@ export function isCurrentCompanyNarrativeAllowed(input: {
   candidateOnly?: boolean;
 }): boolean {
   const { mentionedCompany, activeCompany, closedCompanies, candidateOnly } = input;
-  if (closedCompanies.includes(mentionedCompany)) return false;
+  // Active company check first: explicit re-entry overrides old closure.
   if (activeCompany === mentionedCompany) return true;
+  if (closedCompanies.includes(mentionedCompany)) return false;
   if (candidateOnly) return true;
   return false;
 }

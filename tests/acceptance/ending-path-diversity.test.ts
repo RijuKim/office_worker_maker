@@ -9,11 +9,13 @@ import {
 import {
   assessOrdinaryMentalChoiceBalance,
   evaluateEventQuality,
+  isCurrentCompanyNarrativeAllowed,
 } from "@/lib/game/event-quality";
 import { normalizeAiEvent, parseAiEventContentDetailed } from "@/lib/game/openrouter";
 import { CODEX_CATALOG } from "@/lib/game/codex-catalog";
 import { careerPhaseForEventCount, careerEventKindForCount } from "@/lib/game/career-narrative";
 import { STATIC_EVENTS } from "@/lib/game/event-engine";
+import type { AiEventPromptState } from "@/lib/game/openrouter";
 
 const seeds = Array.from({ length: 500 }, (_, index) =>
   `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
@@ -128,9 +130,31 @@ describe("ending path diversity acceptance", () => {
     expect(verdict.reasons).not.toContain("mental_loss_cadence_violation");
   });
 
-  it("rejects closed-company narration in quality pipeline", () => {
+  it("rejects closed-company narration in quality pipeline for AI source", () => {
     const verdict = evaluateEventQuality({
       source: "AI",
+      candidate: {
+        title: "한빛의료기기 출근",
+        body: "한빛의료기기에서 첫 출근을 했다. 동기들과 인사하며 새로운 회사 생활을 시작한다.",
+        tags: ["취업", "회사"],
+        choices: [
+          { id: "a", label: "열심히 적응한다", summary: "당신은 열심히 적응했다.", statDelta: { practical: 1 }, relationshipDelta: [] },
+          { id: "b", label: "천천히 알아간다", summary: "당신은 천천히 알아가기로 했다.", statDelta: { mental: 1 }, relationshipDelta: [] },
+        ],
+      },
+      context: {
+        academicStatus: "ENROLLED",
+        recentEvents: [],
+        closedCompanies: ["한빛의료기기"],
+      },
+    });
+    expect(verdict.reasons).toContain("closed_company_narration");
+    expect(verdict.hardFailure).toBe(true);
+  });
+
+  it("rejects closed-company narration in quality pipeline for FALLBACK source", () => {
+    const verdict = evaluateEventQuality({
+      source: "FALLBACK",
       candidate: {
         title: "한빛의료기기 출근",
         body: "한빛의료기기에서 첫 출근을 했다. 동기들과 인사하며 새로운 회사 생활을 시작한다.",
@@ -172,6 +196,22 @@ describe("ending path diversity acceptance", () => {
     expect(verdict.reasons).not.toContain("closed_company_narration");
   });
 
+  it("isCurrentCompanyNarrativeAllowed allows active-company re-entry even when company is also in closedCompanies", () => {
+    // Regression: activeCompany check must come before closedCompanies check
+    // so that explicit re-entry (active application) overrides old closure.
+    expect(isCurrentCompanyNarrativeAllowed({
+      mentionedCompany: "한빛의료기기",
+      activeCompany: "한빛의료기기",
+      closedCompanies: ["한빛의료기기"],
+    })).toBe(true);
+    // Without active company, a closed company is rejected
+    expect(isCurrentCompanyNarrativeAllowed({
+      mentionedCompany: "한빛의료기기",
+      activeCompany: null,
+      closedCompanies: ["한빛의료기기"],
+    })).toBe(false);
+  });
+
   it("does not add extra provider calls for mental cadence enforcement", () => {
     const input = {
       title: "테스트",
@@ -191,31 +231,30 @@ describe("ending path diversity acceptance", () => {
   });
 
   it("evidence can promote a cross-major candidate above an aligned one", () => {
-    // Start with a radiology major
     const state = normalizeCareerNarrativeState(null, { storySeed: "test-evidence-promotion", major: "방사선학과", coreEventCount: 0 });
-    // Find a cross-major candidate (affinity <= 0)
     const crossMajor = state.candidates.find((c) => getMajorCareerAffinity("방사선학과", c.name) <= 0);
     expect(crossMajor).toBeDefined();
-    // Find an aligned candidate (affinity > 0)
     const aligned = state.candidates.find((c) => getMajorCareerAffinity("방사선학과", c.name) > 0);
     expect(aligned).toBeDefined();
-    // Advance with evidence that matches the cross-major candidate
-    const advanced = advanceCareerNarrativeState(state, {
-      eventTitle: "디지털 콘텐츠 제작 경험",
-      eventTags: ["온라인 창작", "콘텐츠"],
-      choiceSummary: "당신은 온라인 콘텐츠를 제작하며 창작 경험을 쌓았다.",
-      statDelta: { practical: 3, reputation: 2 },
-      nextCoreEventCount: 1,
-    });
-    const contentCandidate = advanced.candidates.find((c) => c.id === "content");
-    if (contentCandidate) {
-      expect(contentCandidate.evidence.length).toBeGreaterThan(0);
-      expect(contentCandidate.fit).toBeGreaterThan(34);
+    // Apply evidence that matches the cross-major candidate's traits
+    // Use event tags that produce evidence matching the cross-major candidate
+    let advanced = state;
+    for (let i = 0; i < 8; i++) {
+      advanced = advanceCareerNarrativeState(advanced, {
+        eventTitle: `디지털 콘텐츠 제작 경험 ${i}`,
+        eventTags: ["온라인 창작", "콘텐츠"],
+        choiceSummary: "당신은 온라인 콘텐츠를 제작하며 창작 경험을 쌓았다.",
+        statDelta: { practical: 3, reputation: 2 },
+        nextCoreEventCount: i + 1,
+      });
     }
-    const updatedCrossMajor = advanced.candidates.find((c) => c.id === crossMajor!.id);
-    if (updatedCrossMajor) {
-      expect(updatedCrossMajor.fit).toBeGreaterThanOrEqual(crossMajor!.fit);
-    }
+    // The cross-major candidate should have gained fit from evidence
+    const crossMajorAfter = advanced.candidates.find((c) => c.id === crossMajor!.id);
+    const alignedAfter = advanced.candidates.find((c) => c.id === aligned!.id);
+    expect(crossMajorAfter).toBeDefined();
+    expect(alignedAfter).toBeDefined();
+    const crossMajorFitGain = crossMajorAfter!.fit - crossMajor!.fit;
+    expect(crossMajorFitGain).toBeGreaterThan(0);
   });
 
   it("24 is a quick eligibility target not a hard cap", () => {
@@ -239,10 +278,13 @@ describe("ending path diversity acceptance", () => {
     expect(typeof generateAiEvent).toBe("function");
   });
 
-  it("generateAiEvent with fetch mock asserts exactly one provider fetch for multi-mental-loss response", async () => {
-    // Mock fetch to return a response with all-mental-loss choices
-    // The normalizeAiEvent function should normalize it without extra calls
-    const mockResponse = {
+  it("generateAiEvent with mocked fetch normalizes multi-mental-loss response in one call", async () => {
+    const originalFetch = globalThis.fetch;
+    const originalProvider = process.env.AI_PRIMARY_PROVIDER;
+    const originalKey = process.env.OLLAMA_API_KEY;
+    const originalTimeout = process.env.OPENROUTER_TIMEOUT_MS;
+    let fetchCount = 0;
+    const mockEventContent = JSON.stringify({
       title: "스트레스 테스트",
       body: "오늘은 정말 힘든 날이다. 아침부터 시작된 연속된 미팅과 마감 압박이 어깨를 무겁게 짓누른다. 동시에 들어온 두 개의 제안 중 하나는 분명한 리스크를 안고 있다. 당신은 잠시 숨을 고르며 각 선택의 결과를 머릿속에 그려본다. 짧은 시간 안에 결정을 내려야 하는 상황이다.",
       tags: ["일상"],
@@ -251,28 +293,112 @@ describe("ending path diversity acceptance", () => {
         { id: "b", label: "또 무리한다", summary: "당신은 또 무리했다.", statDelta: { mental: -1, health: -1 }, relationshipDelta: [] },
         { id: "c", label: "쉰다", summary: "당신은 쉬기로 했다.", statDelta: { mental: 1, health: 1 }, relationshipDelta: [] },
       ],
-    };
-    // Test that normalizeAiEvent normalizes without any extra calls
-    const normalized = normalizeAiEvent(mockResponse) as {
-      title: string;
-      body: string;
-      tags: string[];
-      choices: Array<{ statDelta: Record<string, number> }>;
-    };
-    const mentalDeltas = normalized.choices.map((c) => c.statDelta.mental ?? 0);
-    const lossCount = mentalDeltas.filter((d) => d < 0).length;
-    const nonLossCount = mentalDeltas.filter((d) => d >= 0).length;
-    expect(lossCount).toBeLessThanOrEqual(1);
-    expect(nonLossCount).toBeGreaterThanOrEqual(1);
-    // Verify the output is valid for the schema
-    const parsed = parseAiEventContentDetailed(JSON.stringify(normalized));
-    expect(parsed.success).toBe(true);
+    });
+    try {
+      process.env.AI_PRIMARY_PROVIDER = "ollama";
+      process.env.OLLAMA_API_KEY = "test-key-for-mock";
+      process.env.OPENROUTER_TIMEOUT_MS = "5000";
+      globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
+        fetchCount++;
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({
+            message: { content: mockEventContent },
+          }),
+        };
+      });
+      const { generateAiEvent } = await import("@/lib/game/openrouter");
+      const minimalState: AiEventPromptState = {
+        name: "테스트",
+        major: "방사선학과",
+        gradeYear: 2,
+        age: 20,
+        coreEventCount: 5,
+        recentSummaries: [],
+        usedEventTitles: [],
+        stats: { academic: 5, practical: 5, health: 5, mental: 5, wealth: 5, charm: 5, reputation: 5 },
+        relationships: [],
+        storyArc: { phase: "exploration" },
+      };
+      const result = await generateAiEvent(minimalState);
+      expect(fetchCount).toBe(1);
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      const mentalDeltas = result.event.choices.map((c) => c.statDelta.mental ?? 0);
+      const lossCount = mentalDeltas.filter((d) => d < 0).length;
+      const nonLossCount = mentalDeltas.filter((d) => d >= 0).length;
+      expect(lossCount).toBeLessThanOrEqual(1);
+      expect(nonLossCount).toBeGreaterThanOrEqual(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalProvider !== undefined) process.env.AI_PRIMARY_PROVIDER = originalProvider;
+      else delete process.env.AI_PRIMARY_PROVIDER;
+      if (originalKey !== undefined) process.env.OLLAMA_API_KEY = originalKey;
+      else delete process.env.OLLAMA_API_KEY;
+      if (originalTimeout !== undefined) process.env.OPENROUTER_TIMEOUT_MS = originalTimeout;
+      else delete process.env.OPENROUTER_TIMEOUT_MS;
+    }
+  });
+
+  it("provider order: Ollama endpoint is attempted first when AI_PRIMARY_PROVIDER=ollama", async () => {
+    const originalFetch = globalThis.fetch;
+    const originalProvider = process.env.AI_PRIMARY_PROVIDER;
+    const originalKey = process.env.OLLAMA_API_KEY;
+    const originalTimeout = process.env.OPENROUTER_TIMEOUT_MS;
+    const calledUrls: string[] = [];
+    const mockEventContent = JSON.stringify({
+      title: "테스트 이벤트",
+      body: "테스트 본문입니다. 아침부터 시작된 연속된 미팅과 마감 압박이 어깨를 무겁게 짓누른다. 동시에 들어온 두 개의 제안 중 하나는 분명한 리스크를 안고 있다. 당신은 잠시 숨을 고르며 각 선택의 결과를 머릿속에 그려본다. 짧은 시간 안에 결정을 내려야 하는 상황이다.",
+      tags: ["일상"],
+      choices: [
+        { id: "a", label: "선택 A", summary: "당신은 A를 선택했다.", statDelta: { practical: 1 }, relationshipDelta: [] },
+        { id: "b", label: "선택 B", summary: "당신은 B를 선택했다.", statDelta: { mental: 1 }, relationshipDelta: [] },
+      ],
+    });
+    try {
+      process.env.AI_PRIMARY_PROVIDER = "ollama";
+      process.env.OLLAMA_API_KEY = "test-key-for-order";
+      process.env.OPENROUTER_TIMEOUT_MS = "5000";
+      globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
+        calledUrls.push(url);
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({
+            message: { content: mockEventContent },
+          }),
+        };
+      });
+      const { generateAiEvent } = await import("@/lib/game/openrouter");
+      const minimalState: AiEventPromptState = {
+        name: "테스트",
+        major: "방사선학과",
+        gradeYear: 2,
+        age: 20,
+        coreEventCount: 5,
+        recentSummaries: [],
+        usedEventTitles: [],
+        stats: { academic: 5, practical: 5, health: 5, mental: 5, wealth: 5, charm: 5, reputation: 5 },
+        relationships: [],
+        storyArc: { phase: "exploration" },
+      };
+      const result = await generateAiEvent(minimalState);
+      expect(calledUrls.length).toBeGreaterThanOrEqual(1);
+      expect(calledUrls[0]).toContain("ollama.com");
+      expect(result.success).toBe(true);
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalProvider !== undefined) process.env.AI_PRIMARY_PROVIDER = originalProvider;
+      else delete process.env.AI_PRIMARY_PROVIDER;
+      if (originalKey !== undefined) process.env.OLLAMA_API_KEY = originalKey;
+      else delete process.env.OLLAMA_API_KEY;
+      if (originalTimeout !== undefined) process.env.OPENROUTER_TIMEOUT_MS = originalTimeout;
+      else delete process.env.OPENROUTER_TIMEOUT_MS;
+    }
   });
 
   it("core-event fixtures have 2-3 choices and at least two mechanically distinct consequences", () => {
-    // Core events are career gates, education transitions, explicit relationship
-    // transitions, or events that change application/life-stage/career/relationship flags.
-    // Check STATIC_EVENTS that have flagDelta entries indicating core-event-like behavior.
     const coreEventCandidates = STATIC_EVENTS.filter((event) => {
       const hasFlagDelta = event.choices.some((c) => Object.keys(c.flagDelta).length > 0);
       const isCareerGate = event.tags.some((t) => ["진로", "취업", "인턴", "공모전", "스펙"].includes(t));
@@ -297,18 +423,13 @@ describe("ending path diversity acceptance", () => {
   });
 
   it("active coherent branch can continue after 24 while quick eligible paths can end", () => {
-    // A quick eligible path (no branch extensions) can conclude around 24 events
     expect(careerPhaseForEventCount(24)).toBe("CONVERGENCE");
-    // An active coherent branch (e.g. internship, relationship) can continue past 24
     expect(careerPhaseForEventCount(26)).toBe("CONVERGENCE");
     expect(careerPhaseForEventCount(28)).toBe("CONVERGENCE");
-    // Event kinds continue cycling past 24
     expect(careerEventKindForCount(24)).toBe("CAREER_GATE");
     expect(careerEventKindForCount(25)).toBe("CAREER_LINKED");
     expect(careerEventKindForCount(26)).toBe("LIFE");
     expect(careerEventKindForCount(27)).toBe("CAREER_GATE");
-    // No fixed cap: the phase and event kind functions handle any count
-    // 40 % 8 = 0 → CAREER_GATE (position 0 in the cycle)
     expect(careerPhaseForEventCount(40)).toBe("CONVERGENCE");
     expect(careerEventKindForCount(40)).toBe("CAREER_GATE");
   });
@@ -316,8 +437,6 @@ describe("ending path diversity acceptance", () => {
 
 describe("complete-run mental balance simulation", () => {
   it("balanced variable-length runs produce <=10% mental collapse", () => {
-    // Use actual assessOrdinaryMentalChoiceBalance to validate choice patterns
-    // that would be used in a real run, then simulate with those patterns
     const validPattern = [
       { statDelta: { mental: -1 } },
       { statDelta: { practical: 1 } },
@@ -327,17 +446,14 @@ describe("complete-run mental balance simulation", () => {
       { statDelta: { mental: -1 } },
       { statDelta: { mental: -1 } },
     ];
-    // Verify the patterns through production code
     expect(assessOrdinaryMentalChoiceBalance(validPattern).valid).toBe(true);
     expect(assessOrdinaryMentalChoiceBalance(allLossPattern).valid).toBe(false);
-    // Simulate balanced runs using the valid pattern
     const runs = 200;
     let collapseCount = 0;
     for (let run = 0; run < runs; run++) {
       let mental = 10;
       const eventCount = 20 + (run % 9);
       for (let e = 0; e < eventCount; e++) {
-        // Player picks a mix: sometimes the loss, sometimes recovery
         const pickLoss = e % 5 === 0;
         const pickRecovery = e % 3 === 0;
         if (pickLoss) mental += -1;
@@ -350,7 +466,6 @@ describe("complete-run mental balance simulation", () => {
   });
 
   it("all-mental-sacrifice strategy can still cause collapse", () => {
-    // Simulate runs where the player always picks the mental-loss choice
     const runs = 50;
     let collapseCount = 0;
     for (let run = 0; run < runs; run++) {
