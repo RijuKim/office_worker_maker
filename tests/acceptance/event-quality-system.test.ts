@@ -7,6 +7,28 @@ import {
 } from "@/lib/game/event-quality";
 
 describe("event quality system acceptance", () => {
+  it("rejects an AI event whose normalized title already appeared in the run", () => {
+    const verdict = evaluateEventQuality({
+      source: "AI",
+      candidate: {
+        title: " 현우와의  짧은 운동 세션 ",
+        body: "현우가 아침 달리기를 제안하고, 운동이 끝난 뒤 다음 목표를 함께 정하자고 말한다.",
+        tags: ["운동", "관계"],
+        choices: [
+          { id: "continue", label: "다음 운동도 함께한다.", summary: "당신은 다음 운동을 약속했다.", statDelta: { health: 1 }, relationshipDelta: [] },
+          { id: "rest", label: "이번에는 쉬기로 한다.", summary: "당신은 회복을 우선했다.", statDelta: { mental: 1 }, relationshipDelta: [] },
+        ],
+      },
+      context: {
+        recentEvents: [{ title: "현우와의 짧은 운동 세션", tags: ["운동", "관계"] }],
+      },
+    });
+
+    expect(verdict.status).toBe("fail");
+    expect(verdict.hardFailure).toBe(true);
+    expect(verdict.reasons).toContain("repeated_event_title");
+  });
+
   it("slice 1: keeps accepted-but-closed activity as history, not an active invitation", () => {
     const lifecycle = inferThreadLifecycle({
       eventFlags: {

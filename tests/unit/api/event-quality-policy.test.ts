@@ -14,6 +14,34 @@ const selectionContext: EventSelectionContext = {
 };
 
 describe("event quality route policy", () => {
+  it("replaces an exact repeated AI title with an unused local event", () => {
+    const repeatedTitle = "현우와의 짧은 운동 세션";
+    const fallback = findValidatedStaticFallback({
+      preferredEvent: {
+        title: repeatedTitle,
+        body: "현우가 아침 운동을 제안하고 달리기가 끝난 뒤 다음 목표를 함께 정하자고 말한다.",
+        tags: ["운동", "관계"],
+        choices: [
+          { id: "again", label: "다음에도 함께한다.", summary: "당신은 다음 운동을 약속했다.", statDelta: { health: 1 }, relationshipDelta: [], flagDelta: {} },
+          { id: "rest", label: "회복할 시간을 갖는다.", summary: "당신은 휴식을 택했다.", statDelta: { mental: 1 }, relationshipDelta: [], flagDelta: {} },
+        ],
+      },
+      selectionContext,
+      excludedEventTitles: [repeatedTitle],
+      qualityContext: {
+        academicStatus: "ENROLLED",
+        lifeStage: "college_early",
+        eventFlags: {},
+        recentEvents: [{ title: repeatedTitle, tags: ["운동", "관계"] }],
+        recentSummaries: [],
+      },
+    });
+
+    expect(fallback).not.toBeNull();
+    expect(fallback?.event.title).not.toBe(repeatedTitle);
+    expect(fallback?.evaluation.verdict.status).toBe("pass");
+  });
+
   it("selects a validated static fallback when the preferred candidate fails hard validation", () => {
     const fallback = findValidatedStaticFallback({
       preferredEvent: {

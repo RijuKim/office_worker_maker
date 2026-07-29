@@ -246,6 +246,9 @@ export function evaluateEventQuality(input: EvaluateEventQualityInput): EventQua
   if (choices.some(hasForbiddenOrdinaryStatDrop) && input.source === "AI") {
     reasons.push("health_mental_delta_violation");
   }
+  if (hasRepeatedEventTitle(candidate, input.context?.recentEvents)) {
+    reasons.push("repeated_event_title");
+  }
 
   if (isLifecycleClosureConsequence(text, lifecycle)) {
     continuityExemptions.push("lifecycle_closure");
@@ -615,6 +618,19 @@ function recentEventText(event: RecentEvent) {
     .join(" ");
 }
 
+function hasRepeatedEventTitle(candidate: EventQualityCandidate, recentEvents?: RecentEvent[]) {
+  if (typeof candidate.title !== "string") return false;
+  const normalizedCandidate = normalizeTitle(candidate.title);
+  if (!normalizedCandidate) return false;
+  return (recentEvents ?? []).some((event) =>
+    typeof event.title === "string" && normalizeTitle(event.title) === normalizedCandidate,
+  );
+}
+
+function normalizeTitle(title: string) {
+  return title.normalize("NFKC").replace(/\s+/g, "").toLocaleLowerCase("ko-KR");
+}
+
 function activityKeywords(text: string) {
   const keywords = [
     "도서관",
@@ -631,6 +647,11 @@ function activityKeywords(text: string) {
     "알바",
     "가족",
     "팀",
+    "운동",
+    "달리기",
+    "러닝",
+    "헬스",
+    "캠핑",
   ];
   return keywords.filter((keyword) => text.includes(keyword));
 }
