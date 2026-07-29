@@ -25,6 +25,7 @@ export type CareerOrganization = {
   traits: string[];
   roles: string[];
   preferredTraits: string[];
+  majorFamilies?: string[];
 };
 
 export type CareerNarrativeState = {
@@ -56,9 +57,21 @@ export const ORGANIZATIONS: CareerOrganization[] = [
   { id: "bluebird-studio", name: "파랑새스튜디오", sector: "콘텐츠·엔터테인먼트", companyType: "콘텐츠 기업", traits: ["프로젝트제", "대중 반응", "포트폴리오"], roles: ["버튜버 운영", "영상기획", "커뮤니티 매니저"], preferredTraits: ["온라인 창작", "무대", "팬 소통"] },
   { id: "daldal-marketing", name: "달달마케팅", sector: "광고·마케팅", companyType: "중소기업", traits: ["고객사 대응", "빠른 실행", "다양한 캠페인"], roles: ["콘텐츠 마케팅", "SNS 운영", "브랜드 기획"], preferredTraits: ["SNS", "창작", "협상"] },
   { id: "global-medix", name: "글로벌메딕스코리아", sector: "외국계 의료", companyType: "외국계", traits: ["영어", "성과 보상", "출장"], roles: ["임상지원", "제품교육", "마케팅"], preferredTraits: ["어학", "발표", "문화 적응"] },
+  { id: "saebom-education-office", name: "새봄교육청", sector: "공공교육", companyType: "교육행정기관", traits: ["공공성", "학교 지원", "지역 교육"], roles: ["교육행정", "학교지원", "교육정책"], preferredTraits: ["교육 이해", "문서", "조율"], majorFamilies: ["education"] },
+  { id: "baeum-policy-lab", name: "배움정책연구원", sector: "교육정책·연구", companyType: "공공연구기관", traits: ["연구 중심", "정책 분석", "현장 조사"], roles: ["교육연구", "정책분석", "조사운영"], preferredTraits: ["교육학", "연구", "기록"], majorFamilies: ["education"] },
+  { id: "onclass", name: "온클래스", sector: "에듀테크", companyType: "교육 스타트업", traits: ["수업 혁신", "사용자 관찰", "빠른 실험"], roles: ["교육콘텐츠 기획", "학습서비스 운영", "교사 연수"], preferredTraits: ["교육 이해", "콘텐츠", "설명력"], majorFamilies: ["education"] },
+  { id: "grow-together-center", name: "함께자람청소년센터", sector: "청소년·상담", companyType: "비영리기관", traits: ["학생 접점", "지역 연계", "사례 관리"], roles: ["청소년 프로그램", "학습상담", "진로지원"], preferredTraits: ["상담", "공감", "책임감"], majorFamilies: ["education"] },
+  { id: "dodam-learning", name: "도담교육출판", sector: "교재·교육콘텐츠", companyType: "교육기업", traits: ["교재 개발", "학교 시장", "콘텐츠 품질"], roles: ["교재기획", "교육콘텐츠 편집", "교수설계"], preferredTraits: ["교육학", "글쓰기", "기획"], majorFamilies: ["education"] },
+  { id: "bridge-lifelong", name: "이음평생학습관", sector: "평생교육", companyType: "지역교육기관", traits: ["성인 학습", "지역 프로그램", "생활 밀착"], roles: ["평생교육 운영", "프로그램 기획", "학습자 지원"], preferredTraits: ["교육 이해", "운영", "소통"], majorFamilies: ["education"] },
+  { id: "mirae-teacher-institute", name: "미래교원연수원", sector: "교원연수", companyType: "교육연수기관", traits: ["교사 성장", "수업 연구", "현장 연계"], roles: ["교원연수 기획", "수업컨설팅", "교육과정 운영"], preferredTraits: ["교육학", "발표", "교사 소통"], majorFamilies: ["education"] },
+  { id: "open-school-network", name: "열린학교네트워크", sector: "학교혁신·비영리", companyType: "교육 비영리", traits: ["학교 협력", "교육격차", "프로젝트 수업"], roles: ["학교협력", "교육프로그램 기획", "학습지원"], preferredTraits: ["교육 이해", "조율", "공공성"], majorFamilies: ["education"] },
 ];
 
 const GENERAL_CANDIDATES = [
+  ["teacher", "교사·교육 전문가"],
+  ["education-admin", "교육행정·공공교육"],
+  ["edtech", "에듀테크·교육콘텐츠"],
+  ["counseling", "학생상담·청소년지원"],
   ["clinical", "병원·임상 전문가"],
   ["medical-device", "의료기기·임상교육"],
   ["public-health", "공공 보건·안전"],
@@ -115,6 +128,7 @@ export function getMajorCareerAffinity(major: string, careerName: string): numbe
     ["행정", ["사회", "경영"], 2],
     ["교육", ["교육"], 3],
     ["교사", ["교육"], 3],
+    ["상담", ["교육", "사회"], 3],
     ["개발", ["공학"], 3],
     ["엔지니어", ["공학"], 3],
   ];
@@ -141,8 +155,17 @@ export function normalizeCareerNarrativeState(
   const record = isRecord(raw) ? raw : {};
   const phase = careerPhaseForEventCount(input.coreEventCount);
   const eventKind = careerEventKindForCount(input.coreEventCount);
-  const organizations = readOrganizations(record.organizations) ?? selectOrganizations(input.storySeed, 8);
-  const candidates = readCandidates(record.candidates) ?? selectCandidates(input.storySeed, input.major);
+  const takenOpportunities = readStrings(record.takenOpportunities).slice(-12);
+  const missedOpportunities = readStrings(record.missedOpportunities).slice(-12);
+  const existingOrganizations = readOrganizations(record.organizations);
+  const committedNames = organizationNamesFromCommitments(existingOrganizations ?? [], takenOpportunities, missedOpportunities, record.lastGate);
+  const organizations = reconcileOrganizations(existingOrganizations, {
+    seed: input.storySeed,
+    major: input.major,
+    committedNames,
+    missedNames: missedOpportunities,
+  });
+  const candidates = reconcileCandidates(readCandidates(record.candidates), input.storySeed, input.major);
   const evidence = Array.isArray(record.evidence) ? record.evidence.filter(isCareerEvidence).slice(-20) : [];
   const priorities = isRecord(record.priorities) ? {
     stability: readNumber(record.priorities.stability), salary: readNumber(record.priorities.salary),
@@ -151,19 +174,19 @@ export function normalizeCareerNarrativeState(
   } : { stability: 0, salary: 0, growth: 0, location: 0, workLifeBalance: 0 };
   return {
     phase, eventKind, organizations, candidates, evidence, priorities,
-    takenOpportunities: readStrings(record.takenOpportunities).slice(-12),
-    missedOpportunities: readStrings(record.missedOpportunities).slice(-12),
+    takenOpportunities,
+    missedOpportunities,
     lastGate: typeof record.lastGate === "string" ? record.lastGate : null,
   };
 }
 
 export function advanceCareerNarrativeState(
   current: CareerNarrativeState,
-  input: { eventTitle: string; eventTags: string[]; choiceSummary: string; statDelta: Record<string, number>; nextCoreEventCount: number },
+  input: { eventTitle: string; eventTags: string[]; choiceSummary: string; statDelta: Record<string, number>; nextCoreEventCount: number; major?: string },
 ): CareerNarrativeState {
   const evidence = inferCareerEvidence(input);
   const updatedCandidates = current.candidates.map((candidate) => {
-    const relevance = evidence.flatMap((item) => item.traits).filter((trait) => candidateTraitMatch(candidate.id, trait)).length;
+    const relevance = evidence.flatMap((item) => item.traits).filter((trait) => candidateTraitMatch(candidate.id, trait, input.major)).length;
     return relevance === 0 ? candidate : {
       ...candidate,
       interest: clamp(candidate.interest + relevance * 2),
@@ -174,6 +197,7 @@ export function advanceCareerNarrativeState(
   const candidates = unlockCareerCandidates(updatedCandidates, evidence)
     .sort((a, b) => (b.fit + b.interest) - (a.fit + a.interest))
     .slice(0, 5);
+  const organizationDecision = inferOrganizationDecision(current.organizations, input.eventTitle, input.choiceSummary);
   return {
     ...current,
     phase: careerPhaseForEventCount(input.nextCoreEventCount),
@@ -182,6 +206,16 @@ export function advanceCareerNarrativeState(
     evidence: [...current.evidence, ...evidence].slice(-20),
     priorities: updatePriorities(current.priorities, input.choiceSummary),
     lastGate: current.eventKind === "CAREER_GATE" ? input.eventTitle : current.lastGate,
+    takenOpportunities: organizationDecision?.decision === "taken"
+      ? appendUnique(current.takenOpportunities, organizationDecision.name)
+      : organizationDecision?.decision === "missed"
+        ? current.takenOpportunities.filter((name) => name !== organizationDecision.name)
+        : current.takenOpportunities,
+    missedOpportunities: organizationDecision?.decision === "missed"
+      ? appendUnique(current.missedOpportunities, organizationDecision.name)
+      : organizationDecision?.decision === "taken"
+        ? current.missedOpportunities.filter((name) => name !== organizationDecision.name)
+        : current.missedOpportunities,
   };
 }
 
@@ -215,15 +249,77 @@ export function summarizeCareerNarrativeForPrompt(state: CareerNarrativeState) {
     phase: state.phase,
     eventKind: state.eventKind,
     leadingCandidates: state.candidates.slice(0, 4),
-    organizations: state.organizations.map(({ name, sector, companyType, traits, roles }) => ({ name, sector, companyType, traits, roles })),
+    organizations: state.organizations
+      .filter((organization) => !state.missedOpportunities.includes(organization.name) || state.takenOpportunities.includes(organization.name))
+      .map(({ name, sector, companyType, traits, roles }) => ({ name, sector, companyType, traits, roles })),
     recentEvidence: state.evidence.slice(-8),
     priorities: state.priorities,
     lastGate: state.lastGate,
   };
 }
 
-function selectOrganizations(seed: string, limit: number) {
-  return deterministicShuffle(ORGANIZATIONS, `${seed}:organizations`).slice(0, limit);
+function selectOrganizations(seed: string, major: string, limit: number, excludedNames: string[] = []) {
+  const available = ORGANIZATIONS.filter((organization) => !excludedNames.includes(organization.name));
+  const alignedTarget = major.includes("교육") ? limit : Math.min(5, limit);
+  const aligned = deterministicShuffle(
+    available.filter((organization) => organizationAffinity(major, organization) > 0),
+    `${seed}:${major}:aligned-organizations`,
+  ).slice(0, alignedTarget);
+  const alignedIds = new Set(aligned.map((organization) => organization.id));
+  const crossMajor = deterministicShuffle(
+    available.filter((organization) => !alignedIds.has(organization.id)),
+    `${seed}:${major}:cross-organizations`,
+  ).slice(0, limit - aligned.length);
+  return [...aligned, ...crossMajor];
+}
+
+function reconcileOrganizations(
+  existing: CareerOrganization[] | null,
+  input: { seed: string; major: string; committedNames: string[]; missedNames: string[] },
+) {
+  const alignedCount = existing?.filter((organization) => organizationAffinity(input.major, organization) > 0).length ?? 0;
+  if (existing && (!input.major.includes("교육") || alignedCount >= 4)) {
+    return existing.filter((organization) => !input.missedNames.includes(organization.name) || input.committedNames.includes(organization.name));
+  }
+  const selected = selectOrganizations(input.seed, input.major, 8, input.missedNames);
+  const committed = (existing ?? []).filter((organization) => input.committedNames.includes(organization.name));
+  return [...committed, ...selected.filter((organization) => !committed.some((item) => item.id === organization.id))].slice(0, 8);
+}
+
+function organizationAffinity(major: string, organization: CareerOrganization) {
+  const family = major.includes("교육") ? "education" : major.includes("방사선") ? "health" : null;
+  return family && organization.majorFamilies?.includes(family) ? 5 : 0;
+}
+
+function organizationNamesFromCommitments(organizations: CareerOrganization[], taken: string[], missed: string[], lastGate: unknown) {
+  const gate = typeof lastGate === "string" ? lastGate : "";
+  return organizations
+    .filter((organization) => taken.includes(organization.name) || (gate.includes(organization.name) && !missed.includes(organization.name)))
+    .map((organization) => organization.name);
+}
+
+function reconcileCandidates(existing: CareerCandidate[] | null, seed: string, major: string) {
+  if (!existing) return selectCandidates(seed, major);
+  if (!major.includes("교육") || existing.filter((candidate) => getMajorCareerAffinity(major, candidate.name) > 0).length >= 3) return existing;
+  const fresh = selectCandidates(seed, major);
+  const evidenceById = new Map(existing.map((candidate) => [candidate.id, candidate.evidence]));
+  return fresh.map((candidate) => ({ ...candidate, evidence: evidenceById.get(candidate.id) ?? candidate.evidence }));
+}
+
+function inferOrganizationDecision(organizations: CareerOrganization[], eventTitle: string, summary: string) {
+  const organization = organizations.find((item) => eventTitle.includes(item.name) || summary.includes(item.name));
+  if (!organization) return null;
+  if (/(다른\s*(회사|기관|길|경로)|거절|지원하지|신청하지|포기|보류|지켜보|더 알아|정보를 수집|탐색)/.test(summary)) {
+    return { name: organization.name, decision: "missed" as const };
+  }
+  if (/(지원|신청|수락|합류|제출|입사|인턴을?\s*시작|근무를?\s*시작|참여하기로)/.test(summary)) {
+    return { name: organization.name, decision: "taken" as const };
+  }
+  return null;
+}
+
+function appendUnique(values: string[], value: string) {
+  return [...values.filter((item) => item !== value), value].slice(-12);
 }
 
 function selectCandidates(seed: string, major: string): CareerCandidate[] {
@@ -289,8 +385,13 @@ function evidenceTraits(type: string, delta: Record<string, number>) {
   return traits;
 }
 
-function candidateTraitMatch(id: string, trait: string) {
+function candidateTraitMatch(id: string, trait: string, major?: string) {
+  if (major?.includes("교육") && ["clinical", "medical-device", "health-tech"].includes(id)) return false;
   const map: Record<string, string[]> = {
+    teacher: ["학업", "설명력", "책임감", "소통", "발표"],
+    "education-admin": ["학업", "정확성", "책임감", "협상", "소통"],
+    edtech: ["온라인 창작", "사용자 이해", "설명력", "실무", "창작"],
+    counseling: ["소통", "고객 대응", "책임감", "회복", "설명력"],
     clinical: ["실무", "현장 대응", "정확성", "고객 대응"],
     "medical-device": ["설명력", "발표", "관계", "현장 대응"],
     "public-health": ["학업", "정확성", "책임감"],

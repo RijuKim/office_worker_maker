@@ -188,10 +188,13 @@ export async function POST(request: Request | NextRequest, context: RouteContext
     careerOrganizations: careerNarrative.organizations.map((org: { name: string }) => org.name),
     activeJobCompany: character.jobApplications
       .filter((app: { isActive: boolean }) => app.isActive)
-      .map((app: { companyName: string }) => app.companyName)[0] ?? null,
-    closedCompanies: character.jobApplications
-      .filter((app: { isActive: boolean }) => !app.isActive)
-      .map((app: { companyName: string }) => app.companyName),
+      .map((app: { companyName: string }) => app.companyName)[0] ?? careerNarrative.takenOpportunities.at(-1) ?? null,
+    closedCompanies: [...new Set([
+      ...character.jobApplications
+        .filter((app: { isActive: boolean }) => !app.isActive)
+        .map((app: { companyName: string }) => app.companyName),
+      ...careerNarrative.missedOpportunities,
+    ])],
   };
   const usedEventTitles = character.eventHistory
     .map((h: { event?: { title?: string } }) => h.event?.title)
@@ -257,9 +260,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
       careerNarrative: summarizeCareerNarrativeForPrompt(careerNarrative),
       avoidPeople: diversityGuidance.avoidPeople,
       starterCandidates: validateStarterCandidates(currentFlags.starterCandidates, character.id),
-      closedCompanies: character.jobApplications
-        .filter((app: { isActive: boolean }) => !app.isActive)
-        .map((app: { companyName: string }) => app.companyName),
+      closedCompanies: qualityContext.closedCompanies,
     };
     const providerStartedAt = Date.now();
     let aiResult: Awaited<ReturnType<typeof generateAiEvent>> | {

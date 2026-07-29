@@ -5,6 +5,8 @@ import {
   careerEventKindForCount,
   careerPhaseForEventCount,
   normalizeCareerNarrativeState,
+  ORGANIZATIONS,
+  summarizeCareerNarrativeForPrompt,
 } from "@/lib/game/career-narrative";
 
 describe("career narrative", () => {
@@ -51,6 +53,63 @@ describe("career narrative", () => {
     expect(first.candidates.some((candidate) => candidate.id === "clinical")).toBe(true);
   });
 
+  it("gives education majors education careers and organizations instead of a medical roster", () => {
+    const state = normalizeCareerNarrativeState(null, { storySeed: "education-run", major: "교육학과", coreEventCount: 0 });
+    expect(state.organizations).toHaveLength(8);
+    expect(state.organizations.every((organization) => organization.majorFamilies?.includes("education"))).toBe(true);
+    expect(state.organizations.some((organization) => organization.id === "celltrium")).toBe(false);
+    expect(state.candidates.slice(0, 4).filter((candidate) =>
+      ["teacher", "education-admin", "edtech", "counseling"].includes(candidate.id),
+    ).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("repairs a legacy education career pool on the next normalization", () => {
+    const legacy = normalizeCareerNarrativeState(null, { storySeed: "legacy-source", major: "방사선학과", coreEventCount: 7 });
+    const repaired = normalizeCareerNarrativeState(legacy, { storySeed: "legacy-source", major: "교육학과", coreEventCount: 7 });
+    expect(repaired.organizations.every((organization) => organization.majorFamilies?.includes("education"))).toBe(true);
+    expect(repaired.candidates.filter((candidate) => ["teacher", "education-admin", "edtech", "counseling"].includes(candidate.id)).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("keeps an explicitly committed cross-major organization during legacy repair", () => {
+    const legacy = normalizeCareerNarrativeState(null, { storySeed: "committed-source", major: "방사선학과", coreEventCount: 8 });
+    const celltrium = ORGANIZATION_BY_ID(ORGANIZATIONS, "celltrium");
+    const raw = { ...legacy, organizations: [celltrium, ...legacy.organizations.filter((item) => item.id !== "celltrium")].slice(0, 8), lastGate: "셀트리움 인턴십 지원" };
+    const repaired = normalizeCareerNarrativeState(raw, { storySeed: "committed-source", major: "교육학과", coreEventCount: 8 });
+    expect(repaired.organizations.some((organization) => organization.id === "celltrium")).toBe(true);
+  });
+
+  it("records a rejected organization and removes it from the next AI prompt", () => {
+    const state = normalizeCareerNarrativeState(null, { storySeed: "rejection-run", major: "교육학과", coreEventCount: 3 });
+    const organization = state.organizations[0];
+    const next = advanceCareerNarrativeState(state, {
+      eventTitle: `${organization.name} 인턴십 제안`,
+      eventTags: ["진로"],
+      choiceSummary: "당신은 지원하지 않고 다른 기관의 정보를 수집하며 더 알아보기로 했다.",
+      statDelta: { academic: 1 },
+      nextCoreEventCount: 4,
+      major: "교육학과",
+    });
+    expect(next.missedOpportunities).toContain(organization.name);
+    expect(summarizeCareerNarrativeForPrompt(next).organizations.some((item) => item.name === organization.name)).toBe(false);
+  });
+
+  it("does not turn a generic education-major internship into medical affinity", () => {
+    const state = normalizeCareerNarrativeState(null, { storySeed: "education-intern", major: "교육학과", coreEventCount: 4 });
+    const withMedicalCandidate = {
+      ...state,
+      candidates: [...state.candidates.slice(0, 4), { id: "clinical", name: "병원·임상 전문가", interest: 30, fit: 25, evidence: [] }],
+    };
+    const next = advanceCareerNarrativeState(withMedicalCandidate, {
+      eventTitle: "교육기관 인턴 첫날",
+      eventTags: ["인턴", "현장"],
+      choiceSummary: "당신은 교육 프로그램 운영을 도왔다.",
+      statDelta: { practical: 1 },
+      nextCoreEventCount: 5,
+      major: "교육학과",
+    });
+    expect(next.candidates.find((candidate) => candidate.id === "clinical")).toMatchObject({ fit: 25, interest: 30, evidence: [] });
+  });
+
   it("turns leisure choices into reusable career evidence", () => {
     const state = normalizeCareerNarrativeState(null, { storySeed: "run-b", major: "방사선학과", coreEventCount: 10 });
     const next = advanceCareerNarrativeState(state, {
@@ -74,8 +133,9 @@ describe("career narrative", () => {
     // Record initial ranks
     const initialContentRank = state.candidates.findIndex((c) => c.id === "content");
     const initialMedDevRank = state.candidates.findIndex((c) => c.id === "medical-device");
-    // content is not in initial 5 (it's unlocked by DIGITAL_CONTENT evidence)
-    expect(initialContentRank).toBe(-1);
+    // Candidate-pool expansion may include content initially; it must remain
+    // able to overtake an initially aligned path through repeated evidence.
+    expect(initialContentRank).toBeGreaterThanOrEqual(0);
     expect(initialMedDevRank).toBe(0);
 
     // Apply DIGITAL_CONTENT evidence repeatedly — uniquely relevant to content
@@ -98,3 +158,9 @@ describe("career narrative", () => {
     expect(finalContentRank).toBeLessThan(finalMedDevRank);
   });
 });
+
+function ORGANIZATION_BY_ID<T extends { id: string }>(organizations: T[], id: string): T {
+  const organization = organizations.find((item) => item.id === id);
+  if (!organization) throw new Error(`missing organization: ${id}`);
+  return organization;
+}

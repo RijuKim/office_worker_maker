@@ -262,6 +262,16 @@ export function createNextEventStreamPost({
             people: readRelationshipNames(history.relationshipDelta),
           })),
           previousChoiceSummary,
+          careerOrganizations: careerNarrative.organizations.map((organization) => organization.name),
+          activeJobCompany: character.jobApplications
+            .filter((app: { isActive: boolean }) => app.isActive)
+            .map((app: { companyName: string }) => app.companyName)[0] ?? careerNarrative.takenOpportunities.at(-1) ?? null,
+          closedCompanies: [...new Set([
+            ...character.jobApplications
+              .filter((app: { isActive: boolean }) => !app.isActive)
+              .map((app: { companyName: string }) => app.companyName),
+            ...careerNarrative.missedOpportunities,
+          ])],
         };
         const usedEventTitles = character.eventHistory.map((history: { event?: { title?: string } }) => history.event?.title).filter(Boolean) as string[];
         const recentlySeenUserEventTitles = await getRecentlySeenUserEventTitles(userId, id);
@@ -325,6 +335,7 @@ export function createNextEventStreamPost({
             allowedCategories: diversityGuidance.allowedCategories,
             careerNarrative: summarizeCareerNarrativeForPrompt(careerNarrative),
             avoidPeople: diversityGuidance.avoidPeople,
+            closedCompanies: qualityContext.closedCompanies,
           };
 
           const providerStartedAt = Date.now();

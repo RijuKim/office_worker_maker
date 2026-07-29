@@ -68,6 +68,13 @@ describe("pickRandomStaticEvent", () => {
     ]).toContain(event.title);
   });
 
+  it("does not offer the IT-specific certification fallback to an education major", () => {
+    expect(isEventAllowedForLifeStage(
+      STATIC_EVENTS.find((event) => event.title === "자격증 시험")!,
+      { burnoutRisk: 0, major: "교육학과", lifeStage: "college_mid", eventFlags: {} },
+    )).toBe(false);
+  });
+
   it("blocks late career gates during early college even when stats are high", () => {
     const event = pickRandomStaticEvent([], {
       burnoutRisk: 10,

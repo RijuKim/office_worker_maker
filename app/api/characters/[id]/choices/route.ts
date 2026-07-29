@@ -192,6 +192,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
     choiceSummary: resolvedSummary,
     statDelta,
     nextCoreEventCount: character.coreEventCount + 1,
+    major: character.major,
   });
   const updatedEventFlags = applyFlagDeltas(currentFlags, {
     ...resolvedFlagDelta,

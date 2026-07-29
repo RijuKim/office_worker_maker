@@ -1648,9 +1648,16 @@ export function isEventAllowedForLifeStage(event: Pick<StaticEvent, "title" | "t
   }
 
   const medicalMajor = /의학|간호|약학|치의|수의|방사선|임상|보건/.test(context.major ?? "");
+  const educationMajor = /교육/.test(context.major ?? "");
   const hasStartupHistory = context.eventFlags?.startupThread !== undefined ||
     context.careerPaths?.some((path) => path.pathType === "startup");
   if (medicalMajor && !hasStartupHistory && (title.includes("앱") || hasAny(tags, ["창업", "포트폴리오"]))) {
+    return false;
+  }
+  // The legacy certification fallback is specifically an information-
+  // processing certificate. It should not become the default career step for
+  // an education major merely because both are tagged as a generic exam.
+  if (educationMajor && title === "자격증 시험") {
     return false;
   }
 

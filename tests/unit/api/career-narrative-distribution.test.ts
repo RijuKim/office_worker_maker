@@ -91,7 +91,7 @@ describe("organization distribution across seeds", () => {
   });
 
   it("exposes the ORGANIZATIONS constant for test use", () => {
-    expect(ORGANIZATIONS).toHaveLength(16);
+    expect(ORGANIZATIONS).toHaveLength(24);
     expect(ORGANIZATIONS.some((org) => org.id === "hanbit-medical")).toBe(true);
   });
 
@@ -113,7 +113,7 @@ describe("organization distribution across seeds", () => {
       firstOrgCounts[firstId] = (firstOrgCounts[firstId] ?? 0) + 1;
     }
 
-    // At least 12 of 16 possible companies must appear as first pick
+    // A broad set of companies must still appear as first pick.
     expect(firstOrgIds.size).toBeGreaterThanOrEqual(12);
 
     // No single company should be first in more than 15% of runs
@@ -137,7 +137,7 @@ describe("organization distribution across seeds", () => {
       }
     }
 
-    // All 16 organizations must appear in at least one run's selection
+    // All organizations must appear in at least one run's selection.
     expect(seenOrgIds.size).toBe(ORGANIZATIONS.length);
   });
 });

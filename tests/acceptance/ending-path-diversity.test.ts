@@ -232,29 +232,29 @@ describe("ending path diversity acceptance", () => {
 
   it("evidence can promote a cross-major candidate above an aligned one", () => {
     const state = normalizeCareerNarrativeState(null, { storySeed: "test-evidence-promotion", major: "방사선학과", coreEventCount: 0 });
-    const crossMajor = state.candidates.find((c) => getMajorCareerAffinity("방사선학과", c.name) <= 0);
-    expect(crossMajor).toBeDefined();
     const aligned = state.candidates.find((c) => getMajorCareerAffinity("방사선학과", c.name) > 0);
     expect(aligned).toBeDefined();
-    // Apply evidence that matches the cross-major candidate's traits
-    // Use event tags that produce evidence matching the cross-major candidate
+    // Use event tags that trigger ACADEMIC_EXPERIENCE evidence, whose traits
+    // ("학업", "정확성") match the cross-major candidate (research).
+    // StatDelta avoids practical/reputation to prevent adding generic traits
+    // ("문제 해결", "관계") that would also match aligned candidates.
     let advanced = state;
     for (let i = 0; i < 8; i++) {
       advanced = advanceCareerNarrativeState(advanced, {
-        eventTitle: `디지털 콘텐츠 제작 경험 ${i}`,
-        eventTags: ["온라인 창작", "콘텐츠"],
-        choiceSummary: "당신은 온라인 콘텐츠를 제작하며 창작 경험을 쌓았다.",
-        statDelta: { practical: 3, reputation: 2 },
+        eventTitle: `연구 세미나 참여 ${i}`,
+        eventTags: ["연구", "시험"],
+        choiceSummary: "당신은 세미나에서 연구 결과를 발표했다.",
+        statDelta: { academic: 1 },
         nextCoreEventCount: i + 1,
       });
     }
-    // The cross-major candidate should have gained fit from evidence
-    const crossMajorAfter = advanced.candidates.find((c) => c.id === crossMajor!.id);
+    const crossMajorAfter = advanced.candidates.find((c) => c.id === "research");
     const alignedAfter = advanced.candidates.find((c) => c.id === aligned!.id);
     expect(crossMajorAfter).toBeDefined();
     expect(alignedAfter).toBeDefined();
-    const crossMajorFitGain = crossMajorAfter!.fit - crossMajor!.fit;
-    expect(crossMajorFitGain).toBeGreaterThan(0);
+    const crossMajorTotal = crossMajorAfter!.fit + crossMajorAfter!.interest;
+    const alignedTotal = alignedAfter!.fit + alignedAfter!.interest;
+    expect(crossMajorTotal).toBeGreaterThan(alignedTotal);
   });
 
   it("24 is a quick eligibility target not a hard cap", () => {
