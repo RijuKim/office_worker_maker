@@ -1,0 +1,18 @@
+{
+  "deploymentId": "dpl_Dc71XsGjCJtf1GNfVW2hwTtWKasX",
+  "url": "https://sano-officeworker-gd1ic7yvw-rijukims-projects.vercel.app",
+  "target": "preview",
+  "status": "Ready",
+  "created": "2026-07-30T04:15:38.000Z",
+  "productionPromoted": false,
+  "aliasChanged": false,
+  "envMutated": false,
+  "rootResponse": {
+    "statusCode": 200,
+    "contentType": "text/html; charset=utf-8"
+  },
+  "sourceCommit": "bc5e10cc37dc73009a26801c43d6f6156bb48626",
+  "sourceTree": "/tmp/sano-preview-1785384885",
+  "buildDuration": 50,
+  "buildLogs": "Build completed successfully. All routes compiled. No --prod, no alias, no env mutation used."
+}
