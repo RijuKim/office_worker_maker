@@ -1,0 +1,3060 @@
+{
+  "character": {
+    "id": "4cfbcff0-f827-46ac-83ea-f7b74df32219",
+    "userId": "9923b196-5f5b-4f3d-a932-aab07d149af6",
+    "name": "테스트3",
+    "age": 23,
+    "startGradeYear": 2,
+    "currentGradeYear": 4,
+    "major": "컴퓨터공학과",
+    "academicStatus": "GRADUATED",
+    "lifeStatus": [],
+    "majorEventCount": 5,
+    "coreEventCount": 24,
+    "specScore": 0,
+    "currentEventId": null,
+    "eventGenerationToken": null,
+    "eventGenerationStartedAt": null,
+    "createdAt": "2026-07-30T07:10:25.533Z",
+    "updatedAt": "2026-07-30T07:17:02.546Z",
+    "stats": {
+      "characterRunId": "4cfbcff0-f827-46ac-83ea-f7b74df32219",
+      "academic": 1,
+      "practical": 10,
+      "communication": 6,
+      "creativity": 5,
+      "health": 7,
+      "mental": 2,
+      "network": 4,
+      "wealth": 153,
+      "reputation": 10,
+      "charm": 9
+    },
+    "hiddenState": {
+      "characterRunId": "4cfbcff0-f827-46ac-83ea-f7b74df32219",
+      "majorFit": 6,
+      "burnoutRisk": 2,
+      "romanceState": {
+        "notes": [],
+        "status": "NONE"
+      },
+      "familyState": {
+        "support": "보통",
+        "pressure": "낮음",
+        "residence": "studio"
+      },
+      "friendState": {
+        "circle": "작지만 안정적"
+      },
+      "careerInterests": [
+        "컴퓨터공학과",
+        "탐색"
+      ],
+      "companyRolePreferences": [],
+      "imageFit": {
+        "tone": "성실한 관찰자"
+      },
+      "selfCareCondition": {
+        "meals": "불규칙하지 않음",
+        "sleepDebt": 0
+      },
+      "eventFlags": {
+        "riskDebt": 1,
+        "specInit": {
+          "specName": "TOEIC",
+          "specType": "LANGUAGE_SCORE"
+        },
+        "storyArc": {
+          "phase": "결말",
+          "title": "합격 다음 날",
+          "chapter": 8,
+          "premise": "취업할 수 있는 사람이 되어가는 동안 돈, 관계, 건강, 자존감 중 무엇을 지키고 포기할지 선택한다.",
+          "tension": 95,
+          "focusAxes": [
+            "생존",
+            "관계",
+            "정체성"
+          ],
+          "openThreads": [
+            "취업 여부뿐 아니라 돈, 건강, 관계, 평판과 자신에 대한 믿음이 어떤 삶으로 이어지는지 보여준다",
+            "생활비와 노동",
+            "가족 압박",
+            "서연과의 관계",
+            "가까운 관계의 변화",
+            "졸업 이후의 방향",
+            "학생회 권력과 책임",
+            "위험한 돈과 회색지대"
+          ],
+          "coreQuestion": "취업할 수 있는 사람이 되어가는 동안, 돈·관계·건강·자존감 중 무엇을 지키고 무엇을 포기할 것인가?",
+          "currentArcId": "aftermath",
+          "foreshadowing": [
+            "단체 채팅에 올라온 인턴 이야기",
+            "처음 보는 듯 익숙한 아침의 위화감"
+          ],
+          "dramaticQuestion": "결과 뒤에 남은 삶은 내가 원한 삶인가?"
+        },
+        "lifeStage": {
+          "id": "college_late"
+        },
+        "careerGate": {
+          "path": "contextual",
+          "basis": "stats_relationships_history",
+          "label": "첫 지원 절차 통과",
+          "score": 92,
+          "status": "passed",
+          "threshold": 92
+        },
+        "graduation": {
+          "state": "gate_ready"
+        },
+        "storyPhase": "절정",
+        "aiGenerated": true,
+        "careerState": {
+          "phase": "CONVERGENCE",
+          "evidence": [
+            {
+              "type": "ADAPTABILITY",
+              "title": "낯선 환경 적응",
+              "traits": [
+                "문화 적응",
+                "도전"
+              ],
+              "strength": 2,
+              "sourceEventTitle": "워홀 준비"
+            },
+            {
+              "type": "RESILIENCE",
+              "title": "책임과 회복",
+              "traits": [
+                "책임감",
+                "회복"
+              ],
+              "strength": 5,
+              "sourceEventTitle": "건강검진 결과"
+            },
+            {
+              "type": "ADAPTABILITY",
+              "title": "낯선 환경 적응",
+              "traits": [
+                "문화 적응",
+                "도전"
+              ],
+              "strength": 5,
+              "sourceEventTitle": "급작스러운 장학금 반환 요구"
+            },
+            {
+              "type": "PRACTICAL_EXPERIENCE",
+              "title": "현장·실무 경험",
+              "traits": [
+                "실무",
+                "현장 대응"
+              ],
+              "strength": 5,
+              "sourceEventTitle": "급작스러운 장학금 반환 요구"
+            },
+            {
+              "type": "PRACTICAL_EXPERIENCE",
+              "title": "현장·실무 경험",
+              "traits": [
+                "실무",
+                "현장 대응"
+              ],
+              "strength": 5,
+              "sourceEventTitle": "편의점 새벽 알바"
+            },
+            {
+              "type": "RESILIENCE",
+              "title": "책임과 회복",
+              "traits": [
+                "책임감",
+                "회복"
+              ],
+              "strength": 5,
+              "sourceEventTitle": "편의점 새벽 알바"
+            },
+            {
+              "type": "CREATIVE_EXPERIENCE",
+              "title": "문화·무대 경험",
+              "traits": [
+                "창작",
+                "발표"
+              ],
+              "strength": 2,
+              "sourceEventTitle": "취미가 짐이 될 때"
+            },
+            {
+              "type": "RESILIENCE",
+              "title": "책임과 회복",
+              "traits": [
+                "책임감",
+                "회복"
+              ],
+              "strength": 2,
+              "sourceEventTitle": "취미가 짐이 될 때"
+            },
+            {
+              "type": "PRACTICAL_EXPERIENCE",
+              "title": "현장·실무 경험",
+              "traits": [
+                "실무",
+                "현장 대응"
+              ],
+              "strength": 5,
+              "sourceEventTitle": "편의점 새벽 알바로 놓친 기회"
+            },
+            {
+              "type": "ACADEMIC_EXPERIENCE",
+              "title": "학습과 전문성",
+              "traits": [
+                "학업",
+                "정확성"
+              ],
+              "strength": 5,
+              "sourceEventTitle": "편의점 새벽 알바로 놓친 기회"
+            },
+            {
+              "type": "ADAPTABILITY",
+              "title": "낯선 환경 적응",
+              "traits": [
+                "문화 적응",
+                "도전"
+              ],
+              "strength": 2,
+              "sourceEventTitle": "잊고 있던 학점과 조교의 호출"
+            },
+            {
+              "type": "ACADEMIC_EXPERIENCE",
+              "title": "학습과 전문성",
+              "traits": [
+                "학업",
+                "정확성"
+              ],
+              "strength": 2,
+              "sourceEventTitle": "잊고 있던 학점과 조교의 호출"
+            },
+            {
+              "type": "PRACTICAL_EXPERIENCE",
+              "title": "현장·실무 경험",
+              "traits": [
+                "실무",
+                "현장 대응"
+              ],
+              "strength": 5,
+              "sourceEventTitle": "지난 학기, 이른 아침 알바와 진로"
+            },
+            {
+              "type": "ACADEMIC_EXPERIENCE",
+              "title": "학습과 전문성",
+              "traits": [
+                "학업",
+                "정확성"
+              ],
+              "strength": 5,
+              "sourceEventTitle": "지난 학기, 이른 아침 알바와 진로"
+            },
+            {
+              "type": "DIGITAL_CONTENT",
+              "title": "온라인 콘텐츠 제작",
+              "traits": [
+                "온라인 창작",
+                "사용자 이해"
+              ],
+              "strength": 1,
+              "sourceEventTitle": "디지털 잔상"
+            },
+            {
+              "type": "CREATIVE_EXPERIENCE",
+              "title": "문화·무대 경험",
+              "traits": [
+                "창작",
+                "발표"
+              ],
+              "strength": 1,
+              "sourceEventTitle": "디지털 잔상"
+            },
+            {
+              "type": "ACADEMIC_EXPERIENCE",
+              "title": "학습과 전문성",
+              "traits": [
+                "학업",
+                "정확성"
+              ],
+              "strength": 5,
+              "sourceEventTitle": "토익 시험 접수"
+            },
+            {
+              "type": "PRACTICAL_EXPERIENCE",
+              "title": "현장·실무 경험",
+              "traits": [
+                "실무",
+                "현장 대응"
+              ],
+              "strength": 1,
+              "sourceEventTitle": "마지막 프로젝트 마감"
+            },
+            {
+              "type": "ACADEMIC_EXPERIENCE",
+              "title": "학습과 전문성",
+              "traits": [
+                "학업",
+                "정확성"
+              ],
+              "strength": 1,
+              "sourceEventTitle": "마지막 프로젝트 마감"
+            },
+            {
+              "type": "PRACTICAL_EXPERIENCE",
+              "title": "현장·실무 경험",
+              "traits": [
+                "실무",
+                "현장 대응"
+              ],
+              "strength": 5,
+              "sourceEventTitle": "마지막 프로젝트와 면접의 딜레마"
+            }
+          ],
+          "lastGate": "분실 지갑과 CCTV",
+          "eventKind": "CAREER_GATE",
+          "candidates": [
+            {
+              "id": "education-admin",
+              "fit": 79,
+              "name": "교육행정·공공교육",
+              "evidence": [
+                "낯선 환경 적응",
+                "학습과 전문성",
+                "갈등 해결",
+                "문화·무대 경험",
+                "책임과 회복",
+                "현장·실무 경험"
+              ],
+              "interest": 62
+            },
+            {
+              "id": "research",
+              "fit": 71,
+              "name": "대학원·연구직",
+              "evidence": [
+                "낯선 환경 적응",
+                "학습과 전문성",
+                "현장·실무 경험"
+              ],
+              "interest": 59
+            },
+            {
+              "id": "global",
+              "fit": 60,
+              "name": "해외·외국계 진로",
+              "evidence": [
+                "낯선 환경 적응",
+                "학습과 전문성",
+                "갈등 해결",
+                "현장·실무 경험"
+              ],
+              "interest": 49
+            },
+            {
+              "id": "content",
+              "fit": 54,
+              "name": "디지털 콘텐츠·미디어",
+              "evidence": [
+                "문화·무대 경험",
+                "책임과 회복",
+                "온라인 콘텐츠 제작"
+              ],
+              "interest": 46
+            },
+            {
+              "id": "corporate",
+              "fit": 36,
+              "name": "일반 기업 직무",
+              "evidence": [
+                "갈등 해결",
+                "낯선 환경 적응"
+              ],
+              "interest": 36
+            }
+          ],
+          "priorities": {
+            "growth": 1,
+            "salary": 1,
+            "location": 1,
+            "stability": 0,
+            "workLifeBalance": 2
+          },
+          "organizations": [
+            {
+              "id": "sk-hynichip",
+              "name": "에스케이하이칩",
+              "roles": [
+                "품질",
+                "안전",
+                "기술지원"
+              ],
+              "sector": "반도체",
+              "traits": [
+                "기술 중심",
+                "교대 가능성",
+                "빠른 성장"
+              ],
+              "companyType": "대기업",
+              "preferredTraits": [
+                "실무",
+                "협업",
+                "정확성"
+              ]
+            },
+            {
+              "id": "coupango",
+              "name": "쿠팡고",
+              "roles": [
+                "운영관리",
+                "고객경험",
+                "안전관리"
+              ],
+              "sector": "이커머스·물류",
+              "traits": [
+                "성과 중심",
+                "속도",
+                "운영 규모"
+              ],
+              "companyType": "대기업",
+              "preferredTraits": [
+                "고객 대응",
+                "체력",
+                "운영"
+              ]
+            },
+            {
+              "id": "baeum-policy-lab",
+              "name": "배움정책연구원",
+              "roles": [
+                "교육연구",
+                "정책분석",
+                "조사운영"
+              ],
+              "sector": "교육정책·연구",
+              "traits": [
+                "연구 중심",
+                "정책 분석",
+                "현장 조사"
+              ],
+              "companyType": "공공연구기관",
+              "majorFamilies": [
+                "education"
+              ],
+              "preferredTraits": [
+                "교육학",
+                "연구",
+                "기록"
+              ]
+            },
+            {
+              "id": "open-school-network",
+              "name": "열린학교네트워크",
+              "roles": [
+                "학교협력",
+                "교육프로그램 기획",
+                "학습지원"
+              ],
+              "sector": "학교혁신·비영리",
+              "traits": [
+                "학교 협력",
+                "교육격차",
+                "프로젝트 수업"
+              ],
+              "companyType": "교육 비영리",
+              "majorFamilies": [
+                "education"
+              ],
+              "preferredTraits": [
+                "교육 이해",
+                "조율",
+                "공공성"
+              ]
+            },
+            {
+              "id": "dodam-learning",
+              "name": "도담교육출판",
+              "roles": [
+                "교재기획",
+                "교육콘텐츠 편집",
+                "교수설계"
+              ],
+              "sector": "교재·교육콘텐츠",
+              "traits": [
+                "교재 개발",
+                "학교 시장",
+                "콘텐츠 품질"
+              ],
+              "companyType": "교육기업",
+              "majorFamilies": [
+                "education"
+              ],
+              "preferredTraits": [
+                "교육학",
+                "글쓰기",
+                "기획"
+              ]
+            },
+            {
+              "id": "grow-together-center",
+              "name": "함께자람청소년센터",
+              "roles": [
+                "청소년 프로그램",
+                "학습상담",
+                "진로지원"
+              ],
+              "sector": "청소년·상담",
+              "traits": [
+                "학생 접점",
+                "지역 연계",
+                "사례 관리"
+              ],
+              "companyType": "비영리기관",
+              "majorFamilies": [
+                "education"
+              ],
+              "preferredTraits": [
+                "상담",
+                "공감",
+                "책임감"
+              ]
+            },
+            {
+              "id": "kakaong",
+              "name": "카카옹",
+              "roles": [
+                "서비스 운영",
+                "마케팅",
+                "사업 제휴"
+              ],
+              "sector": "플랫폼·핀테크",
+              "traits": [
+                "서비스 중심",
+                "협업",
+                "높은 변화율"
+              ],
+              "companyType": "IT 대기업",
+              "preferredTraits": [
+                "소통",
+                "콘텐츠",
+                "문제 해결"
+              ]
+            },
+            {
+              "id": "mirae-teacher-institute",
+              "name": "미래교원연수원",
+              "roles": [
+                "교원연수 기획",
+                "수업컨설팅",
+                "교육과정 운영"
+              ],
+              "sector": "교원연수",
+              "traits": [
+                "교사 성장",
+                "수업 연구",
+                "현장 연계"
+              ],
+              "companyType": "교육연수기관",
+              "majorFamilies": [
+                "education"
+              ],
+              "preferredTraits": [
+                "교육학",
+                "발표",
+                "교사 소통"
+              ]
+            }
+          ],
+          "takenOpportunities": [],
+          "missedOpportunities": []
+        },
+        "partTimeJob": "extra_shift",
+        "storyLedger": [
+          {
+            "beat": 4,
+            "flags": {
+              "contestJoined": true
+            },
+            "summary": "공모전 준비로 바쁘지만 스펙과 관계를 쌓았다.",
+            "choiceId": "join_contest",
+            "eventTitle": "공모전 팀 구성"
+          },
+          {
+            "beat": 4,
+            "flags": {
+              "partTimeJob": "extra_shift"
+            },
+            "summary": "당신은 생활비를 벌기 위해 더 긴 새벽을 받아들였다.",
+            "choiceId": "take_extra_shift",
+            "eventTitle": "편의점 새벽 알바"
+          },
+          {
+            "beat": 5,
+            "flags": {
+              "storyPhase": "위기",
+              "aiGenerated": true
+            },
+            "summary": "당신은 번아웃을 막기 위해 전시회 참여를 포기하고 휴식을 선택한다.",
+            "choiceId": "prioritize_rest",
+            "eventTitle": "취미가 짐이 될 때"
+          },
+          {
+            "beat": 5,
+            "flags": {
+              "storyPhase": "위기",
+              "aiGenerated": true
+            },
+            "summary": "당신은 시온에게 새벽 알바를 거절하고 함께 발표 준비를 돕는다.",
+            "choiceId": "1",
+            "eventTitle": "편의점 새벽 알바로 놓친 기회"
+          },
+          {
+            "beat": 5,
+            "flags": {
+              "storyPhase": "심화",
+              "aiGenerated": true
+            },
+            "summary": "당신은 학점을 복구하기 위해 계획했던 전공 심화 수업 하나를 포기하기로 결심한다.",
+            "choiceId": "retake_course",
+            "eventTitle": "잊고 있던 학점과 조교의 호출"
+          },
+          {
+            "beat": 5,
+            "flags": {
+              "careerGate": {
+                "path": "contextual",
+                "basis": "stats_relationships_history",
+                "label": "첫 지원 절차 통과",
+                "score": 92,
+                "status": "passed",
+                "threshold": 92
+              },
+              "careerGateAttempt": {
+                "path": "contextual",
+                "score": 92,
+                "approach": "history_based",
+                "threshold": 92
+              },
+              "contextualCareerGate": true
+            },
+            "summary": "당신은 흩어진 경험을 하나의 지원 논리로 엮었다. 판정 결과: 첫 지원 절차 통과.",
+            "choiceId": "contextual_gate_use_history",
+            "eventTitle": "졸업 전 마지막 갈림길"
+          },
+          {
+            "beat": 5,
+            "flags": {
+              "romanceFuture": "cohabitation"
+            },
+            "summary": "당신은 관계를 생활의 문제로 끌어와 진지하게 마주했다.",
+            "choiceId": "consider_living_together",
+            "eventTitle": "같이 살자는 말"
+          },
+          {
+            "beat": 5,
+            "flags": {
+              "storyPhase": "심화",
+              "aiGenerated": true
+            },
+            "summary": "당신은 새벽 알바를 중단하지 않고 학점 보강을 포기하기로 결심한다.",
+            "choiceId": "1",
+            "eventTitle": "지난 학기, 이른 아침 알바와 진로"
+          },
+          {
+            "beat": 5,
+            "flags": {
+              "storyPhase": "결단",
+              "aiGenerated": true
+            },
+            "summary": "당신은 창작과 취업 준비를 병행하기 위해, 공모전 주제를 담은 짧은 영상을 기획하기 시작한다.",
+            "choiceId": "create",
+            "eventTitle": "디지털 잔상"
+          },
+          {
+            "beat": 5,
+            "flags": {
+              "specInit": {
+                "specName": "TOEIC",
+                "specType": "LANGUAGE_SCORE"
+              }
+            },
+            "summary": "당신은 토익 접수를 마치고 어학 스펙 준비를 시작했다.",
+            "choiceId": "toeic_register",
+            "eventTitle": "토익 시험 접수"
+          },
+          {
+            "beat": 5,
+            "flags": {
+              "studentCouncil": "vp"
+            },
+            "summary": "학생회 부회장으로서 바쁜 한 학기를 보내게 되었다.",
+            "choiceId": "accept_vp",
+            "eventTitle": "학생회장의 제안"
+          },
+          {
+            "beat": 5,
+            "flags": {
+              "storyPhase": "절정",
+              "aiGenerated": true
+            },
+            "summary": "당신은 발표를 미루고 휴식을 취해 정신을 정돈한다. 면접에서는 다른 포트폴리오를 제시해야 한다.",
+            "choiceId": "delay",
+            "eventTitle": "마지막 프로젝트 마감"
+          },
+          {
+            "beat": 5,
+            "flags": {
+              "investigationThread": "lawful"
+            },
+            "summary": "당신은 안전한 절차를 택해 괜한 의심을 피했다.",
+            "choiceId": "turn_wallet_in",
+            "eventTitle": "분실 지갑과 CCTV"
+          },
+          {
+            "beat": 5,
+            "flags": {
+              "storyPhase": "절정",
+              "aiGenerated": true
+            },
+            "summary": "당신은 문제 상황을 솔직히 털어놓고 일정 조정을 요청한다.",
+            "choiceId": "1",
+            "eventTitle": "마지막 프로젝트와 면접의 딜레마"
+          },
+          {
+            "beat": 5,
+            "flags": {
+              "startupThread": "mvp"
+            },
+            "summary": "당신은 작은 서비스를 세상에 내놓으며 창업의 문턱을 밟았다.",
+            "choiceId": "ship_mvp",
+            "eventTitle": "작은 앱 아이디어"
+          }
+        ],
+        "academicPlan": {
+          "major": "컴퓨터공학과",
+          "minor": null,
+          "doubleMajor": null,
+          "majorChanged": false,
+          "retakePressure": false,
+          "scholarshipWarning": false,
+          "interdisciplinaryTrack": null
+        },
+        "academicTerm": {
+          "label": "4학년 1학기",
+          "semester": 1,
+          "gradeYear": 4
+        },
+        "contestJoined": true,
+        "healthRoutine": "rest",
+        "rentHelpAsked": true,
+        "romanceFuture": "cohabitation",
+        "romanceThread": "direct",
+        "startupThread": "mvp",
+        "careerPathInit": {
+          "pathType": "WORKING_HOLIDAY"
+        },
+        "familyPressure": "financial_help",
+        "lastProviderId": "ollama",
+        "preferredStats": [
+          "academic",
+          "health"
+        ],
+        "studentCouncil": "vp",
+        "lastEventSource": "FALLBACK",
+        "lastStoryImpact": {
+          "summary": "당신은 작은 서비스를 세상에 내놓으며 창업의 문턱을 밟았다.",
+          "threads": [
+            "졸업 이후의 방향",
+            "학생회 권력과 책임",
+            "위험한 돈과 회색지대",
+            "창업과 공개 실패"
+          ],
+          "choiceId": "ship_mvp",
+          "majorBeat": 5,
+          "eventTitle": "작은 앱 아이디어"
+        },
+        "stageEventCount": 3,
+        "careerPathChosen": true,
+        "characterProfile": {
+          "gender": "female",
+          "traits": [],
+          "ageBand": "standard",
+          "pronouns": "여성 주인공",
+          "gradeBand": "middle",
+          "background": "평범한 학사 리듬의 학생",
+          "honorificGuidance": "주인공을 오빠, 형, 군으로 부르지 않는다. 필요하면 언니, 선배, 씨, 이름만 사용한다."
+        },
+        "firstEventIssued": true,
+        "lastFallbackUsed": true,
+        "careerGateAttempt": {
+          "path": "contextual",
+          "score": 92,
+          "approach": "history_based",
+          "threshold": 92
+        },
+        "starterCandidates": [
+          {
+            "name": "시온",
+            "role": "팀 프로젝트 동료"
+          },
+          {
+            "name": "성민",
+            "role": "스터디 동기"
+          },
+          {
+            "name": "예나",
+            "role": "교양 수업 동기"
+          },
+          {
+            "name": "다희",
+            "role": "학과 후배"
+          },
+          {
+            "name": "가은",
+            "role": "학과 선배"
+          },
+          {
+            "name": "윤호",
+            "role": "수업 동료"
+          },
+          {
+            "name": "아린",
+            "role": "학생지원관 선배"
+          }
+        ],
+        "activeStoryThreads": [
+          "생활비와 노동",
+          "가족 압박",
+          "서연과의 관계",
+          "가까운 관계의 변화",
+          "졸업 이후의 방향",
+          "학생회 권력과 책임",
+          "위험한 돈과 회색지대",
+          "창업과 공개 실패"
+        ],
+        "internshipCuriosity": true,
+        "investigationThread": "lawful",
+        "lifeStageTransition": {
+          "reasons": [
+            "no_transition"
+          ],
+          "atCoreEventCount": 24
+        },
+        "contextualCareerGate": true,
+        "lastAiFallbackReason": "quality_or_generation_failed",
+        "lastGenerationReason": "target_category_mismatch",
+        "destinationCandidates": []
+      }
+    },
+    "relationships": [
+      {
+        "id": "dccf83f8-9052-4cfc-ab2c-10c7cabf02ce",
+        "characterRunId": "4cfbcff0-f827-46ac-83ea-f7b74df32219",
+        "name": "시온",
+        "role": "팀 프로젝트 동료",
+        "trust": 48,
+        "status": "acquaintance",
+        "tags": [
+          "동료",
+          "협업",
+          "학업"
+        ],
+        "createdAt": "2026-07-30T07:10:25.560Z"
+      },
+      {
+        "id": "720d490a-7406-47fb-832a-25c1b0d6b3e9",
+        "characterRunId": "4cfbcff0-f827-46ac-83ea-f7b74df32219",
+        "name": "성민",
+        "role": "스터디 동기",
+        "trust": 53,
+        "status": "acquaintance",
+        "tags": [
+          "동기",
+          "학업",
+          "계획"
+        ],
+        "createdAt": "2026-07-30T07:10:25.560Z"
+      },
+      {
+        "id": "6b58bce2-a761-4981-b0b4-b1437b1406fe",
+        "characterRunId": "4cfbcff0-f827-46ac-83ea-f7b74df32219",
+        "name": "부모님",
+        "role": "관계 인물",
+        "trust": 40,
+        "status": "acquaintance",
+        "tags": [
+          "이벤트로 만남"
+        ],
+        "createdAt": "2026-07-30T07:11:22.071Z"
+      },
+      {
+        "id": "52956390-4e76-4c96-8a94-1a5ff1fbcb0a",
+        "characterRunId": "4cfbcff0-f827-46ac-83ea-f7b74df32219",
+        "name": "서연",
+        "role": "관계 인물",
+        "trust": 61,
+        "status": "acquaintance",
+        "tags": [
+          "이벤트로 만남"
+        ],
+        "createdAt": "2026-07-30T07:11:28.692Z"
+      },
+      {
+        "id": "c837234a-f327-4e74-b4a2-845d47096793",
+        "characterRunId": "4cfbcff0-f827-46ac-83ea-f7b74df32219",
+        "name": "태수",
+        "role": "관계 인물",
+        "trust": 43,
+        "status": "acquaintance",
+        "tags": [
+          "이벤트로 만남"
+        ],
+        "createdAt": "2026-07-30T07:12:09.734Z"
+      },
+      {
+        "id": "f0559044-7b02-4797-9610-78993178dbe9",
+        "characterRunId": "4cfbcff0-f827-46ac-83ea-f7b74df32219",
+        "name": "시에나",
+        "role": "관계 인물",
+        "trust": 36,
+        "status": "acquaintance",
+        "tags": [
+          "이벤트로 만남"
+        ],
+        "createdAt": "2026-07-30T07:14:20.311Z"
+      },
+      {
+        "id": "e19ea386-e367-4fbd-b747-0f1c8aedc5d4",
+        "characterRunId": "4cfbcff0-f827-46ac-83ea-f7b74df32219",
+        "name": "동규",
+        "role": "관계 인물",
+        "trust": 45,
+        "status": "acquaintance",
+        "tags": [
+          "이벤트로 만남"
+        ],
+        "createdAt": "2026-07-30T07:15:20.659Z"
+      }
+    ],
+    "events": [],
+    "eventHistory": [
+      {
+        "id": "fe13d569-814a-44b2-a300-fc749784fddc",
+        "characterRunId": "4cfbcff0-f827-46ac-83ea-f7b74df32219",
+        "eventId": "a2746a8a-ba5f-492c-915a-ae499b60ab91",
+        "choiceId": "ship_mvp",
+        "summary": "당신은 작은 서비스를 세상에 내놓으며 창업의 문턱을 밟았다.",
+        "statDelta": {
+          "health": -1,
+          "mental": -1,
+          "practical": 6,
+          "reputation": 3
+        },
+        "relationshipDelta": [],
+        "flagDelta": {
+          "riskDebt": 1,
+          "lifeStage": {
+            "id": "college_late"
+          },
+          "graduation": {
+            "state": "gate_ready"
+          },
+          "storyLedger": [
+            {
+              "beat": 4,
+              "flags": {
+                "contestJoined": true
+              },
+              "summary": "공모전 준비로 바쁘지만 스펙과 관계를 쌓았다.",
+              "choiceId": "join_contest",
+              "eventTitle": "공모전 팀 구성"
+            },
+            {
+              "beat": 4,
+              "flags": {
+                "partTimeJob": "extra_shift"
+              },
+              "summary": "당신은 생활비를 벌기 위해 더 긴 새벽을 받아들였다.",
+              "choiceId": "take_extra_shift",
+              "eventTitle": "편의점 새벽 알바"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "위기",
+                "aiGenerated": true
+              },
+              "summary": "당신은 번아웃을 막기 위해 전시회 참여를 포기하고 휴식을 선택한다.",
+              "choiceId": "prioritize_rest",
+              "eventTitle": "취미가 짐이 될 때"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "위기",
+                "aiGenerated": true
+              },
+              "summary": "당신은 시온에게 새벽 알바를 거절하고 함께 발표 준비를 돕는다.",
+              "choiceId": "1",
+              "eventTitle": "편의점 새벽 알바로 놓친 기회"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "심화",
+                "aiGenerated": true
+              },
+              "summary": "당신은 학점을 복구하기 위해 계획했던 전공 심화 수업 하나를 포기하기로 결심한다.",
+              "choiceId": "retake_course",
+              "eventTitle": "잊고 있던 학점과 조교의 호출"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "careerGate": {
+                  "path": "contextual",
+                  "basis": "stats_relationships_history",
+                  "label": "첫 지원 절차 통과",
+                  "score": 92,
+                  "status": "passed",
+                  "threshold": 92
+                },
+                "careerGateAttempt": {
+                  "path": "contextual",
+                  "score": 92,
+                  "approach": "history_based",
+                  "threshold": 92
+                },
+                "contextualCareerGate": true
+              },
+              "summary": "당신은 흩어진 경험을 하나의 지원 논리로 엮었다. 판정 결과: 첫 지원 절차 통과.",
+              "choiceId": "contextual_gate_use_history",
+              "eventTitle": "졸업 전 마지막 갈림길"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "romanceFuture": "cohabitation"
+              },
+              "summary": "당신은 관계를 생활의 문제로 끌어와 진지하게 마주했다.",
+              "choiceId": "consider_living_together",
+              "eventTitle": "같이 살자는 말"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "심화",
+                "aiGenerated": true
+              },
+              "summary": "당신은 새벽 알바를 중단하지 않고 학점 보강을 포기하기로 결심한다.",
+              "choiceId": "1",
+              "eventTitle": "지난 학기, 이른 아침 알바와 진로"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "결단",
+                "aiGenerated": true
+              },
+              "summary": "당신은 창작과 취업 준비를 병행하기 위해, 공모전 주제를 담은 짧은 영상을 기획하기 시작한다.",
+              "choiceId": "create",
+              "eventTitle": "디지털 잔상"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "specInit": {
+                  "specName": "TOEIC",
+                  "specType": "LANGUAGE_SCORE"
+                }
+              },
+              "summary": "당신은 토익 접수를 마치고 어학 스펙 준비를 시작했다.",
+              "choiceId": "toeic_register",
+              "eventTitle": "토익 시험 접수"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "studentCouncil": "vp"
+              },
+              "summary": "학생회 부회장으로서 바쁜 한 학기를 보내게 되었다.",
+              "choiceId": "accept_vp",
+              "eventTitle": "학생회장의 제안"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "절정",
+                "aiGenerated": true
+              },
+              "summary": "당신은 발표를 미루고 휴식을 취해 정신을 정돈한다. 면접에서는 다른 포트폴리오를 제시해야 한다.",
+              "choiceId": "delay",
+              "eventTitle": "마지막 프로젝트 마감"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "investigationThread": "lawful"
+              },
+              "summary": "당신은 안전한 절차를 택해 괜한 의심을 피했다.",
+              "choiceId": "turn_wallet_in",
+              "eventTitle": "분실 지갑과 CCTV"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "절정",
+                "aiGenerated": true
+              },
+              "summary": "당신은 문제 상황을 솔직히 털어놓고 일정 조정을 요청한다.",
+              "choiceId": "1",
+              "eventTitle": "마지막 프로젝트와 면접의 딜레마"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "startupThread": "mvp"
+              },
+              "summary": "당신은 작은 서비스를 세상에 내놓으며 창업의 문턱을 밟았다.",
+              "choiceId": "ship_mvp",
+              "eventTitle": "작은 앱 아이디어"
+            }
+          ],
+          "academicPlan": {
+            "major": "컴퓨터공학과",
+            "minor": null,
+            "doubleMajor": null,
+            "majorChanged": false,
+            "retakePressure": false,
+            "scholarshipWarning": false,
+            "interdisciplinaryTrack": null
+          },
+          "academicTerm": {
+            "label": "4학년 1학기",
+            "semester": 1,
+            "gradeYear": 4
+          },
+          "startupThread": "mvp",
+          "lastStoryImpact": {
+            "summary": "당신은 작은 서비스를 세상에 내놓으며 창업의 문턱을 밟았다.",
+            "threads": [
+              "졸업 이후의 방향",
+              "학생회 권력과 책임",
+              "위험한 돈과 회색지대",
+              "창업과 공개 실패"
+            ],
+            "choiceId": "ship_mvp",
+            "majorBeat": 5,
+            "eventTitle": "작은 앱 아이디어"
+          },
+          "stageEventCount": 3,
+          "activeStoryThreads": [
+            "생활비와 노동",
+            "가족 압박",
+            "서연과의 관계",
+            "가까운 관계의 변화",
+            "졸업 이후의 방향",
+            "학생회 권력과 책임",
+            "위험한 돈과 회색지대",
+            "창업과 공개 실패"
+          ],
+          "lifeStageTransition": {
+            "reasons": [
+              "no_transition"
+            ],
+            "atCoreEventCount": 24
+          },
+          "destinationCandidates": []
+        },
+        "createdAt": "2026-07-30T07:17:02.530Z"
+      },
+      {
+        "id": "498ef525-dc42-42c9-ad55-0ae7706cce83",
+        "characterRunId": "4cfbcff0-f827-46ac-83ea-f7b74df32219",
+        "eventId": "82046d67-fff1-430e-9649-6ba4234cb0cc",
+        "choiceId": "1",
+        "summary": "당신은 문제 상황을 솔직히 털어놓고 일정 조정을 요청한다.",
+        "statDelta": {
+          "mental": 0,
+          "wealth": -5
+        },
+        "relationshipDelta": [],
+        "flagDelta": {
+          "riskDebt": 1,
+          "lifeStage": {
+            "id": "college_late"
+          },
+          "graduation": {
+            "state": "gate_ready"
+          },
+          "storyPhase": "절정",
+          "aiGenerated": true,
+          "storyLedger": [
+            {
+              "beat": 4,
+              "flags": {
+                "storyPhase": "상승",
+                "aiGenerated": true
+              },
+              "summary": "당신은 성민에게 소개 요청을 하고 주말 알바를 추가로 잡아 장학금 반환금을 마련한다",
+              "choiceId": "proof_1",
+              "eventTitle": "급작스러운 장학금 반환 요구"
+            },
+            {
+              "beat": 4,
+              "flags": {
+                "contestJoined": true
+              },
+              "summary": "공모전 준비로 바쁘지만 스펙과 관계를 쌓았다.",
+              "choiceId": "join_contest",
+              "eventTitle": "공모전 팀 구성"
+            },
+            {
+              "beat": 4,
+              "flags": {
+                "partTimeJob": "extra_shift"
+              },
+              "summary": "당신은 생활비를 벌기 위해 더 긴 새벽을 받아들였다.",
+              "choiceId": "take_extra_shift",
+              "eventTitle": "편의점 새벽 알바"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "위기",
+                "aiGenerated": true
+              },
+              "summary": "당신은 번아웃을 막기 위해 전시회 참여를 포기하고 휴식을 선택한다.",
+              "choiceId": "prioritize_rest",
+              "eventTitle": "취미가 짐이 될 때"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "위기",
+                "aiGenerated": true
+              },
+              "summary": "당신은 시온에게 새벽 알바를 거절하고 함께 발표 준비를 돕는다.",
+              "choiceId": "1",
+              "eventTitle": "편의점 새벽 알바로 놓친 기회"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "심화",
+                "aiGenerated": true
+              },
+              "summary": "당신은 학점을 복구하기 위해 계획했던 전공 심화 수업 하나를 포기하기로 결심한다.",
+              "choiceId": "retake_course",
+              "eventTitle": "잊고 있던 학점과 조교의 호출"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "careerGate": {
+                  "path": "contextual",
+                  "basis": "stats_relationships_history",
+                  "label": "첫 지원 절차 통과",
+                  "score": 92,
+                  "status": "passed",
+                  "threshold": 92
+                },
+                "careerGateAttempt": {
+                  "path": "contextual",
+                  "score": 92,
+                  "approach": "history_based",
+                  "threshold": 92
+                },
+                "contextualCareerGate": true
+              },
+              "summary": "당신은 흩어진 경험을 하나의 지원 논리로 엮었다. 판정 결과: 첫 지원 절차 통과.",
+              "choiceId": "contextual_gate_use_history",
+              "eventTitle": "졸업 전 마지막 갈림길"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "romanceFuture": "cohabitation"
+              },
+              "summary": "당신은 관계를 생활의 문제로 끌어와 진지하게 마주했다.",
+              "choiceId": "consider_living_together",
+              "eventTitle": "같이 살자는 말"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "심화",
+                "aiGenerated": true
+              },
+              "summary": "당신은 새벽 알바를 중단하지 않고 학점 보강을 포기하기로 결심한다.",
+              "choiceId": "1",
+              "eventTitle": "지난 학기, 이른 아침 알바와 진로"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "결단",
+                "aiGenerated": true
+              },
+              "summary": "당신은 창작과 취업 준비를 병행하기 위해, 공모전 주제를 담은 짧은 영상을 기획하기 시작한다.",
+              "choiceId": "create",
+              "eventTitle": "디지털 잔상"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "specInit": {
+                  "specName": "TOEIC",
+                  "specType": "LANGUAGE_SCORE"
+                }
+              },
+              "summary": "당신은 토익 접수를 마치고 어학 스펙 준비를 시작했다.",
+              "choiceId": "toeic_register",
+              "eventTitle": "토익 시험 접수"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "studentCouncil": "vp"
+              },
+              "summary": "학생회 부회장으로서 바쁜 한 학기를 보내게 되었다.",
+              "choiceId": "accept_vp",
+              "eventTitle": "학생회장의 제안"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "절정",
+                "aiGenerated": true
+              },
+              "summary": "당신은 발표를 미루고 휴식을 취해 정신을 정돈한다. 면접에서는 다른 포트폴리오를 제시해야 한다.",
+              "choiceId": "delay",
+              "eventTitle": "마지막 프로젝트 마감"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "investigationThread": "lawful"
+              },
+              "summary": "당신은 안전한 절차를 택해 괜한 의심을 피했다.",
+              "choiceId": "turn_wallet_in",
+              "eventTitle": "분실 지갑과 CCTV"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "절정",
+                "aiGenerated": true
+              },
+              "summary": "당신은 문제 상황을 솔직히 털어놓고 일정 조정을 요청한다.",
+              "choiceId": "1",
+              "eventTitle": "마지막 프로젝트와 면접의 딜레마"
+            }
+          ],
+          "academicPlan": {
+            "major": "컴퓨터공학과",
+            "minor": null,
+            "doubleMajor": null,
+            "majorChanged": false,
+            "retakePressure": false,
+            "scholarshipWarning": false,
+            "interdisciplinaryTrack": null
+          },
+          "academicTerm": {
+            "label": "4학년 1학기",
+            "semester": 1,
+            "gradeYear": 4
+          },
+          "lastStoryImpact": {
+            "summary": "당신은 문제 상황을 솔직히 털어놓고 일정 조정을 요청한다.",
+            "threads": [
+              "가까운 관계의 변화",
+              "졸업 이후의 방향",
+              "학생회 권력과 책임",
+              "위험한 돈과 회색지대"
+            ],
+            "choiceId": "1",
+            "majorBeat": 5,
+            "eventTitle": "마지막 프로젝트와 면접의 딜레마"
+          },
+          "stageEventCount": 2,
+          "activeStoryThreads": [
+            "생활비와 노동",
+            "가족 압박",
+            "서연과의 관계",
+            "가까운 관계의 변화",
+            "졸업 이후의 방향",
+            "학생회 권력과 책임",
+            "위험한 돈과 회색지대"
+          ],
+          "lifeStageTransition": {
+            "reasons": [
+              "no_transition"
+            ],
+            "atCoreEventCount": 23
+          },
+          "destinationCandidates": []
+        },
+        "createdAt": "2026-07-30T07:16:40.507Z"
+      },
+      {
+        "id": "9c66a65e-d323-4ab9-ac4a-98288ecbcc7e",
+        "characterRunId": "4cfbcff0-f827-46ac-83ea-f7b74df32219",
+        "eventId": "58a2ce5b-5029-4aef-9359-15978ae08c87",
+        "choiceId": "turn_wallet_in",
+        "summary": "당신은 안전한 절차를 택해 괜한 의심을 피했다.",
+        "statDelta": {
+          "charm": -1,
+          "mental": 1,
+          "practical": -1,
+          "reputation": 4
+        },
+        "relationshipDelta": [],
+        "flagDelta": {
+          "riskDebt": 1,
+          "lifeStage": {
+            "id": "college_late"
+          },
+          "graduation": {
+            "state": "gate_ready"
+          },
+          "storyLedger": [
+            {
+              "beat": 3,
+              "flags": {
+                "healthRoutine": "rest"
+              },
+              "summary": "일정을 줄이고 회복에 집중했다.",
+              "choiceId": "reduce_schedule",
+              "eventTitle": "건강검진 결과"
+            },
+            {
+              "beat": 4,
+              "flags": {
+                "storyPhase": "상승",
+                "aiGenerated": true
+              },
+              "summary": "당신은 성민에게 소개 요청을 하고 주말 알바를 추가로 잡아 장학금 반환금을 마련한다",
+              "choiceId": "proof_1",
+              "eventTitle": "급작스러운 장학금 반환 요구"
+            },
+            {
+              "beat": 4,
+              "flags": {
+                "contestJoined": true
+              },
+              "summary": "공모전 준비로 바쁘지만 스펙과 관계를 쌓았다.",
+              "choiceId": "join_contest",
+              "eventTitle": "공모전 팀 구성"
+            },
+            {
+              "beat": 4,
+              "flags": {
+                "partTimeJob": "extra_shift"
+              },
+              "summary": "당신은 생활비를 벌기 위해 더 긴 새벽을 받아들였다.",
+              "choiceId": "take_extra_shift",
+              "eventTitle": "편의점 새벽 알바"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "위기",
+                "aiGenerated": true
+              },
+              "summary": "당신은 번아웃을 막기 위해 전시회 참여를 포기하고 휴식을 선택한다.",
+              "choiceId": "prioritize_rest",
+              "eventTitle": "취미가 짐이 될 때"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "위기",
+                "aiGenerated": true
+              },
+              "summary": "당신은 시온에게 새벽 알바를 거절하고 함께 발표 준비를 돕는다.",
+              "choiceId": "1",
+              "eventTitle": "편의점 새벽 알바로 놓친 기회"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "심화",
+                "aiGenerated": true
+              },
+              "summary": "당신은 학점을 복구하기 위해 계획했던 전공 심화 수업 하나를 포기하기로 결심한다.",
+              "choiceId": "retake_course",
+              "eventTitle": "잊고 있던 학점과 조교의 호출"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "careerGate": {
+                  "path": "contextual",
+                  "basis": "stats_relationships_history",
+                  "label": "첫 지원 절차 통과",
+                  "score": 92,
+                  "status": "passed",
+                  "threshold": 92
+                },
+                "careerGateAttempt": {
+                  "path": "contextual",
+                  "score": 92,
+                  "approach": "history_based",
+                  "threshold": 92
+                },
+                "contextualCareerGate": true
+              },
+              "summary": "당신은 흩어진 경험을 하나의 지원 논리로 엮었다. 판정 결과: 첫 지원 절차 통과.",
+              "choiceId": "contextual_gate_use_history",
+              "eventTitle": "졸업 전 마지막 갈림길"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "romanceFuture": "cohabitation"
+              },
+              "summary": "당신은 관계를 생활의 문제로 끌어와 진지하게 마주했다.",
+              "choiceId": "consider_living_together",
+              "eventTitle": "같이 살자는 말"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "심화",
+                "aiGenerated": true
+              },
+              "summary": "당신은 새벽 알바를 중단하지 않고 학점 보강을 포기하기로 결심한다.",
+              "choiceId": "1",
+              "eventTitle": "지난 학기, 이른 아침 알바와 진로"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "결단",
+                "aiGenerated": true
+              },
+              "summary": "당신은 창작과 취업 준비를 병행하기 위해, 공모전 주제를 담은 짧은 영상을 기획하기 시작한다.",
+              "choiceId": "create",
+              "eventTitle": "디지털 잔상"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "specInit": {
+                  "specName": "TOEIC",
+                  "specType": "LANGUAGE_SCORE"
+                }
+              },
+              "summary": "당신은 토익 접수를 마치고 어학 스펙 준비를 시작했다.",
+              "choiceId": "toeic_register",
+              "eventTitle": "토익 시험 접수"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "studentCouncil": "vp"
+              },
+              "summary": "학생회 부회장으로서 바쁜 한 학기를 보내게 되었다.",
+              "choiceId": "accept_vp",
+              "eventTitle": "학생회장의 제안"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "절정",
+                "aiGenerated": true
+              },
+              "summary": "당신은 발표를 미루고 휴식을 취해 정신을 정돈한다. 면접에서는 다른 포트폴리오를 제시해야 한다.",
+              "choiceId": "delay",
+              "eventTitle": "마지막 프로젝트 마감"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "investigationThread": "lawful"
+              },
+              "summary": "당신은 안전한 절차를 택해 괜한 의심을 피했다.",
+              "choiceId": "turn_wallet_in",
+              "eventTitle": "분실 지갑과 CCTV"
+            }
+          ],
+          "academicPlan": {
+            "major": "컴퓨터공학과",
+            "minor": null,
+            "doubleMajor": null,
+            "majorChanged": false,
+            "retakePressure": false,
+            "scholarshipWarning": false,
+            "interdisciplinaryTrack": null
+          },
+          "academicTerm": {
+            "label": "4학년 1학기",
+            "semester": 1,
+            "gradeYear": 4
+          },
+          "lastStoryImpact": {
+            "summary": "당신은 안전한 절차를 택해 괜한 의심을 피했다.",
+            "threads": [
+              "가까운 관계의 변화",
+              "졸업 이후의 방향",
+              "학생회 권력과 책임",
+              "위험한 돈과 회색지대"
+            ],
+            "choiceId": "turn_wallet_in",
+            "majorBeat": 5,
+            "eventTitle": "분실 지갑과 CCTV"
+          },
+          "stageEventCount": 4,
+          "activeStoryThreads": [
+            "생활비와 노동",
+            "가족 압박",
+            "서연과의 관계",
+            "가까운 관계의 변화",
+            "졸업 이후의 방향",
+            "학생회 권력과 책임",
+            "위험한 돈과 회색지대"
+          ],
+          "investigationThread": "lawful",
+          "lifeStageTransition": {
+            "reasons": [
+              "no_transition"
+            ],
+            "atCoreEventCount": 22
+          },
+          "destinationCandidates": []
+        },
+        "createdAt": "2026-07-30T07:16:30.323Z"
+      },
+      {
+        "id": "144628b7-396d-4473-b55b-af366d9cae1e",
+        "characterRunId": "4cfbcff0-f827-46ac-83ea-f7b74df32219",
+        "eventId": "dc4f05ce-ae00-42d5-a94d-b87282040578",
+        "choiceId": "delay",
+        "summary": "당신은 발표를 미루고 휴식을 취해 정신을 정돈한다. 면접에서는 다른 포트폴리오를 제시해야 한다.",
+        "statDelta": {
+          "mental": 0,
+          "wealth": 0
+        },
+        "relationshipDelta": [
+          {
+            "name": "시온",
+            "trust": 0
+          }
+        ],
+        "flagDelta": {
+          "riskDebt": 0,
+          "lifeStage": {
+            "id": "college_late"
+          },
+          "graduation": {
+            "state": "gate_ready"
+          },
+          "storyPhase": "절정",
+          "aiGenerated": true,
+          "storyLedger": [
+            {
+              "beat": 3,
+              "flags": {
+                "careerPathInit": {
+                  "pathType": "WORKING_HOLIDAY"
+                },
+                "careerPathChosen": true
+              },
+              "summary": "당신은 워킹홀리데이 준비에 마음을 열고 첫걸음을 뗐다.",
+              "choiceId": "wh_prepare",
+              "eventTitle": "워홀 준비"
+            },
+            {
+              "beat": 3,
+              "flags": {
+                "healthRoutine": "rest"
+              },
+              "summary": "일정을 줄이고 회복에 집중했다.",
+              "choiceId": "reduce_schedule",
+              "eventTitle": "건강검진 결과"
+            },
+            {
+              "beat": 4,
+              "flags": {
+                "storyPhase": "상승",
+                "aiGenerated": true
+              },
+              "summary": "당신은 성민에게 소개 요청을 하고 주말 알바를 추가로 잡아 장학금 반환금을 마련한다",
+              "choiceId": "proof_1",
+              "eventTitle": "급작스러운 장학금 반환 요구"
+            },
+            {
+              "beat": 4,
+              "flags": {
+                "contestJoined": true
+              },
+              "summary": "공모전 준비로 바쁘지만 스펙과 관계를 쌓았다.",
+              "choiceId": "join_contest",
+              "eventTitle": "공모전 팀 구성"
+            },
+            {
+              "beat": 4,
+              "flags": {
+                "partTimeJob": "extra_shift"
+              },
+              "summary": "당신은 생활비를 벌기 위해 더 긴 새벽을 받아들였다.",
+              "choiceId": "take_extra_shift",
+              "eventTitle": "편의점 새벽 알바"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "위기",
+                "aiGenerated": true
+              },
+              "summary": "당신은 번아웃을 막기 위해 전시회 참여를 포기하고 휴식을 선택한다.",
+              "choiceId": "prioritize_rest",
+              "eventTitle": "취미가 짐이 될 때"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "위기",
+                "aiGenerated": true
+              },
+              "summary": "당신은 시온에게 새벽 알바를 거절하고 함께 발표 준비를 돕는다.",
+              "choiceId": "1",
+              "eventTitle": "편의점 새벽 알바로 놓친 기회"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "심화",
+                "aiGenerated": true
+              },
+              "summary": "당신은 학점을 복구하기 위해 계획했던 전공 심화 수업 하나를 포기하기로 결심한다.",
+              "choiceId": "retake_course",
+              "eventTitle": "잊고 있던 학점과 조교의 호출"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "careerGate": {
+                  "path": "contextual",
+                  "basis": "stats_relationships_history",
+                  "label": "첫 지원 절차 통과",
+                  "score": 92,
+                  "status": "passed",
+                  "threshold": 92
+                },
+                "careerGateAttempt": {
+                  "path": "contextual",
+                  "score": 92,
+                  "approach": "history_based",
+                  "threshold": 92
+                },
+                "contextualCareerGate": true
+              },
+              "summary": "당신은 흩어진 경험을 하나의 지원 논리로 엮었다. 판정 결과: 첫 지원 절차 통과.",
+              "choiceId": "contextual_gate_use_history",
+              "eventTitle": "졸업 전 마지막 갈림길"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "romanceFuture": "cohabitation"
+              },
+              "summary": "당신은 관계를 생활의 문제로 끌어와 진지하게 마주했다.",
+              "choiceId": "consider_living_together",
+              "eventTitle": "같이 살자는 말"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "심화",
+                "aiGenerated": true
+              },
+              "summary": "당신은 새벽 알바를 중단하지 않고 학점 보강을 포기하기로 결심한다.",
+              "choiceId": "1",
+              "eventTitle": "지난 학기, 이른 아침 알바와 진로"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "결단",
+                "aiGenerated": true
+              },
+              "summary": "당신은 창작과 취업 준비를 병행하기 위해, 공모전 주제를 담은 짧은 영상을 기획하기 시작한다.",
+              "choiceId": "create",
+              "eventTitle": "디지털 잔상"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "specInit": {
+                  "specName": "TOEIC",
+                  "specType": "LANGUAGE_SCORE"
+                }
+              },
+              "summary": "당신은 토익 접수를 마치고 어학 스펙 준비를 시작했다.",
+              "choiceId": "toeic_register",
+              "eventTitle": "토익 시험 접수"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "studentCouncil": "vp"
+              },
+              "summary": "학생회 부회장으로서 바쁜 한 학기를 보내게 되었다.",
+              "choiceId": "accept_vp",
+              "eventTitle": "학생회장의 제안"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "절정",
+                "aiGenerated": true
+              },
+              "summary": "당신은 발표를 미루고 휴식을 취해 정신을 정돈한다. 면접에서는 다른 포트폴리오를 제시해야 한다.",
+              "choiceId": "delay",
+              "eventTitle": "마지막 프로젝트 마감"
+            }
+          ],
+          "academicPlan": {
+            "major": "컴퓨터공학과",
+            "minor": null,
+            "doubleMajor": null,
+            "majorChanged": false,
+            "retakePressure": false,
+            "scholarshipWarning": false,
+            "interdisciplinaryTrack": null
+          },
+          "academicTerm": {
+            "label": "4학년 1학기",
+            "semester": 1,
+            "gradeYear": 4
+          },
+          "lastStoryImpact": {
+            "summary": "당신은 발표를 미루고 휴식을 취해 정신을 정돈한다. 면접에서는 다른 포트폴리오를 제시해야 한다.",
+            "threads": [
+              "서연과의 관계",
+              "가까운 관계의 변화",
+              "졸업 이후의 방향",
+              "학생회 권력과 책임"
+            ],
+            "choiceId": "delay",
+            "majorBeat": 5,
+            "eventTitle": "마지막 프로젝트 마감"
+          },
+          "stageEventCount": 3,
+          "activeStoryThreads": [
+            "생활비와 노동",
+            "가족 압박",
+            "서연과의 관계",
+            "가까운 관계의 변화",
+            "졸업 이후의 방향",
+            "학생회 권력과 책임"
+          ],
+          "lifeStageTransition": {
+            "reasons": [
+              "no_transition"
+            ],
+            "atCoreEventCount": 21
+          },
+          "destinationCandidates": []
+        },
+        "createdAt": "2026-07-30T07:15:27.700Z"
+      },
+      {
+        "id": "d773eb3d-44f0-494c-a183-e9f59d7c6b63",
+        "characterRunId": "4cfbcff0-f827-46ac-83ea-f7b74df32219",
+        "eventId": "4e67f87b-180b-4307-8d3f-46d7981eb080",
+        "choiceId": "accept_vp",
+        "summary": "학생회 부회장으로서 바쁜 한 학기를 보내게 되었다.",
+        "statDelta": {
+          "health": -1,
+          "mental": -1,
+          "academic": -3,
+          "practical": 3,
+          "reputation": 5
+        },
+        "relationshipDelta": [
+          {
+            "name": "동규",
+            "trust": 10
+          }
+        ],
+        "flagDelta": {
+          "riskDebt": 0,
+          "lifeStage": {
+            "id": "college_late"
+          },
+          "graduation": {
+            "state": "gate_ready"
+          },
+          "storyLedger": [
+            {
+              "beat": 3,
+              "flags": {
+                "storyPhase": "전개",
+                "aiGenerated": true
+              },
+              "summary": "당신은 시온과 성민의 요구에 귀를 기울이며 팀의 목표를 위해 최선을 다한다.",
+              "choiceId": "engage",
+              "eventTitle": "온라인 창작의 첫 책임"
+            },
+            {
+              "beat": 3,
+              "flags": {
+                "careerPathInit": {
+                  "pathType": "WORKING_HOLIDAY"
+                },
+                "careerPathChosen": true
+              },
+              "summary": "당신은 워킹홀리데이 준비에 마음을 열고 첫걸음을 뗐다.",
+              "choiceId": "wh_prepare",
+              "eventTitle": "워홀 준비"
+            },
+            {
+              "beat": 3,
+              "flags": {
+                "healthRoutine": "rest"
+              },
+              "summary": "일정을 줄이고 회복에 집중했다.",
+              "choiceId": "reduce_schedule",
+              "eventTitle": "건강검진 결과"
+            },
+            {
+              "beat": 4,
+              "flags": {
+                "storyPhase": "상승",
+                "aiGenerated": true
+              },
+              "summary": "당신은 성민에게 소개 요청을 하고 주말 알바를 추가로 잡아 장학금 반환금을 마련한다",
+              "choiceId": "proof_1",
+              "eventTitle": "급작스러운 장학금 반환 요구"
+            },
+            {
+              "beat": 4,
+              "flags": {
+                "contestJoined": true
+              },
+              "summary": "공모전 준비로 바쁘지만 스펙과 관계를 쌓았다.",
+              "choiceId": "join_contest",
+              "eventTitle": "공모전 팀 구성"
+            },
+            {
+              "beat": 4,
+              "flags": {
+                "partTimeJob": "extra_shift"
+              },
+              "summary": "당신은 생활비를 벌기 위해 더 긴 새벽을 받아들였다.",
+              "choiceId": "take_extra_shift",
+              "eventTitle": "편의점 새벽 알바"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "위기",
+                "aiGenerated": true
+              },
+              "summary": "당신은 번아웃을 막기 위해 전시회 참여를 포기하고 휴식을 선택한다.",
+              "choiceId": "prioritize_rest",
+              "eventTitle": "취미가 짐이 될 때"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "위기",
+                "aiGenerated": true
+              },
+              "summary": "당신은 시온에게 새벽 알바를 거절하고 함께 발표 준비를 돕는다.",
+              "choiceId": "1",
+              "eventTitle": "편의점 새벽 알바로 놓친 기회"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "심화",
+                "aiGenerated": true
+              },
+              "summary": "당신은 학점을 복구하기 위해 계획했던 전공 심화 수업 하나를 포기하기로 결심한다.",
+              "choiceId": "retake_course",
+              "eventTitle": "잊고 있던 학점과 조교의 호출"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "careerGate": {
+                  "path": "contextual",
+                  "basis": "stats_relationships_history",
+                  "label": "첫 지원 절차 통과",
+                  "score": 92,
+                  "status": "passed",
+                  "threshold": 92
+                },
+                "careerGateAttempt": {
+                  "path": "contextual",
+                  "score": 92,
+                  "approach": "history_based",
+                  "threshold": 92
+                },
+                "contextualCareerGate": true
+              },
+              "summary": "당신은 흩어진 경험을 하나의 지원 논리로 엮었다. 판정 결과: 첫 지원 절차 통과.",
+              "choiceId": "contextual_gate_use_history",
+              "eventTitle": "졸업 전 마지막 갈림길"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "romanceFuture": "cohabitation"
+              },
+              "summary": "당신은 관계를 생활의 문제로 끌어와 진지하게 마주했다.",
+              "choiceId": "consider_living_together",
+              "eventTitle": "같이 살자는 말"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "심화",
+                "aiGenerated": true
+              },
+              "summary": "당신은 새벽 알바를 중단하지 않고 학점 보강을 포기하기로 결심한다.",
+              "choiceId": "1",
+              "eventTitle": "지난 학기, 이른 아침 알바와 진로"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "결단",
+                "aiGenerated": true
+              },
+              "summary": "당신은 창작과 취업 준비를 병행하기 위해, 공모전 주제를 담은 짧은 영상을 기획하기 시작한다.",
+              "choiceId": "create",
+              "eventTitle": "디지털 잔상"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "specInit": {
+                  "specName": "TOEIC",
+                  "specType": "LANGUAGE_SCORE"
+                }
+              },
+              "summary": "당신은 토익 접수를 마치고 어학 스펙 준비를 시작했다.",
+              "choiceId": "toeic_register",
+              "eventTitle": "토익 시험 접수"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "studentCouncil": "vp"
+              },
+              "summary": "학생회 부회장으로서 바쁜 한 학기를 보내게 되었다.",
+              "choiceId": "accept_vp",
+              "eventTitle": "학생회장의 제안"
+            }
+          ],
+          "academicPlan": {
+            "major": "컴퓨터공학과",
+            "minor": null,
+            "doubleMajor": null,
+            "majorChanged": false,
+            "retakePressure": false,
+            "scholarshipWarning": false,
+            "interdisciplinaryTrack": null
+          },
+          "academicTerm": {
+            "label": "4학년 1학기",
+            "semester": 1,
+            "gradeYear": 4
+          },
+          "studentCouncil": "vp",
+          "lastStoryImpact": {
+            "summary": "학생회 부회장으로서 바쁜 한 학기를 보내게 되었다.",
+            "threads": [
+              "서연과의 관계",
+              "가까운 관계의 변화",
+              "졸업 이후의 방향",
+              "학생회 권력과 책임"
+            ],
+            "choiceId": "accept_vp",
+            "majorBeat": 5,
+            "eventTitle": "학생회장의 제안"
+          },
+          "stageEventCount": 2,
+          "activeStoryThreads": [
+            "생활비와 노동",
+            "가족 압박",
+            "서연과의 관계",
+            "가까운 관계의 변화",
+            "졸업 이후의 방향",
+            "학생회 권력과 책임"
+          ],
+          "lifeStageTransition": {
+            "reasons": [
+              "no_transition"
+            ],
+            "atCoreEventCount": 20
+          },
+          "destinationCandidates": []
+        },
+        "createdAt": "2026-07-30T07:15:20.641Z"
+      },
+      {
+        "id": "d2d4eb25-e8ba-4fe2-8899-6e82f9468337",
+        "characterRunId": "4cfbcff0-f827-46ac-83ea-f7b74df32219",
+        "eventId": "d4d7aa0f-fb6e-443f-90c0-720849580d9a",
+        "choiceId": "toeic_register",
+        "summary": "당신은 토익 접수를 마치고 어학 스펙 준비를 시작했다.",
+        "statDelta": {
+          "wealth": -5,
+          "academic": 1
+        },
+        "relationshipDelta": [],
+        "flagDelta": {
+          "riskDebt": 0,
+          "specInit": {
+            "specName": "TOEIC",
+            "specType": "LANGUAGE_SCORE"
+          },
+          "lifeStage": {
+            "id": "college_late"
+          },
+          "graduation": {
+            "state": "gate_ready"
+          },
+          "storyLedger": [
+            {
+              "beat": 2,
+              "flags": {
+                "romanceThread": "direct"
+              },
+              "summary": "당신은 불편함을 감수하고 마음의 답을 확인하려 했다.",
+              "choiceId": "ask_directly",
+              "eventTitle": "읽씹된 고백"
+            },
+            {
+              "beat": 3,
+              "flags": {
+                "storyPhase": "전개",
+                "aiGenerated": true
+              },
+              "summary": "당신은 시온과 성민의 요구에 귀를 기울이며 팀의 목표를 위해 최선을 다한다.",
+              "choiceId": "engage",
+              "eventTitle": "온라인 창작의 첫 책임"
+            },
+            {
+              "beat": 3,
+              "flags": {
+                "careerPathInit": {
+                  "pathType": "WORKING_HOLIDAY"
+                },
+                "careerPathChosen": true
+              },
+              "summary": "당신은 워킹홀리데이 준비에 마음을 열고 첫걸음을 뗐다.",
+              "choiceId": "wh_prepare",
+              "eventTitle": "워홀 준비"
+            },
+            {
+              "beat": 3,
+              "flags": {
+                "healthRoutine": "rest"
+              },
+              "summary": "일정을 줄이고 회복에 집중했다.",
+              "choiceId": "reduce_schedule",
+              "eventTitle": "건강검진 결과"
+            },
+            {
+              "beat": 4,
+              "flags": {
+                "storyPhase": "상승",
+                "aiGenerated": true
+              },
+              "summary": "당신은 성민에게 소개 요청을 하고 주말 알바를 추가로 잡아 장학금 반환금을 마련한다",
+              "choiceId": "proof_1",
+              "eventTitle": "급작스러운 장학금 반환 요구"
+            },
+            {
+              "beat": 4,
+              "flags": {
+                "contestJoined": true
+              },
+              "summary": "공모전 준비로 바쁘지만 스펙과 관계를 쌓았다.",
+              "choiceId": "join_contest",
+              "eventTitle": "공모전 팀 구성"
+            },
+            {
+              "beat": 4,
+              "flags": {
+                "partTimeJob": "extra_shift"
+              },
+              "summary": "당신은 생활비를 벌기 위해 더 긴 새벽을 받아들였다.",
+              "choiceId": "take_extra_shift",
+              "eventTitle": "편의점 새벽 알바"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "위기",
+                "aiGenerated": true
+              },
+              "summary": "당신은 번아웃을 막기 위해 전시회 참여를 포기하고 휴식을 선택한다.",
+              "choiceId": "prioritize_rest",
+              "eventTitle": "취미가 짐이 될 때"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "위기",
+                "aiGenerated": true
+              },
+              "summary": "당신은 시온에게 새벽 알바를 거절하고 함께 발표 준비를 돕는다.",
+              "choiceId": "1",
+              "eventTitle": "편의점 새벽 알바로 놓친 기회"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "심화",
+                "aiGenerated": true
+              },
+              "summary": "당신은 학점을 복구하기 위해 계획했던 전공 심화 수업 하나를 포기하기로 결심한다.",
+              "choiceId": "retake_course",
+              "eventTitle": "잊고 있던 학점과 조교의 호출"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "careerGate": {
+                  "path": "contextual",
+                  "basis": "stats_relationships_history",
+                  "label": "첫 지원 절차 통과",
+                  "score": 92,
+                  "status": "passed",
+                  "threshold": 92
+                },
+                "careerGateAttempt": {
+                  "path": "contextual",
+                  "score": 92,
+                  "approach": "history_based",
+                  "threshold": 92
+                },
+                "contextualCareerGate": true
+              },
+              "summary": "당신은 흩어진 경험을 하나의 지원 논리로 엮었다. 판정 결과: 첫 지원 절차 통과.",
+              "choiceId": "contextual_gate_use_history",
+              "eventTitle": "졸업 전 마지막 갈림길"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "romanceFuture": "cohabitation"
+              },
+              "summary": "당신은 관계를 생활의 문제로 끌어와 진지하게 마주했다.",
+              "choiceId": "consider_living_together",
+              "eventTitle": "같이 살자는 말"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "심화",
+                "aiGenerated": true
+              },
+              "summary": "당신은 새벽 알바를 중단하지 않고 학점 보강을 포기하기로 결심한다.",
+              "choiceId": "1",
+              "eventTitle": "지난 학기, 이른 아침 알바와 진로"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "결단",
+                "aiGenerated": true
+              },
+              "summary": "당신은 창작과 취업 준비를 병행하기 위해, 공모전 주제를 담은 짧은 영상을 기획하기 시작한다.",
+              "choiceId": "create",
+              "eventTitle": "디지털 잔상"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "specInit": {
+                  "specName": "TOEIC",
+                  "specType": "LANGUAGE_SCORE"
+                }
+              },
+              "summary": "당신은 토익 접수를 마치고 어학 스펙 준비를 시작했다.",
+              "choiceId": "toeic_register",
+              "eventTitle": "토익 시험 접수"
+            }
+          ],
+          "academicPlan": {
+            "major": "컴퓨터공학과",
+            "minor": null,
+            "doubleMajor": null,
+            "majorChanged": false,
+            "retakePressure": false,
+            "scholarshipWarning": false,
+            "interdisciplinaryTrack": null
+          },
+          "academicTerm": {
+            "label": "4학년 1학기",
+            "semester": 1,
+            "gradeYear": 4
+          },
+          "lastStoryImpact": {
+            "summary": "당신은 토익 접수를 마치고 어학 스펙 준비를 시작했다.",
+            "threads": [
+              "가족 압박",
+              "서연과의 관계",
+              "가까운 관계의 변화",
+              "졸업 이후의 방향"
+            ],
+            "choiceId": "toeic_register",
+            "majorBeat": 5,
+            "eventTitle": "토익 시험 접수"
+          },
+          "stageEventCount": 4,
+          "activeStoryThreads": [
+            "생활비와 노동",
+            "가족 압박",
+            "서연과의 관계",
+            "가까운 관계의 변화",
+            "졸업 이후의 방향"
+          ],
+          "lifeStageTransition": {
+            "reasons": [
+              "no_transition"
+            ],
+            "atCoreEventCount": 19
+          },
+          "destinationCandidates": []
+        },
+        "createdAt": "2026-07-30T07:14:25.075Z"
+      },
+      {
+        "id": "aad88b0d-8eb1-48f2-9f1e-e42cf902ff5e",
+        "characterRunId": "4cfbcff0-f827-46ac-83ea-f7b74df32219",
+        "eventId": "d75eed68-88ff-4d51-b7cb-3cdaa5cacbec",
+        "choiceId": "create",
+        "summary": "당신은 창작과 취업 준비를 병행하기 위해, 공모전 주제를 담은 짧은 영상을 기획하기 시작한다.",
+        "statDelta": {
+          "mental": 0,
+          "practical": 1
+        },
+        "relationshipDelta": [
+          {
+            "name": "시에나",
+            "trust": 1
+          }
+        ],
+        "flagDelta": {
+          "riskDebt": 0,
+          "lifeStage": {
+            "id": "college_late"
+          },
+          "graduation": {
+            "state": "gate_ready"
+          },
+          "storyPhase": "결단",
+          "aiGenerated": true,
+          "storyLedger": [
+            {
+              "beat": 2,
+              "flags": {
+                "rentHelpAsked": true,
+                "familyPressure": "financial_help"
+              },
+              "summary": "당신은 자존심을 접고 가족에게 월세 도움을 요청했다.",
+              "choiceId": "ask_family_rent_help",
+              "eventTitle": "자취방 월세 고지서"
+            },
+            {
+              "beat": 2,
+              "flags": {
+                "romanceThread": "direct"
+              },
+              "summary": "당신은 불편함을 감수하고 마음의 답을 확인하려 했다.",
+              "choiceId": "ask_directly",
+              "eventTitle": "읽씹된 고백"
+            },
+            {
+              "beat": 3,
+              "flags": {
+                "storyPhase": "전개",
+                "aiGenerated": true
+              },
+              "summary": "당신은 시온과 성민의 요구에 귀를 기울이며 팀의 목표를 위해 최선을 다한다.",
+              "choiceId": "engage",
+              "eventTitle": "온라인 창작의 첫 책임"
+            },
+            {
+              "beat": 3,
+              "flags": {
+                "careerPathInit": {
+                  "pathType": "WORKING_HOLIDAY"
+                },
+                "careerPathChosen": true
+              },
+              "summary": "당신은 워킹홀리데이 준비에 마음을 열고 첫걸음을 뗐다.",
+              "choiceId": "wh_prepare",
+              "eventTitle": "워홀 준비"
+            },
+            {
+              "beat": 3,
+              "flags": {
+                "healthRoutine": "rest"
+              },
+              "summary": "일정을 줄이고 회복에 집중했다.",
+              "choiceId": "reduce_schedule",
+              "eventTitle": "건강검진 결과"
+            },
+            {
+              "beat": 4,
+              "flags": {
+                "storyPhase": "상승",
+                "aiGenerated": true
+              },
+              "summary": "당신은 성민에게 소개 요청을 하고 주말 알바를 추가로 잡아 장학금 반환금을 마련한다",
+              "choiceId": "proof_1",
+              "eventTitle": "급작스러운 장학금 반환 요구"
+            },
+            {
+              "beat": 4,
+              "flags": {
+                "contestJoined": true
+              },
+              "summary": "공모전 준비로 바쁘지만 스펙과 관계를 쌓았다.",
+              "choiceId": "join_contest",
+              "eventTitle": "공모전 팀 구성"
+            },
+            {
+              "beat": 4,
+              "flags": {
+                "partTimeJob": "extra_shift"
+              },
+              "summary": "당신은 생활비를 벌기 위해 더 긴 새벽을 받아들였다.",
+              "choiceId": "take_extra_shift",
+              "eventTitle": "편의점 새벽 알바"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "위기",
+                "aiGenerated": true
+              },
+              "summary": "당신은 번아웃을 막기 위해 전시회 참여를 포기하고 휴식을 선택한다.",
+              "choiceId": "prioritize_rest",
+              "eventTitle": "취미가 짐이 될 때"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "위기",
+                "aiGenerated": true
+              },
+              "summary": "당신은 시온에게 새벽 알바를 거절하고 함께 발표 준비를 돕는다.",
+              "choiceId": "1",
+              "eventTitle": "편의점 새벽 알바로 놓친 기회"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "심화",
+                "aiGenerated": true
+              },
+              "summary": "당신은 학점을 복구하기 위해 계획했던 전공 심화 수업 하나를 포기하기로 결심한다.",
+              "choiceId": "retake_course",
+              "eventTitle": "잊고 있던 학점과 조교의 호출"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "careerGate": {
+                  "path": "contextual",
+                  "basis": "stats_relationships_history",
+                  "label": "첫 지원 절차 통과",
+                  "score": 92,
+                  "status": "passed",
+                  "threshold": 92
+                },
+                "careerGateAttempt": {
+                  "path": "contextual",
+                  "score": 92,
+                  "approach": "history_based",
+                  "threshold": 92
+                },
+                "contextualCareerGate": true
+              },
+              "summary": "당신은 흩어진 경험을 하나의 지원 논리로 엮었다. 판정 결과: 첫 지원 절차 통과.",
+              "choiceId": "contextual_gate_use_history",
+              "eventTitle": "졸업 전 마지막 갈림길"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "romanceFuture": "cohabitation"
+              },
+              "summary": "당신은 관계를 생활의 문제로 끌어와 진지하게 마주했다.",
+              "choiceId": "consider_living_together",
+              "eventTitle": "같이 살자는 말"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "심화",
+                "aiGenerated": true
+              },
+              "summary": "당신은 새벽 알바를 중단하지 않고 학점 보강을 포기하기로 결심한다.",
+              "choiceId": "1",
+              "eventTitle": "지난 학기, 이른 아침 알바와 진로"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "결단",
+                "aiGenerated": true
+              },
+              "summary": "당신은 창작과 취업 준비를 병행하기 위해, 공모전 주제를 담은 짧은 영상을 기획하기 시작한다.",
+              "choiceId": "create",
+              "eventTitle": "디지털 잔상"
+            }
+          ],
+          "academicPlan": {
+            "major": "컴퓨터공학과",
+            "minor": null,
+            "doubleMajor": null,
+            "majorChanged": false,
+            "retakePressure": false,
+            "scholarshipWarning": false,
+            "interdisciplinaryTrack": null
+          },
+          "academicTerm": {
+            "label": "4학년 1학기",
+            "semester": 1,
+            "gradeYear": 4
+          },
+          "lastStoryImpact": {
+            "summary": "당신은 창작과 취업 준비를 병행하기 위해, 공모전 주제를 담은 짧은 영상을 기획하기 시작한다.",
+            "threads": [
+              "가족 압박",
+              "서연과의 관계",
+              "가까운 관계의 변화",
+              "졸업 이후의 방향"
+            ],
+            "choiceId": "create",
+            "majorBeat": 5,
+            "eventTitle": "디지털 잔상"
+          },
+          "stageEventCount": 3,
+          "activeStoryThreads": [
+            "생활비와 노동",
+            "가족 압박",
+            "서연과의 관계",
+            "가까운 관계의 변화",
+            "졸업 이후의 방향"
+          ],
+          "lifeStageTransition": {
+            "reasons": [
+              "no_transition"
+            ],
+            "atCoreEventCount": 18
+          },
+          "destinationCandidates": []
+        },
+        "createdAt": "2026-07-30T07:14:20.294Z"
+      },
+      {
+        "id": "53c389e2-2812-454e-b5fd-baf711bd8c1a",
+        "characterRunId": "4cfbcff0-f827-46ac-83ea-f7b74df32219",
+        "eventId": "11bb9b74-08bd-499a-a76a-5f49a40407ed",
+        "choiceId": "1",
+        "summary": "당신은 새벽 알바를 중단하지 않고 학점 보강을 포기하기로 결심한다.",
+        "statDelta": {
+          "mental": 0,
+          "wealth": -10,
+          "academic": -1,
+          "practical": 2
+        },
+        "relationshipDelta": [
+          {
+            "name": "태수",
+            "trust": 1
+          },
+          {
+            "name": "시온",
+            "trust": -1
+          }
+        ],
+        "flagDelta": {
+          "riskDebt": 0,
+          "lifeStage": {
+            "id": "college_late"
+          },
+          "graduation": {
+            "state": "gate_ready"
+          },
+          "storyPhase": "심화",
+          "aiGenerated": true,
+          "storyLedger": [
+            {
+              "beat": 2,
+              "flags": {
+                "storyPhase": "발단",
+                "aiGenerated": true
+              },
+              "summary": "당신은 시온과 성민에게 즉시 연락해 새로운 발표 일정을 조율한다. 팀원들과의 협업을 중시하면서, 프로젝트 진행 속도를 늦추더라도 완성도를 높이기 위해 노력한다.",
+              "choiceId": "a",
+              "eventTitle": "수정된 학기 일정에 대한 긴급 통보"
+            },
+            {
+              "beat": 2,
+              "flags": {
+                "rentHelpAsked": true,
+                "familyPressure": "financial_help"
+              },
+              "summary": "당신은 자존심을 접고 가족에게 월세 도움을 요청했다.",
+              "choiceId": "ask_family_rent_help",
+              "eventTitle": "자취방 월세 고지서"
+            },
+            {
+              "beat": 2,
+              "flags": {
+                "romanceThread": "direct"
+              },
+              "summary": "당신은 불편함을 감수하고 마음의 답을 확인하려 했다.",
+              "choiceId": "ask_directly",
+              "eventTitle": "읽씹된 고백"
+            },
+            {
+              "beat": 3,
+              "flags": {
+                "storyPhase": "전개",
+                "aiGenerated": true
+              },
+              "summary": "당신은 시온과 성민의 요구에 귀를 기울이며 팀의 목표를 위해 최선을 다한다.",
+              "choiceId": "engage",
+              "eventTitle": "온라인 창작의 첫 책임"
+            },
+            {
+              "beat": 3,
+              "flags": {
+                "careerPathInit": {
+                  "pathType": "WORKING_HOLIDAY"
+                },
+                "careerPathChosen": true
+              },
+              "summary": "당신은 워킹홀리데이 준비에 마음을 열고 첫걸음을 뗐다.",
+              "choiceId": "wh_prepare",
+              "eventTitle": "워홀 준비"
+            },
+            {
+              "beat": 3,
+              "flags": {
+                "healthRoutine": "rest"
+              },
+              "summary": "일정을 줄이고 회복에 집중했다.",
+              "choiceId": "reduce_schedule",
+              "eventTitle": "건강검진 결과"
+            },
+            {
+              "beat": 4,
+              "flags": {
+                "storyPhase": "상승",
+                "aiGenerated": true
+              },
+              "summary": "당신은 성민에게 소개 요청을 하고 주말 알바를 추가로 잡아 장학금 반환금을 마련한다",
+              "choiceId": "proof_1",
+              "eventTitle": "급작스러운 장학금 반환 요구"
+            },
+            {
+              "beat": 4,
+              "flags": {
+                "contestJoined": true
+              },
+              "summary": "공모전 준비로 바쁘지만 스펙과 관계를 쌓았다.",
+              "choiceId": "join_contest",
+              "eventTitle": "공모전 팀 구성"
+            },
+            {
+              "beat": 4,
+              "flags": {
+                "partTimeJob": "extra_shift"
+              },
+              "summary": "당신은 생활비를 벌기 위해 더 긴 새벽을 받아들였다.",
+              "choiceId": "take_extra_shift",
+              "eventTitle": "편의점 새벽 알바"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "위기",
+                "aiGenerated": true
+              },
+              "summary": "당신은 번아웃을 막기 위해 전시회 참여를 포기하고 휴식을 선택한다.",
+              "choiceId": "prioritize_rest",
+              "eventTitle": "취미가 짐이 될 때"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "위기",
+                "aiGenerated": true
+              },
+              "summary": "당신은 시온에게 새벽 알바를 거절하고 함께 발표 준비를 돕는다.",
+              "choiceId": "1",
+              "eventTitle": "편의점 새벽 알바로 놓친 기회"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "심화",
+                "aiGenerated": true
+              },
+              "summary": "당신은 학점을 복구하기 위해 계획했던 전공 심화 수업 하나를 포기하기로 결심한다.",
+              "choiceId": "retake_course",
+              "eventTitle": "잊고 있던 학점과 조교의 호출"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "careerGate": {
+                  "path": "contextual",
+                  "basis": "stats_relationships_history",
+                  "label": "첫 지원 절차 통과",
+                  "score": 92,
+                  "status": "passed",
+                  "threshold": 92
+                },
+                "careerGateAttempt": {
+                  "path": "contextual",
+                  "score": 92,
+                  "approach": "history_based",
+                  "threshold": 92
+                },
+                "contextualCareerGate": true
+              },
+              "summary": "당신은 흩어진 경험을 하나의 지원 논리로 엮었다. 판정 결과: 첫 지원 절차 통과.",
+              "choiceId": "contextual_gate_use_history",
+              "eventTitle": "졸업 전 마지막 갈림길"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "romanceFuture": "cohabitation"
+              },
+              "summary": "당신은 관계를 생활의 문제로 끌어와 진지하게 마주했다.",
+              "choiceId": "consider_living_together",
+              "eventTitle": "같이 살자는 말"
+            },
+            {
+              "beat": 5,
+              "flags": {
+                "storyPhase": "심화",
+                "aiGenerated": true
+              },
+              "summary": "당신은 새벽 알바를 중단하지 않고 학점 보강을 포기하기로 결심한다.",
+              "choiceId": "1",
+              "eventTitle": "지난 학기, 이른 아침 알바와 진로"
+            }
+          ],
+          "academicPlan": {
+            "major": "컴퓨터공학과",
+            "minor": null,
+            "doubleMajor": null,
+            "majorChanged": false,
+            "retakePressure": false,
+            "scholarshipWarning": false,
+            "interdisciplinaryTrack": null
+          },
+          "academicTerm": {
+            "label": "4학년 1학기",
+            "semester": 1,
+            "gradeYear": 4
+          },
+          "lastStoryImpact": {
+            "summary": "당신은 새벽 알바를 중단하지 않고 학점 보강을 포기하기로 결심한다.",
+            "threads": [
+              "가족 압박",
+              "서연과의 관계",
+              "가까운 관계의 변화",
+              "졸업 이후의 방향"
+            ],
+            "choiceId": "1",
+            "majorBeat": 5,
+            "eventTitle": "지난 학기, 이른 아침 알바와 진로"
+          },
+          "stageEventCount": 2,
+          "activeStoryThreads": [
+            "생활비와 노동",
+            "가족 압박",
+            "서연과의 관계",
+            "가까운 관계의 변화",
+            "졸업 이후의 방향"
+          ],
+          "lifeStageTransition": {
+            "reasons": [
+              "no_transition"
+            ],
+            "atCoreEventCount": 17
+          },
+          "destinationCandidates": []
+        },
+        "createdAt": "2026-07-30T07:14:05.008Z"
+      }
+    ],
+    "records": [
+      {
+        "id": "c198ec47-2e58-4d1f-8798-e9debebfba76",
+        "userId": "9923b196-5f5b-4f3d-a932-aab07d149af6",
+        "characterRunId": "4cfbcff0-f827-46ac-83ea-f7b74df32219",
+        "title": "작은 서비스로 세상을 열어가다",
+        "summary": "대학 마지막 학기, 과제와 알바를 버리고 ‘MVP’를 만들기로 결심한 순간부터 시작된 여정이다. 서버 다운으로 인한 고객 불편을 직접 목격한 경험이 ‘실시간 장애 감지 알림 서비스’의 아이디어로 이어졌고, 시온·시에나와 함께 작은 팀을 꾸려 서비스를 론칭했다. 초기에는 구독 고객이 거의 없었지만, 운영을 개선하며 소규모 커뮤니티에 활용되기 시작했고, 사용자 수가 두 배로 늘어났다. 재정적으로는 가족의 지원과 초기 투자금으로 버텼으며, 매출은 점차 상승했다. 그러나 파트타이머가 사라지고, 정신적·신체적 피로가 쌓이면서 보건과 회복의 중요성을 깨달았다. 이 경험을 통해 성장 잠재력이 큰 서비스와 체계적인 회복 계획을 동시에 갖춘 경력을 쌓게 되었다.",
+        "longNarrative": "대학 마지막 학기, 귀찮아지던 과제와 새벽 알바를 버리고 ‘MVP’를 만들기로 결심한 순간이 시작이었다. 항구적이었지만 안정적인 직장을 놓고 당신은 온라인에서 일어나는 문제를 해결하는 서비스를 구상했다. 서버가 다운되면 사라지는 고객의 불편한 상황을 직접 목격한 경험이 방정식이 되었고, 이 경험을 바탕으로 ‘실시간 장애 감지 알림 서비스’를 론칭했다. 처음엔 구독 고객이 거의 없었지만, 운영을 바로잡으며 개선점을 찾아 가면서 소규모 커뮤니티에 활용되기 시작했다. 팀원은 시온과 시에나가 함께했으며, 그들의 신뢰가 만든 작은 협업 네트워크가 성장의 엔진이 되었다. 재정적으로는 초기 투자금과 가족의 작은 지원을 힘입어 냈지만, 매출은 서서히 상승하며 월간 수익이 꾸준히 발생했다. 잠시마다 바쁜 일정과 통신 장애, 그리고 예기치 못한 GDPR 이슈에 직면해 검토와 수정에 시간을 끌었으나, 결국 서비스는 안정성을 얻었고, 사용자 수가 두 배로 늘어났다. 이런 상황에서 당신은 직업적 만족감을 느끼며, 개인적 매력과 리더십이 공존하는 장면을 마주했다. 하지만 첫 번째 파트타이머는 사라지고, 당신은 한 사람으로 전념하던 창업의 이면에 ‘보건과 정신적 회복’이 얼마나 중요한지를 깨달았다. 1년 가량의 허둥과 안정적이 아닌 재정 상황은 체력과 멘탈을 지배했고, 오히려 동료와 가족과의 관계는 가깝고 신뢰가 굳어졌다. 이제 당신은 월등한 성장 잠재력을 가진 서비스와, 세심한 회복 계획이 결합된 일관된 경력을 갖추었다.",
+        "careerPath": "아르바이트 경력자",
+        "jobRole": null,
+        "destinationName": null,
+        "salaryBand": null,
+        "workplaceTone": [],
+        "statSnapshot": {
+          "charm": 9,
+          "health": 7,
+          "mental": 2,
+          "wealth": 153,
+          "network": 4,
+          "academic": 1,
+          "practical": 10,
+          "creativity": 5,
+          "reputation": 10,
+          "communication": 6
+        },
+        "keyRelationships": [
+          {
+            "name": "시온",
+            "role": "팀 프로젝트 동료",
+            "tags": [
+              "동료",
+              "협업",
+              "학업"
+            ],
+            "trust": 48
+          },
+          {
+            "name": "성민",
+            "role": "스터디 동기",
+            "tags": [
+              "동기",
+              "학업",
+              "계획"
+            ],
+            "trust": 53
+          },
+          {
+            "name": "부모님",
+            "role": "관계 인물",
+            "tags": [
+              "이벤트로 만남"
+            ],
+            "trust": 40
+          },
+          {
+            "name": "서연",
+            "role": "관계 인물",
+            "tags": [
+              "이벤트로 만남"
+            ],
+            "trust": 61
+          },
+          {
+            "name": "태수",
+            "role": "관계 인물",
+            "tags": [
+              "이벤트로 만남"
+            ],
+            "trust": 43
+          },
+          {
+            "name": "시에나",
+            "role": "관계 인물",
+            "tags": [
+              "이벤트로 만남"
+            ],
+            "trust": 36
+          },
+          {
+            "name": "동규",
+            "role": "관계 인물",
+            "tags": [
+              "이벤트로 만남"
+            ],
+            "trust": 45
+          }
+        ],
+        "majorEvents": [
+          {
+            "summary": "당신은 선배에게 인턴 정보를 물어보며 실무 감각을 넓혔다.",
+            "choiceId": null,
+            "eventTitle": "눈을 뜬 첫 아침"
+          },
+          {
+            "summary": "당신은 시온과 함께 해외 자료를 번역하며, 새로운 네트워크를 확장하고, 실무 감각을 키운다.",
+            "choiceId": null,
+            "eventTitle": "길게 숨 쉬는 순간"
+          },
+          {
+            "summary": "당신은 시온과 성민에게 즉시 연락해 새로운 발표 일정을 조율한다. 팀원들과의 협업을 중시하면서, 프로젝트 진행 속도를 늦추더라도 완성도를 높이기 위해 노력한다.",
+            "choiceId": null,
+            "eventTitle": "수정된 학기 일정에 대한 긴급 통보"
+          },
+          {
+            "summary": "당신은 자존심을 접고 가족에게 월세 도움을 요청했다.",
+            "choiceId": null,
+            "eventTitle": "자취방 월세 고지서"
+          },
+          {
+            "summary": "당신은 불편함을 감수하고 마음의 답을 확인하려 했다.",
+            "choiceId": null,
+            "eventTitle": "읽씹된 고백"
+          },
+          {
+            "summary": "당신은 시온과 성민의 요구에 귀를 기울이며 팀의 목표를 위해 최선을 다한다.",
+            "choiceId": null,
+            "eventTitle": "온라인 창작의 첫 책임"
+          },
+          {
+            "summary": "당신은 워킹홀리데이 준비에 마음을 열고 첫걸음을 뗐다.",
+            "choiceId": null,
+            "eventTitle": "워홀 준비"
+          },
+          {
+            "summary": "일정을 줄이고 회복에 집중했다.",
+            "choiceId": null,
+            "eventTitle": "건강검진 결과"
+          },
+          {
+            "summary": "당신은 성민에게 소개 요청을 하고 주말 알바를 추가로 잡아 장학금 반환금을 마련한다",
+            "choiceId": null,
+            "eventTitle": "급작스러운 장학금 반환 요구"
+          },
+          {
+            "summary": "공모전 준비로 바쁘지만 스펙과 관계를 쌓았다.",
+            "choiceId": null,
+            "eventTitle": "공모전 팀 구성"
+          },
+          {
+            "summary": "당신은 생활비를 벌기 위해 더 긴 새벽을 받아들였다.",
+            "choiceId": null,
+            "eventTitle": "편의점 새벽 알바"
+          },
+          {
+            "summary": "당신은 번아웃을 막기 위해 전시회 참여를 포기하고 휴식을 선택한다.",
+            "choiceId": null,
+            "eventTitle": "취미가 짐이 될 때"
+          },
+          {
+            "summary": "당신은 시온에게 새벽 알바를 거절하고 함께 발표 준비를 돕는다.",
+            "choiceId": null,
+            "eventTitle": "편의점 새벽 알바로 놓친 기회"
+          },
+          {
+            "summary": "당신은 학점을 복구하기 위해 계획했던 전공 심화 수업 하나를 포기하기로 결심한다.",
+            "choiceId": null,
+            "eventTitle": "잊고 있던 학점과 조교의 호출"
+          },
+          {
+            "summary": "당신은 흩어진 경험을 하나의 지원 논리로 엮었다. 판정 결과: 첫 지원 절차 통과.",
+            "choiceId": null,
+            "eventTitle": "졸업 전 마지막 갈림길"
+          },
+          {
+            "summary": "당신은 관계를 생활의 문제로 끌어와 진지하게 마주했다.",
+            "choiceId": null,
+            "eventTitle": "같이 살자는 말"
+          },
+          {
+            "summary": "당신은 새벽 알바를 중단하지 않고 학점 보강을 포기하기로 결심한다.",
+            "choiceId": null,
+            "eventTitle": "지난 학기, 이른 아침 알바와 진로"
+          },
+          {
+            "summary": "당신은 창작과 취업 준비를 병행하기 위해, 공모전 주제를 담은 짧은 영상을 기획하기 시작한다.",
+            "choiceId": null,
+            "eventTitle": "디지털 잔상"
+          },
+          {
+            "summary": "당신은 토익 접수를 마치고 어학 스펙 준비를 시작했다.",
+            "choiceId": null,
+            "eventTitle": "토익 시험 접수"
+          },
+          {
+            "summary": "학생회 부회장으로서 바쁜 한 학기를 보내게 되었다.",
+            "choiceId": null,
+            "eventTitle": "학생회장의 제안"
+          },
+          {
+            "summary": "당신은 발표를 미루고 휴식을 취해 정신을 정돈한다. 면접에서는 다른 포트폴리오를 제시해야 한다.",
+            "choiceId": null,
+            "eventTitle": "마지막 프로젝트 마감"
+          },
+          {
+            "summary": "당신은 안전한 절차를 택해 괜한 의심을 피했다.",
+            "choiceId": null,
+            "eventTitle": "분실 지갑과 CCTV"
+          },
+          {
+            "summary": "당신은 문제 상황을 솔직히 털어놓고 일정 조정을 요청한다.",
+            "choiceId": null,
+            "eventTitle": "마지막 프로젝트와 면접의 딜레마"
+          },
+          {
+            "summary": "당신은 작은 서비스를 세상에 내놓으며 창업의 문턱을 밟았다.",
+            "choiceId": null,
+            "eventTitle": "작은 앱 아이디어"
+          }
+        ],
+        "satisfaction": 6,
+        "growthPotential": 7,
+        "workLifeBalance": 5,
+        "healthState": "낮은 체력과 정신적 피로를 겪으면서도 회복을 위한 계획 중",
+        "relationshipState": "독신이지만, 팀원 및 가족과 깊은 신뢰를 유지",
+        "tags": [
+          "스타트업",
+          "소프트웨어",
+          "MVP",
+          "불확실성",
+          "팀 협업",
+          "회복"
+        ],
+        "similarityKey": "result-아르바이트 경력자",
+        "createdAt": "2026-07-30T07:17:02.542Z"
+      }
+    ],
+    "lifeStage": {
+      "lifeStage": "college_late",
+      "term": {
+        "gradeYear": 4,
+        "semester": 1,
+        "label": "4학년 1학기"
+      },
+      "academicPlan": {
+        "major": "컴퓨터공학과",
+        "majorChanged": false,
+        "doubleMajor": null,
+        "minor": null,
+        "interdisciplinaryTrack": null,
+        "retakePressure": false,
+        "scholarshipWarning": false
+      },
+      "graduation": "gate_ready",
+      "destinationCandidates": [],
+      "stageEventCount": 3
+    },
+    "progressLabel": "4학년 1학기 · 졸업요건 점검"
+  },
+  "currentEvent": null,
+  "recordsSummary": {
+    "recentCount": 1,
+    "recentTitles": [
+      "작은 서비스로 세상을 열어가다"
+    ]
+  }
+}

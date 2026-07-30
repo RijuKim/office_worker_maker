@@ -1,0 +1,163 @@
+{
+  "deployment": {
+    "url": "https://sano-officeworker-gaha9xgdm-rijukims-projects.vercel.app",
+    "deploymentId": "dpl_EgbSMjMcXiyDZwATSx2BRd2upwfe",
+    "target": "preview",
+    "ready": true,
+    "productionPromoted": false
+  },
+  "runs": [
+    {
+      "major": "사회학과",
+      "actualMajor": "사회학과",
+      "majorVerified": true,
+      "eventCount": 24,
+      "isGraduated": true,
+      "hasEnding": true,
+      "lastProviderId": "openrouter",
+      "lastFallbackUsed": false,
+      "lastAiFallbackReason": "quality_or_generation_failed",
+      "lastEventSource": "AI",
+      "lastGenerationReason": null,
+      "providerIds": [
+        "openrouter"
+      ],
+      "fallbackCount": 0,
+      "openRouterCalls": 1,
+      "ending": {
+        "recordAvailable": true,
+        "recordId": "0a6d38ae-97c5-43f8-8aeb-a2299f628f16",
+        "title": "선택의 결과: 새봄교육청에서의 첫걸음",
+        "summary": "대학을 졸업한 직후, 새봄교육청 교육행정 부서에 입사한 주인공은 사회학적 시각으로 공공교육의 실무를 체험하며, 직장 생활과 개인 건강, 인간관계 사이에서 균형을 찾으려 노력한다. 첫 해를 통해 직무 역량을 키우고, 동료와의 협업으로 성장하며, 동시에 체력과 정신적 피로를 관리하는 방법을 모색한다.",
+        "careerPath": "아르바이트 경력자",
+        "longNarrativeLength": 896,
+        "longNarrativeVisible": true,
+        "satisfaction": 6,
+        "growthPotential": 10,
+        "workLifeBalance": 5,
+        "tags": [
+          "공공교육",
+          "사회학",
+          "건강 관리",
+          "팀워크",
+          "자립"
+        ]
+      },
+      "consoleErrors": 0,
+      "blockingErrors": 0
+    },
+    {
+      "major": "교육학과",
+      "actualMajor": "교육학과",
+      "majorVerified": true,
+      "eventCount": 24,
+      "isGraduated": true,
+      "hasEnding": true,
+      "lastProviderId": "openrouter",
+      "lastFallbackUsed": false,
+      "lastAiFallbackReason": "quality_or_generation_failed",
+      "lastEventSource": "AI",
+      "lastGenerationReason": null,
+      "providerIds": [
+        "openrouter"
+      ],
+      "fallbackCount": 0,
+      "openRouterCalls": 1,
+      "ending": {
+        "recordAvailable": true,
+        "recordId": "73ffca1b-afcf-496d-81a2-09b0cb3bdbdd",
+        "title": "새로운 시작, 비로소 자유",
+        "summary": "대학을 졸업하고, 현실과 꿈 사이에서 망설이며 이음평생학습관의 교육운영팀에 합류한 당신. 피곤하지만, 실전 경험과 인내가 쌓인 삶이 당신을 기다린다.",
+        "careerPath": "아르바이트 경력자",
+        "longNarrativeLength": 1059,
+        "longNarrativeVisible": true,
+        "satisfaction": 10,
+        "growthPotential": 10,
+        "workLifeBalance": 10,
+        "tags": [
+          "교육학과",
+          "실무경험",
+          "지역사회",
+          "안정",
+          "성장",
+          "보호",
+          "성실"
+        ]
+      },
+      "consoleErrors": 0,
+      "blockingErrors": 0
+    },
+    {
+      "major": "컴퓨터공학과",
+      "actualMajor": "컴퓨터공학과",
+      "majorVerified": true,
+      "eventCount": 24,
+      "isGraduated": true,
+      "hasEnding": true,
+      "lastProviderId": "ollama",
+      "lastFallbackUsed": true,
+      "lastAiFallbackReason": "quality_or_generation_failed",
+      "lastEventSource": "FALLBACK",
+      "lastGenerationReason": "target_category_mismatch",
+      "providerIds": [
+        "ollama"
+      ],
+      "fallbackCount": 1,
+      "openRouterCalls": 0,
+      "ending": {
+        "recordAvailable": true,
+        "recordId": "c198ec47-2e58-4d1f-8798-e9debebfba76",
+        "title": "작은 서비스로 세상을 열어가다",
+        "summary": "대학 마지막 학기, 과제와 알바를 버리고 ‘MVP’를 만들기로 결심한 순간부터 시작된 여정이다. 서버 다운으로 인한 고객 불편을 직접 목격한 경험이 ‘실시간 장애 감지 알림 서비스’의 아이디어로 이어졌고, 시온·시에나와 함께 작은 팀을 꾸려 서비스를 론칭했다. 초기에는 구독 고객이 거의 없었지만, 운영을 개선하며 소규모 커뮤니티에 활용되기 시작했고, 사용자 수가 두 배로 늘어났다. 재정적으로는 가족의 지원과 초기 투자금으로 버텼으며, 매출은 점차 상승했다. 그러나 파트타이머가 사라지고, 정신적·신체적 피로가 쌓이면서 보건과 회복의 중요성을 깨달았다. 이 경험을 통해 성장 잠재력이 큰 서비스와 체계적인 회복 계획을 동시에 갖춘 경력을 쌓게 되었다.",
+        "careerPath": "아르바이트 경력자",
+        "longNarrativeLength": 736,
+        "longNarrativeVisible": true,
+        "satisfaction": 6,
+        "growthPotential": 7,
+        "workLifeBalance": 5,
+        "tags": [
+          "스타트업",
+          "소프트웨어",
+          "MVP",
+          "불확실성",
+          "팀 협업",
+          "회복"
+        ]
+      },
+      "consoleErrors": 0,
+      "blockingErrors": 0
+    }
+  ],
+  "mobile": {
+    "major": "컴퓨터공학과",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "endingVisible": false,
+    "correctRecordExpanded": false
+  },
+  "summary": {
+    "totalRuns": 3,
+    "passedRuns": 3,
+    "totalErrors": 0,
+    "totalConsoleErrors": 0,
+    "totalFallbackEvents": 1,
+    "totalOpenRouterCalls": 2,
+    "ollamaPrimaryCount": 1,
+    "openrouterPrimaryCount": 2
+  },
+  "performance": {
+    "p50": 4700,
+    "p95": 53542
+  },
+  "qualityCriteria": {
+    "allMajorsVerified": true,
+    "allGraduated": true,
+    "allHaveEndingRecords": true,
+    "allHaveLongNarrative": true,
+    "zeroFallbackEvents": false,
+    "ollamaPrimary": true,
+    "zeroConsoleErrors": true
+  }
+}
