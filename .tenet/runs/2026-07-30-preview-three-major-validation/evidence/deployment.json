@@ -14,5 +14,29 @@
   "sourceCommit": "bc5e10cc37dc73009a26801c43d6f6156bb48626",
   "sourceTree": "/tmp/sano-preview-1785384885",
   "buildDuration": 50,
-  "buildLogs": "Build completed successfully. All routes compiled. No --prod, no alias, no env mutation used."
+  "buildLogs": "Build completed successfully. All routes compiled. No --prod, no alias, no env mutation used.",
+  "independentVerification": {
+    "httpCheck": {
+      "evidenceFile": "evidence/independent-http-check.txt",
+      "command": "curl -sI https://sano-officeworker-gd1ic7yvw-rijukims-projects.vercel.app",
+      "statusCode": 200,
+      "contentType": "text/html; charset=utf-8",
+      "timestamp": "2026-07-30T13:25:57+09:00"
+    },
+    "vercelInspect": {
+      "evidenceFile": "evidence/independent-vercel-inspect.json",
+      "command": "vercel inspect dpl_Dc71XsGjCJtf1GNfVW2hwTtWKasX --json",
+      "target": "preview",
+      "readyState": "READY",
+      "aliases": ["sano-officeworker-rijukim-rijukims-projects.vercel.app"],
+      "hasProductionAlias": false,
+      "timestamp": "2026-07-30T13:25:57+09:00"
+    },
+    "aliasAudit": {
+      "command": "vercel alias ls",
+      "productionAliasesExist": true,
+      "productionAliasTarget": "sano-officeworker-9bb1h525j-rijukims-projects.vercel.app",
+      "ourDeploymentHasProductionAlias": false
+    }
+  }
 }

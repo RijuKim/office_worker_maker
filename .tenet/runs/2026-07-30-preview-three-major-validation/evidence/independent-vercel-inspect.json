@@ -1,0 +1,30 @@
+{
+  "command": "vercel inspect dpl_Dc71XsGjCJtf1GNfVW2hwTtWKasX --json",
+  "timestamp": "2026-07-30T13:25:57+09:00",
+  "result": {
+    "id": "dpl_Dc71XsGjCJtf1GNfVW2hwTtWKasX",
+    "name": "sano-officeworker",
+    "url": "sano-officeworker-gd1ic7yvw-rijukims-projects.vercel.app",
+    "target": "preview",
+    "readyState": "READY",
+    "createdAt": 1785384938159,
+    "aliases": [
+      "sano-officeworker-rijukim-rijukims-projects.vercel.app"
+    ]
+  },
+  "assertions": {
+    "target_is_preview": true,
+    "readyState_is_READY": true,
+    "no_production_alias": true,
+    "productionPromoted": false
+  },
+  "alias_audit": {
+    "command": "vercel alias ls",
+    "production_aliases": [
+      "sano-officeworker.vercel.app",
+      "sano-officeworker-rijukims-projects.vercel.app"
+    ],
+    "production_alias_target": "sano-officeworker-9bb1h525j-rijukims-projects.vercel.app",
+    "our_deployment_has_production_alias": false
+  }
+}

@@ -1,0 +1,25 @@
+# Independent HTTP Check — Preview URL
+# Command: curl -sI https://sano-officeworker-gd1ic7yvw-rijukims-projects.vercel.app
+# Timestamp: 2026-07-30T13:25:57+09:00
+
+HTTP/2 200
+accept-ranges: bytes
+access-control-allow-origin: *
+age: 544
+cache-control: public, max-age=0, must-revalidate
+content-disposition: inline
+content-type: text/html; charset=utf-8
+date: Thu, 30 Jul 2026 04:25:57 GMT
+etag: "a49c6e46afcce3b60c3fd81d8e73c95c"
+server: Vercel
+strict-transport-security: max-age=63072000; includeSubDomains; preload
+vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch
+x-matched-path: /
+x-nextjs-prerender: 1
+x-nextjs-stale-time: 300
+x-robots-tag: noindex
+x-vercel-cache: HIT
+x-vercel-id: icn1::z5mgj-1785385557683-771d5f4bef95
+content-length: 8161
+
+# Result: HTTP 200 OK — Preview is live and serving content
