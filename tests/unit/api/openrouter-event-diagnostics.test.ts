@@ -110,7 +110,7 @@ describe("AI event diagnostics", () => {
       tags: ["선택", "성장"],
     };
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
-      choices: [{ message: { content: JSON.stringify(validEnding) } }],
+      message: { content: JSON.stringify(validEnding) },
     }), { status: 200 }));
 
     const result = await generateAiEnding({
@@ -124,13 +124,71 @@ describe("AI event diagnostics", () => {
 
     expect(result).toMatchObject({ success: true, providerId: "ollama" });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://ollama.com/api/chat");
     const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
-    expect(request.max_tokens).toBe(2_800);
+    expect(request.options.num_predict).toBe(5_000);
+    expect(request.format).toBe("json");
     const prompt = request.messages[1].content as string;
     expect(prompt).toContain('"order":1');
     expect(prompt).toContain('"title":"1번째 선택"');
     expect(prompt).toContain('"order":24');
     expect(prompt).toContain('"title":"24번째 선택"');
+  });
+
+  it("repairs an invalid Ollama ending with Ollama instead of switching providers", async () => {
+    process.env.AI_PRIMARY_PROVIDER = "ollama";
+    process.env.OLLAMA_API_KEY = "ollama-key";
+    process.env.OPENROUTER_API_KEY = "openrouter-key";
+    const baseEnding = {
+      title: "남겨 둔 불빛",
+      longNarrative: "당신은 졸업 뒤 과거의 선택을 새로운 일의 기준으로 삼았다. 오래 지킨 약속은 동료의 신뢰로 돌아왔고, 무리했던 날의 기억은 생활의 속도를 늦추게 했다. ".repeat(12),
+      careerPath: "서비스 기획",
+      jobRole: "기획자",
+      destinationName: "새길연구소",
+      salaryBand: "안정적",
+      workplaceTone: ["협업"],
+      satisfaction: 72,
+      growthPotential: 78,
+      workLifeBalance: 66,
+      healthState: "회복 중",
+      relationshipState: "좁지만 안정적",
+      tags: ["선택", "성장"],
+    };
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ message: { content: JSON.stringify({ ...baseEnding, summary: "너무 짧다" }) } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ message: { content: JSON.stringify({
+        ...baseEnding,
+        summary: "당신은 오래 지킨 약속과 무리했던 날의 비용을 함께 기억하며 새로운 실무를 시작했고, 관계와 건강을 다시 조율하면서 다음 계절의 생활을 스스로 만들었다.",
+      }) } }), { status: 200 }));
+
+    const result = await generateAiEnding({
+      name: "서윤", age: 24, major: "사회학과", stats: {}, hiddenState: {}, relationships: [], eventHistory: [],
+      finalChoiceSummary: "당신은 제안을 받아들였다.",
+    });
+
+    expect(result).toMatchObject({ success: true, providerId: "ollama" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.every(([url]) => String(url) === "https://ollama.com/api/chat")).toBe(true);
+    const repairRequest = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+    expect(repairRequest.options).toEqual({ temperature: 0.2, num_predict: 2400 });
+    expect(repairRequest.messages[1].content).toContain("summary");
+  });
+
+  it("calls OpenRouter exactly once after a concrete Ollama failure", async () => {
+    process.env.AI_PRIMARY_PROVIDER = "ollama";
+    process.env.OLLAMA_API_KEY = "ollama-key";
+    process.env.OPENROUTER_API_KEY = "openrouter-key";
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("upstream failure", { status: 500 }));
+
+    const result = await generateAiEvent({
+      name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4,
+      recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {},
+    });
+
+    expect(result).toMatchObject({ success: false, providerId: "openrouter" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("ollama.com");
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain("openrouter.ai");
   });
 
   it("classifies malformed JSON separately", () => {
@@ -184,7 +242,7 @@ describe("AI event diagnostics", () => {
     expect(result.event.choices[0]?.statDelta).toEqual({ academic: 15, health: -1, wealth: -15 });
   });
 
-  it("clamps excessive mental loss instead of rejecting the generated event", () => {
+  it("removes unjustified mental loss while clamping other excessive loss", () => {
     const result = parseAiEventContentDetailed(JSON.stringify({
       ...validEvent,
       choices: [
@@ -195,18 +253,18 @@ describe("AI event diagnostics", () => {
 
     expect(result.success).toBe(true);
     if (!result.success) return;
-    expect(result.event.choices[0]?.statDelta).toEqual({ mental: -1, health: -1 });
+    expect(result.event.choices[0]?.statDelta).toEqual({ mental: 0, health: -1 });
   });
 
   it("accepts a slow successful provider response without fallback or a second call", async () => {
-    process.env.OPENROUTER_API_KEY = "test-key";
+    process.env.OLLAMA_API_KEY = "test-key";
     vi.spyOn(Date, "now")
       .mockReturnValueOnce(0)
       .mockReturnValueOnce(0)
       .mockReturnValueOnce(12_001)
       .mockReturnValue(12_001);
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
-      choices: [{ message: { content: JSON.stringify(validEvent) } }],
+      message: { content: JSON.stringify(validEvent) },
     }), { status: 200, headers: { "content-type": "application/json" } }));
 
     const result = await generateAiEvent({
@@ -220,7 +278,7 @@ describe("AI event diagnostics", () => {
 
   it("aborts at the configured timeout and returns bounded timeout telemetry", async () => {
     vi.useFakeTimers();
-    process.env.OPENROUTER_API_KEY = "test-key";
+    process.env.OLLAMA_API_KEY = "test-key";
     process.env.OPENROUTER_TIMEOUT_MS = "5000";
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation((_url, init) => new Promise((_resolve, reject) => {
       init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
@@ -234,9 +292,9 @@ describe("AI event diagnostics", () => {
     const result = await pending;
 
     expect(result).toMatchObject({
-      success: false, reason: "timeout", providerId: "openrouter",
+      success: false, reason: "timeout", providerId: "ollama",
       providerElapsedMs: 5_000, totalElapsedMs: 5_000, slow: false,
-      providerFailures: [{ providerId: "openrouter", stage: "provider", reason: "timeout", providerElapsedMs: 5_000 }],
+      providerFailures: [{ providerId: "ollama", stage: "provider", reason: "timeout", providerElapsedMs: 5_000 }],
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
@@ -269,8 +327,8 @@ describe("AI event diagnostics", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(result).toMatchObject({ success: false, reason: "timeout", totalElapsedMs: 5_000 });
     expect(result.providerFailures).toEqual([
-      expect.objectContaining({ providerId: "openrouter", reason: "rate_limited", providerElapsedMs: 4_000 }),
-      expect.objectContaining({ providerId: "ollama", reason: "timeout", providerElapsedMs: 1_000 }),
+      expect.objectContaining({ providerId: "ollama", reason: "rate_limited", providerElapsedMs: 4_000 }),
+      expect.objectContaining({ providerId: "openrouter", reason: "timeout", providerElapsedMs: 1_000 }),
     ]);
   });
 
@@ -290,14 +348,14 @@ describe("AI event diagnostics", () => {
     await vi.advanceTimersByTimeAsync(5_000);
     const result = await pending;
 
-    expect(result).toMatchObject({ success: false, reason: "timeout", providerId: "openrouter", totalElapsedMs: 5_000 });
+    expect(result).toMatchObject({ success: false, reason: "timeout", providerId: "ollama", totalElapsedMs: 5_000 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("uses one bounded structured request for narrative and all choices", async () => {
-    process.env.OPENROUTER_API_KEY = "test-key";
+    process.env.OLLAMA_API_KEY = "test-key";
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
-      choices: [{ message: { content: JSON.stringify(validEvent) } }],
+      message: { content: JSON.stringify(validEvent) },
     }), { status: 200 }));
 
     await generateAiEvent({
@@ -307,8 +365,8 @@ describe("AI event diagnostics", () => {
     const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(request.max_tokens).toBeLessThanOrEqual(4_000);
-    expect(request.response_format).toEqual({ type: "json_object" });
+    expect(request.options.num_predict).toBeLessThanOrEqual(4_000);
+    expect(request.format).toBe("json");
     const instructions = request.messages.map((message: { content: string }) => message.content).join("\n");
     for (const required of ["title", "body", "tags", "choices", "id", "label", "summary", "statDelta", "relationshipDelta"]) {
       expect(instructions).toContain(`\"${required}\"`);
@@ -319,7 +377,7 @@ describe("AI event diagnostics", () => {
   });
 
   it("ignores Ollama reasoning tokens before the structured JSON content", async () => {
-    process.env.OPENROUTER_API_KEY = "test-key";
+    process.env.OLLAMA_API_KEY = "test-key";
     const stream = [
       `data: ${JSON.stringify({ choices: [{ delta: { reasoning: "We need to reason first." } }] })}`,
       `data: ${JSON.stringify({ choices: [{ delta: { content: JSON.stringify(validEvent) } }] })}`,
@@ -332,7 +390,7 @@ describe("AI event diagnostics", () => {
       recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {},
     }, () => {});
 
-    expect(result).toMatchObject({ success: true, providerId: "openrouter" });
+    expect(result).toMatchObject({ success: true, providerId: "ollama" });
   });
 
   it("retains safe primary failure telemetry when the secondary provider succeeds", async () => {
@@ -347,7 +405,7 @@ describe("AI event diagnostics", () => {
       recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {},
     });
 
-    expect(result).toMatchObject({ success: true, providerId: "ollama", retryUsed: true, providerFailures: [{ providerId: "openrouter", stage: "provider", reason: "rate_limited" }] });
+    expect(result).toMatchObject({ success: true, providerId: "openrouter", retryUsed: true, providerFailures: [{ providerId: "ollama", stage: "provider", reason: "rate_limited" }] });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(JSON.stringify(result)).not.toContain("primary-secret");
     expect(JSON.stringify(result)).not.toContain("secondary-secret");
@@ -357,22 +415,22 @@ describe("AI event diagnostics", () => {
   it("classifies a missing provider key without making a request", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
     const result = await generateAiEvent({ name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4, recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {} }, { primaryOnly: true });
-    expect(result).toMatchObject({ success: false, reason: "no_key", providerId: "openrouter", providerElapsedMs: 0 });
+    expect(result).toMatchObject({ success: false, reason: "no_key", providerId: "ollama", providerElapsedMs: 0 });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it.each([[429, "rate_limited"], [500, "api_error"]] as const)("classifies HTTP %i as %s", async (status, reason) => {
-    process.env.OPENROUTER_API_KEY = "test-key";
+    process.env.OLLAMA_API_KEY = "test-key";
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("upstream failure", { status }));
     const result = await generateAiEvent({ name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4, recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {} }, { primaryOnly: true });
-    expect(result).toMatchObject({ success: false, reason, providerId: "openrouter" });
+    expect(result).toMatchObject({ success: false, reason, providerId: "ollama" });
   });
 
   it.each([
     ["empty content", { choices: [{ message: { content: "" } }] }, "empty_content"],
     ["malformed JSON", { choices: [{ message: { content: "{broken" } }] }, "malformed_json"],
   ])("classifies %s responses", async (_label, payload, reason) => {
-    process.env.OPENROUTER_API_KEY = "test-key";
+    process.env.OLLAMA_API_KEY = "test-key";
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(payload), { status: 200 }));
     const result = await generateAiEvent({ name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4, recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {} }, { primaryOnly: true });
     expect(result).toMatchObject({ success: false, reason });
@@ -383,7 +441,7 @@ describe("AI event diagnostics", () => {
     ["choice_field", { ...validEvent, choices: [{ ...validEvent.choices[0], label: 42 }, validEvent.choices[1]] }],
     ["choice_schema", { ...validEvent, choices: [{ ...validEvent.choices[0], statDelta: "bad" }, validEvent.choices[1]] }],
   ] as const)("classifies real provider choice output as %s with one bounded call", async (reason, candidate) => {
-    process.env.OPENROUTER_API_KEY = "test-key";
+    process.env.OLLAMA_API_KEY = "test-key";
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
       choices: [{ message: { content: JSON.stringify(candidate) } }],
     }), { status: 200 }));
@@ -396,7 +454,7 @@ describe("AI event diagnostics", () => {
   });
 
   it.each([false, true])("classifies HTTP-200 SSE in-band errors (EOF=%s)", async (atEof) => {
-    process.env.OPENROUTER_API_KEY = "test-key";
+    process.env.OLLAMA_API_KEY = "test-key";
     const suffix = atEof ? "" : "\n\n";
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(`data: {"error":{"message":"upstream failed"}}${suffix}`, { status: 200 }));
     const result = await generateAiEventStream({ name: "서윤", major: "문학", gradeYear: 2, age: 21, coreEventCount: 4, recentSummaries: [], usedEventTitles: [], stats: {}, relationships: [], storyArc: {} }, () => {}, { primaryOnly: true });
