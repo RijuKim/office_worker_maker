@@ -93,7 +93,7 @@ const routeEvent = vi.hoisted(() => ({
   title: "동시에 도착한 권위 이벤트",
   body: "두 요청이 동시에 생성해도 플레이어에게는 하나의 동일한 본문만 전달됩니다.",
   source: "STATIC",
-  tags: ["관계"],
+  tags: ["수업", "갈등"],
   choices: [
     { id: "talk", label: "대화한다", summary: "대화했다.", statDelta: { mental: 1 }, relationshipDelta: [], flagDelta: {} },
     { id: "wait", label: "기다린다", summary: "기다렸다.", statDelta: { health: 1 }, relationshipDelta: [], flagDelta: {} },
@@ -863,7 +863,7 @@ describe("stateful JSON/SSE event authority", () => {
     const failure = failureKind === "quality" ? {
       success: true as const,
       event: {
-        title: "품질 거절 후보", body: "짧다", tags: ["진로"],
+        title: "품질 거절 후보", body: "짧다", tags: ["수업", "갈등"],
         choices: [
           { id: "a", label: "합격한다", summary: "당신은 갔다.", statDelta: { mental: -1 } },
           { id: "b", label: "남는다", summary: "당신은 남았다.", statDelta: { wealth: -1 } },
@@ -923,7 +923,7 @@ describe("stateful JSON/SSE event authority", () => {
     expect(logged).not.toContain("raw");
   });
 
-  it("commits one slow primary-provider result through the real generator without retry or fallback", async () => {
+  it("commits one slow OpenRouter fallback when the Ollama key is unavailable", async () => {
     vi.useFakeTimers();
     fixture.aiEnabled = true;
     const secret = "PRIMARY_ROUTE_KEY_SENTINEL_7c93";
@@ -936,7 +936,7 @@ describe("stateful JSON/SSE event authority", () => {
     const aiEvent = {
       title: "느리지만 한 번에 도착한 제안",
       body: "당신은 늦은 오후 도서관 창가에서 지원서를 펼쳤다. 빗소리 사이로 새로운 제안이 도착했고, 담당자는 오늘 안에 답을 달라고 했다. 조건은 매력적이지만 준비하던 계획과 충돌했다. 당신은 비용과 가능성을 차분히 비교했다. 어떤 답이든 다음 일정과 관계가 달라질 순간이었다.",
-      tags: ["진로"],
+      tags: ["수업", "갈등"],
       choices: routeEvent.choices,
     };
     const providerResponseBody = JSON.stringify({
@@ -969,8 +969,10 @@ describe("stateful JSON/SSE event authority", () => {
     expect(aiMocks.generateAiEvent).toHaveBeenCalledTimes(1);
     expect(info).toHaveBeenCalledWith(expect.stringContaining("이벤트 생성 완료"), expect.objectContaining({
       eventId: fixture.pointer, providerId: "openrouter", providerElapsedMs: 12_000,
-      totalElapsedMs: 12_000, retryUsed: false, fallbackUsed: false, slow: true,
-      providerFailures: [],
+      totalElapsedMs: 12_000, retryUsed: true, fallbackUsed: false, slow: true,
+      providerFailures: [expect.objectContaining({
+        providerId: "ollama", stage: "provider", reason: "no_key", providerElapsedMs: 0,
+      })],
     }));
     expect(serializedRequest).toContain(secret);
     expect(serializedRequest).toContain(prompt);
@@ -998,7 +1000,7 @@ describe("stateful JSON/SSE event authority", () => {
     const aiEvent = {
       title: "두 번째 공급자의 제안",
       body: "당신은 늦은 오후 도서관 창가에서 지원서를 펼쳤다. 빗소리 사이로 새로운 제안이 도착했고, 담당자는 오늘 안에 답을 달라고 했다. 조건은 매력적이지만 준비하던 계획과 충돌했다. 당신은 비용과 가능성을 차분히 비교했다. 어떤 답이든 다음 일정과 관계가 달라질 순간이었다.",
-      tags: ["진로"],
+      tags: ["수업", "갈등"],
       choices: routeEvent.choices,
     };
     const secondaryResponseBody = JSON.stringify({
@@ -1039,10 +1041,10 @@ describe("stateful JSON/SSE event authority", () => {
     expect(fixture.events.get(fixture.pointer!)).toMatchObject({ id: fixture.pointer, source: "AI", status: "ACTIVE" });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(info).toHaveBeenCalledWith(expect.stringContaining("이벤트 생성 완료"), expect.objectContaining({
-      eventId: fixture.pointer, providerId: "ollama", providerElapsedMs: 7_000,
+      eventId: fixture.pointer, providerId: "openrouter", providerElapsedMs: 7_000,
       totalElapsedMs: 12_000, retryUsed: true, fallbackUsed: false, slow: true,
       providerFailures: [expect.objectContaining({
-        providerId: "openrouter", stage: "provider", reason: "rate_limited", providerElapsedMs: 5_000,
+        providerId: "ollama", stage: "provider", reason: "rate_limited", providerElapsedMs: 5_000,
       })],
     }));
     for (const sentinel of [primarySecret, secondarySecret, prompt]) {
@@ -1087,7 +1089,7 @@ describe("stateful JSON/SSE event authority", () => {
   it("honors the configured provider timeout at route level and commits a validated fallback", async () => {
     vi.useFakeTimers();
     fixture.aiEnabled = true;
-    aiMocks.checkDailyAiLimit.mockResolvedValue({ allowed: false });
+    aiMocks.checkDailyAiLimit.mockResolvedValue({ allowed: true });
     process.env.OLLAMA_API_KEY = "ROUTE_TIMEOUT_SECRET_SENTINEL";
     process.env.OPENROUTER_TIMEOUT_MS = "5000";
     const rawSentinel = "ROUTE_RAW_RESPONSE_SENTINEL";
