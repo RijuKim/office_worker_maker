@@ -125,6 +125,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
       charm: character.stats.charm,
     },
     statDelta,
+    { coreEventCount: character.coreEventCount },
   );
   const previousStats = {
     academic: character.stats.academic,

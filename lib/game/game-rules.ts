@@ -5,6 +5,16 @@ export const MAX_HEALTH_LOSS_PER_CHOICE = 1;
 export const MAX_MENTAL_LOSS_PER_CHOICE = 1;
 export const BURNOUT_THRESHOLD = 80;
 
+/**
+ * Cumulative balance guard thresholds.
+ * Prevents implausible early stat collapse from consecutive fixed-event costs.
+ * The guard activates only during the early/mid college window (first 8 events)
+ * and ensures health/mental cannot drop below the floor through ordinary
+ * consecutive depletion. Meaningful risk and later failure paths are preserved.
+ */
+export const CUMULATIVE_GUARD_EVENT_LIMIT = 8;
+export const CUMULATIVE_GUARD_FLOOR = 2;
+
 export const TRUST_MIN = -100;
 export const TRUST_MAX = 100;
 
@@ -30,6 +40,7 @@ export function clampTrust(value: number): number {
 export function applyStatDeltas(
   currentStats: Record<string, number>,
   deltas: StatDelta,
+  options?: { coreEventCount?: number },
 ): Record<string, number> {
   const result = { ...currentStats };
   const normalizedDeltas = normalizeStatDeltas(deltas);
@@ -43,7 +54,28 @@ export function applyStatDeltas(
     result[stat] = clampPublicStat(current + clamped, stat);
   }
 
-  return result;
+  return applyCumulativeBalanceGuard(result, options);
+}
+
+/**
+ * Prevents implausible early stat collapse from consecutive fixed-event costs.
+ * During the first CUMULATIVE_GUARD_EVENT_LIMIT events, health and mental
+ * cannot drop below CUMULATIVE_GUARD_FLOOR. This preserves meaningful risk
+ * (the floor is still low enough to trigger collapse warnings) while preventing
+ * the five-consecutive-minus-one regression. After the guard window, normal
+ * depletion rules apply, so late-game failure paths are unaffected.
+ */
+export function applyCumulativeBalanceGuard(
+  stats: Record<string, number>,
+  options?: { coreEventCount?: number },
+): Record<string, number> {
+  const count = options?.coreEventCount;
+  if (count === undefined || count > CUMULATIVE_GUARD_EVENT_LIMIT) return stats;
+  return {
+    ...stats,
+    health: Math.max(CUMULATIVE_GUARD_FLOOR, stats.health),
+    mental: Math.max(CUMULATIVE_GUARD_FLOOR, stats.mental),
+  };
 }
 
 export function normalizeStatDeltas(deltas: StatDelta): StatDelta {

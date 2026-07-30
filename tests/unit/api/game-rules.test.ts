@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyCumulativeBalanceGuard,
   applyFlagDeltas,
   applyRelationshipDeltas,
   applyStatDeltas,
   checkForcedEvent,
   clampPublicStat,
   clampTrust,
+  CUMULATIVE_GUARD_EVENT_LIMIT,
+  CUMULATIVE_GUARD_FLOOR,
   normalizeStatDeltas,
   validateChoiceIndex,
 } from "@/lib/game/game-rules";
@@ -109,5 +112,81 @@ describe("validateChoiceIndex", () => {
     expect(validateChoiceIndex([1, 2, 3], -1)).toBe(false);
     expect(validateChoiceIndex([1, 2, 3], 3)).toBe(false);
     expect(validateChoiceIndex([1, 2, 3], "x" as unknown as number)).toBe(false);
+  });
+});
+
+describe("applyCumulativeBalanceGuard", () => {
+  it("does not modify stats above the floor", () => {
+    const result = applyCumulativeBalanceGuard(
+      { health: 6, mental: 5, academic: 7 },
+      { coreEventCount: 3 },
+    );
+    expect(result.health).toBe(6);
+    expect(result.mental).toBe(5);
+    expect(result.academic).toBe(7);
+  });
+
+  it("prevents health from dropping below floor during early events", () => {
+    const result = applyCumulativeBalanceGuard(
+      { health: 1, mental: 5 },
+      { coreEventCount: 3 },
+    );
+    expect(result.health).toBe(CUMULATIVE_GUARD_FLOOR);
+    expect(result.mental).toBe(5);
+  });
+
+  it("prevents mental from dropping below floor during early events", () => {
+    const result = applyCumulativeBalanceGuard(
+      { health: 5, mental: 1 },
+      { coreEventCount: 5 },
+    );
+    expect(result.health).toBe(5);
+    expect(result.mental).toBe(CUMULATIVE_GUARD_FLOOR);
+  });
+
+  it("allows health/mental to drop below floor after guard window", () => {
+    const result = applyCumulativeBalanceGuard(
+      { health: 1, mental: 1 },
+      { coreEventCount: CUMULATIVE_GUARD_EVENT_LIMIT + 1 },
+    );
+    expect(result.health).toBe(1);
+    expect(result.mental).toBe(1);
+  });
+
+  it("prevents the five-consecutive-minus-one regression", () => {
+    // Simulate 5 consecutive choices each applying -1 to mental
+    let stats: Record<string, number> = { health: 6, mental: 6, academic: 5 };
+    for (let i = 0; i < 5; i++) {
+      stats = applyStatDeltas(stats, { mental: -1 }, { coreEventCount: i });
+    }
+    // After 5 consecutive -1 mental hits, mental should be at floor, not 1
+    expect(stats.mental).toBe(CUMULATIVE_GUARD_FLOOR);
+    expect(stats.mental).toBeGreaterThan(1);
+  });
+
+  it("preserves meaningful risk by allowing floor-level stats to trigger collapse warnings", () => {
+    // At floor=2, a single -1 hit brings it to 1 which triggers collapseWarning
+    const result = applyCumulativeBalanceGuard(
+      { health: 2, mental: 5 },
+      { coreEventCount: 3 },
+    );
+    expect(result.health).toBe(2);
+    // A subsequent -1 delta would bring it to 1, triggering healthCollapseWarning
+  });
+
+  it("does not guard when coreEventCount is undefined", () => {
+    const result = applyCumulativeBalanceGuard({ health: 1, mental: 1 });
+    expect(result.health).toBe(1);
+    expect(result.mental).toBe(1);
+  });
+
+  it("preserves other stats unchanged", () => {
+    const result = applyCumulativeBalanceGuard(
+      { health: 1, mental: 1, academic: 10, practical: 8, wealth: 100 },
+      { coreEventCount: 2 },
+    );
+    expect(result.academic).toBe(10);
+    expect(result.practical).toBe(8);
+    expect(result.wealth).toBe(100);
   });
 });

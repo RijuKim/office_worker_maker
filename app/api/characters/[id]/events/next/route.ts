@@ -1,11 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { EventSource } from "@prisma/client";
 
-import { getStoryArc, isEventAllowedForLifeStage, selectNextEvent, type StaticEvent } from "@/lib/game/event-engine";
+import { getStoryArc, isEventAllowedForLifeStage, selectNextEvent, STORY_CORE_QUESTION, type StaticEvent } from "@/lib/game/event-engine";
 import { evaluateCandidateEvent, findValidatedStaticFallback } from "@/lib/game/event-quality-policy";
 import { deriveLifeStageState } from "@/lib/game/life-stage";
 import { normalizeCareerNarrativeState, summarizeCareerNarrativeForPrompt } from "@/lib/game/career-narrative";
-import { buildDiversityCategoryGuidance, eventMatchesCategory, normalizeEventCategory, selectStoryCategoryPalette } from "@/lib/game/event-diversity";
+import { buildDiversityCategoryGuidance, collectRecentPeople, eventMatchesCategory, normalizeEventCategory, selectStoryCategoryPalette } from "@/lib/game/event-diversity";
 import { checkDailyAiLimit, generateAiEvent, getOpenRouterTimeoutMs, incrementAiUsage } from "@/lib/game/openrouter";
 import { NPC_POOL, selectStarterCandidates } from "@/lib/game/npcs";
 import { recordEventQualityLog } from "@/lib/server/event-quality-log";
@@ -111,7 +111,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
     major: character.major,
     coreEventCount: character.coreEventCount,
   });
-  const diversityGuidance = buildDiversityGuidance(character.eventHistory, character.coreEventCount, character.id);
+  const diversityGuidance = buildDiversityGuidance(character.eventHistory, character.relationships, character.coreEventCount, character.id);
   const lastHistory = character.eventHistory[0];
   const previousChoiceSummary = lastHistory?.summary;
   const selectionContext = {
@@ -335,7 +335,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
           flagDelta: { aiGenerated: true, storyPhase: storyArc.phase },
         })),
         tags: aiResult.event.tags,
-        source: "FALLBACK" as const,
+        source: "AI" as const,
       };
       const initialEvaluation = evaluateCandidateEvent("AI", aiEvent, qualityContext);
       recordEventQualityLog({
@@ -417,7 +417,12 @@ export async function POST(request: Request | NextRequest, context: RouteContext
         body: selectedEvent.body,
         source,
         choices: selectedEvent.choices,
-        tags: selectedEvent.tags,
+        tags: [
+          ...selectedEvent.tags,
+          ...(providerId ? [`provider:${providerId}`] : []),
+          ...(fallbackUsed ? ["fallback:true"] : []),
+          ...(generationReason ? [`reason:${generationReason}`] : []),
+        ],
       }),
       onCommitted: async (_event, transaction) => {
         const tx = transaction as Pick<typeof prisma, "hiddenState">;
@@ -428,6 +433,9 @@ export async function POST(request: Request | NextRequest, context: RouteContext
               ...selectionFlags,
               storyArc,
               lastEventSource: source,
+              lastProviderId: providerId,
+              lastFallbackUsed: fallbackUsed,
+              lastGenerationReason: generationReason,
               ...(fallbackUsed ? { lastAiFallbackReason: "quality_or_generation_failed" } : {}),
             },
           },
@@ -486,7 +494,7 @@ export async function POST(request: Request | NextRequest, context: RouteContext
 function validateStarterCandidates(raw: unknown, characterId: string): { name: string; role: string }[] {
   if (!Array.isArray(raw)) return selectStarterCandidates(characterId, 7);
   if (raw.length < 6 || raw.length > 8) return selectStarterCandidates(characterId, 7);
-  const safeNames = new Set(NPC_POOL.filter((n) => n.dangerLevel === 0).map((n) => n.name));
+  const safeNames = new Set(NPC_POOL.filter((n) => n.dangerLevel === 0 && n.starterEligible === true).map((n) => n.name));
   const allValid = raw.every(
     (item) =>
       typeof item === "object" && item !== null &&
@@ -518,7 +526,8 @@ function advanceStoryArc(rawArc: unknown, coreEventCount: number, flags: Record<
   const arc = getStoryArc(coreEventCount);
   const tensionBase = typeof base.tension === "number" ? base.tension : 18;
   const riskDebt = typeof flags.riskDebt === "number" ? flags.riskDebt : 0;
-  const tension = Math.max(10, Math.min(95, tensionBase + (arc.phase === "위기" ? 9 : arc.phase === "절정" ? 12 : 4) + Math.min(12, riskDebt * 2)));
+  const phaseTension = arc.phase === "절정" ? 12 : arc.phase === "위기" ? 9 : arc.phase === "심화" || arc.phase === "결단" ? 7 : 4;
+  const tension = Math.max(10, Math.min(95, tensionBase + phaseTension + Math.min(12, riskDebt * 2)));
   const openThreads = Array.isArray(base.openThreads) && base.openThreads.length > 0
     ? base.openThreads.filter((thread) => typeof thread === "string")
     : [arc.openThread];
@@ -528,27 +537,30 @@ function advanceStoryArc(rawArc: unknown, coreEventCount: number, flags: Record<
 
   return {
     title: arc.title,
-    premise: typeof base.premise === "string" ? base.premise : "작은 대학 생활의 선택들이 취업, 관계, 휴학, 직업으로 이어진다.",
+    premise: typeof base.premise === "string" ? base.premise : "취업을 준비하는 동안 무엇을 지키고 포기할지 선택한다.",
+    coreQuestion: STORY_CORE_QUESTION,
     phase: arc.phase,
+    currentArcId: arc.id,
     chapter: Math.floor(coreEventCount / 3) + 1,
+    dramaticQuestion: arc.dramaticQuestion,
+    focusAxes: arc.focusAxes,
     tension,
     foreshadowing: Array.isArray(base.foreshadowing) && base.foreshadowing.length > 0
       ? base.foreshadowing
       : ["아직 정체를 알 수 없는 커리어 제안", "처음 보는 듯 익숙한 아침의 위화감"],
-    openThreads: [...new Set([arc.openThread, ...openThreads, ...activeThreads])].slice(0, 8),
+    openThreads: [...new Set([arc.openThread, ...activeThreads, ...openThreads])].slice(0, 8),
   };
 }
 
 function buildDiversityGuidance(eventHistory: Array<{
-  event?: { tags?: unknown };
+  event?: { title?: string | null; body?: string | null; tags?: unknown };
   relationshipDelta?: unknown;
-}>, coreEventCount: number, storySeed: string) {
+}>, relationships: Array<{ name: string }>, coreEventCount: number, storySeed: string) {
   const recent = eventHistory.slice(0, 5);
   const recentTags = recent.flatMap((history) =>
     Array.isArray(history.event?.tags) ? history.event.tags.filter((tag) => typeof tag === "string") : [],
   );
-  const recentPeople = recent.flatMap((history) => readRelationshipNames(history.relationshipDelta));
-  const peopleCounts = countItems(recentPeople);
+  const { recentPeople, avoidPeople } = collectRecentPeople(recent, relationships);
   const allowedCategories = selectStoryCategoryPalette(storySeed);
   const categoryGuidance = buildDiversityCategoryGuidance(
     recentTags.map(normalizeEventCategory).filter(Boolean),
@@ -557,9 +569,6 @@ function buildDiversityGuidance(eventHistory: Array<{
     coreEventCount % 3 === 2,
   );
   const avoidCategories = categoryGuidance.avoidCategories;
-  const avoidPeople = Object.entries(peopleCounts)
-    .filter(([, count]) => count >= 2)
-    .map(([name]) => name);
   const preferCategories = categoryGuidance.preferCategories;
   const targetCategory = categoryGuidance.targetCategory;
 
@@ -571,11 +580,4 @@ function readRelationshipNames(raw: unknown) {
   return raw
     .map((item) => typeof item === "object" && item !== null ? (item as Record<string, unknown>).name : null)
     .filter((name): name is string => typeof name === "string" && name.trim().length > 0);
-}
-
-function countItems(items: string[]) {
-  return items.reduce<Record<string, number>>((counts, item) => {
-    counts[item] = (counts[item] ?? 0) + 1;
-    return counts;
-  }, {});
 }
