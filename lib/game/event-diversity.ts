@@ -83,6 +83,43 @@ export function eventMatchesCategory(
   return eventCategoryExamples(category).some((keyword) => text.includes(keyword.toLowerCase()));
 }
 
+/**
+ * Finds persisted people who actually appeared in recent scenes. This keeps a
+ * familiar cast available without making the same person drive consecutive events.
+ */
+export function collectRecentPeople(
+  history: Array<{
+    event?: { title?: string | null; body?: string | null };
+    relationshipDelta?: unknown;
+  }>,
+  relationships: Array<{ name: string }>,
+) {
+  const persistedNames = relationships
+    .map(({ name }) => name.trim())
+    .filter(Boolean);
+  const recentPeople: string[] = [];
+
+  for (const item of history) {
+    const sceneText = `${item.event?.title ?? ""} ${item.event?.body ?? ""}`;
+    const deltaNames = Array.isArray(item.relationshipDelta)
+      ? item.relationshipDelta
+        .map((delta) => typeof delta === "object" && delta !== null ? (delta as Record<string, unknown>).name : null)
+        .filter((name): name is string => typeof name === "string")
+      : [];
+
+    for (const name of persistedNames) {
+      if ((sceneText.includes(name) || deltaNames.includes(name)) && !recentPeople.includes(name)) {
+        recentPeople.push(name);
+      }
+    }
+  }
+
+  return {
+    recentPeople,
+    avoidPeople: recentPeople.slice(0, 3),
+  };
+}
+
 /** Keep one run cohesive by drawing repeatedly from a stable, personalized palette. */
 export function selectStoryCategoryPalette(
   storySeed: string,
