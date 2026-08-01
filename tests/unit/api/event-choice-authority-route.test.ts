@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   requireCurrentUserId: vi.fn(),
@@ -41,7 +41,7 @@ vi.mock("@/lib/server/prisma", () => ({
 
 vi.mock("@/lib/game/openrouter", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/game/openrouter")>();
-  return { ...actual, generateAiEnding: vi.fn() };
+  return { ...actual, generateAiEnding: vi.fn().mockResolvedValue({ success: false, reason: "mocked" }) };
 });
 
 import { GET as getCharacter } from "@/app/api/characters/[id]/route";
@@ -239,6 +239,113 @@ describe("choice event authority", () => {
     expect(mocks.historyCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({ summary: expect.not.stringMatching(/\(\d+\/\d+\)/) }),
     });
+  });
+
+  it("persists non-null structured fields in final ending record when gate is not passed", async () => {
+    const gateEvent = activeEvent("final-gate", "마지막 관문");
+    gateEvent.choices[0] = {
+      ...gateEvent.choices[0],
+      summary: "당신은 마지막 선택을 내렸다.",
+      flagDelta: {
+        authoritativeChoice: true,
+      } as Record<string, unknown> & { authoritativeChoice: boolean },
+    };
+    const run = character([gateEvent], gateEvent.id);
+    run.coreEventCount = 23;
+    run.hiddenState = {
+      burnoutRisk: 10,
+      eventFlags: {
+        careerGate: { status: "failed", path: "general_job", label: "첫 지원 절차 탈락" },
+      },
+      familyState: {},
+    };
+    mocks.characterFindFirst.mockResolvedValue(run);
+
+    const response = await choose(request(), { params: Promise.resolve({ id: "run-1" }) });
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.result.endingTriggered).toBe(true);
+
+    const createdEnding = mocks.endingCreate.mock.calls[0]?.[0]?.data ?? {};
+    expect(createdEnding.jobRole).not.toBeNull();
+    expect(createdEnding.destinationName).not.toBeNull();
+    expect(createdEnding.careerPath).toContain("탈락");
+    expect(createdEnding.salaryBand).toBeNull();
+  });
+
+  it("persists gated employer fields in final ending record when gate is passed", async () => {
+    const gateEvent = activeEvent("final-gate-passed", "마지막 관문");
+    gateEvent.choices[0] = {
+      ...gateEvent.choices[0],
+      summary: "당신은 마지막 선택을 내렸다.",
+      flagDelta: {
+        authoritativeChoice: true,
+        careerGateAttempt: { path: "company", approach: "project_cases" },
+      } as Record<string, unknown> & { authoritativeChoice: boolean },
+    };
+    const run = character([gateEvent], gateEvent.id);
+    run.coreEventCount = 23;
+    run.hiddenState = {
+      burnoutRisk: 10,
+      eventFlags: {
+        careerGate: { status: "passed", path: "company", label: "기업 최종 면접 합격" },
+        destinationCandidates: [
+          {
+            id: "career-company",
+            kind: "company",
+            name: "다람소프트",
+            introducedBy: "career-gate-event",
+            status: "gate_passed",
+          },
+        ],
+      },
+      familyState: {},
+    };
+    mocks.characterFindFirst.mockResolvedValue(run);
+
+    const response = await choose(request(), { params: Promise.resolve({ id: "run-1" }) });
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.result.endingTriggered).toBe(true);
+
+    const createdEnding = mocks.endingCreate.mock.calls[0]?.[0]?.data ?? {};
+    expect(createdEnding.careerPath).toContain("다람소프트");
+  });
+
+  it("persists non-null structured fields in crisis ending record", async () => {
+    const crisisEvent = activeEvent("crisis-event", "위기 상황");
+    crisisEvent.choices[0] = {
+      ...crisisEvent.choices[0],
+      summary: "당신은 위기 속에서 마지막 선택을 내렸다.",
+      statDelta: { health: -100, mental: -100 } as unknown as { mental: number },
+      flagDelta: { authoritativeChoice: true },
+    };
+    const run = character([crisisEvent], crisisEvent.id);
+    run.stats = {
+      academic: 50, practical: 50, communication: 50, creativity: 50,
+      health: 1, mental: 70, network: 40, wealth: 30, reputation: 50, charm: 50,
+    };
+    run.hiddenState = {
+      burnoutRisk: 10,
+      eventFlags: { healthCollapseWarning: true },
+      familyState: {},
+    };
+    mocks.characterFindFirst.mockResolvedValue(run);
+
+    const response = await choose(request(), { params: Promise.resolve({ id: "run-1" }) });
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.result.endingTriggered).toBe(true);
+
+    const createdEnding = mocks.endingCreate.mock.calls[0]?.[0]?.data ?? {};
+    expect(createdEnding.jobRole).not.toBeNull();
+    expect(createdEnding.destinationName).not.toBeNull();
+    expect(createdEnding.jobRole).toBe("건강 회복 중");
+    expect(createdEnding.destinationName).toBe("휴식·회복");
+    expect(createdEnding.salaryBand).toBeNull();
   });
 
   it("rejects a stale choice after another transaction advances the pointer without applying duplicate effects", async () => {

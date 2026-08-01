@@ -931,6 +931,9 @@ async function buildImmediateBadEndingRecord(input: {
   });
   const generated = aiEnding.success ? aiEnding.ending : null;
   const concreteResult = gateConcreteResultFields(generated, input.hiddenState);
+  const crisisStructured = concreteResult.jobRole && concreteResult.destinationName
+    ? concreteResult
+    : deriveCrisisStructuredFields(input.endingType, input.stats);
 
   return {
     userId: input.userId,
@@ -939,9 +942,9 @@ async function buildImmediateBadEndingRecord(input: {
     summary: sanitizeResultText(generated?.summary) ?? `${input.characterName}은 ${input.eventTitle} 이후 ${reason}.`,
     longNarrative: sanitizeResultText(generated?.longNarrative) ?? buildLongFallbackEnding(input.characterName, input.major, "중도 이탈", input.stats, input.summary, reason),
     careerPath: sanitizeResultText(generated?.careerPath) ?? "중도 이탈",
-    jobRole: concreteResult.jobRole,
-    destinationName: concreteResult.destinationName,
-    salaryBand: concreteResult.salaryBand,
+    jobRole: crisisStructured.jobRole,
+    destinationName: crisisStructured.destinationName,
+    salaryBand: crisisStructured.salaryBand,
     workplaceTone: sanitizeTextArray(generated?.workplaceTone),
     statSnapshot: input.stats,
     keyRelationships: serializeRelationships(input.relationships),
@@ -1014,6 +1017,9 @@ async function buildFinalEndingRecord(input: {
   });
   const generated = aiEnding.success ? aiEnding.ending : null;
   const concreteResult = gateConcreteResultFields(generated, input.hiddenState);
+  const structuredFields = gate?.status === "passed"
+    ? concreteResult
+    : deriveStructuredFieldsFromCareerPath(careerPath, input.stats);
 
   return {
     userId: input.userId,
@@ -1022,9 +1028,9 @@ async function buildFinalEndingRecord(input: {
     summary: sanitizeResultText(generated?.summary) ?? `${input.characterName}은 ${input.summary} 그 선택을 계기로 ${careerPath}의 삶을 시작했습니다.`,
     longNarrative: sanitizeResultText(generated?.longNarrative) ?? buildLongFallbackEnding(input.characterName, input.major, careerPath, input.stats, input.summary, relationshipState, input.eventHistory),
     careerPath,
-    jobRole: gate?.status === "passed" ? concreteResult.jobRole : null,
-    destinationName: gate?.status === "passed" ? concreteResult.destinationName : null,
-    salaryBand: gate?.status === "passed" ? concreteResult.salaryBand : null,
+    jobRole: structuredFields.jobRole,
+    destinationName: structuredFields.destinationName,
+    salaryBand: structuredFields.salaryBand,
     workplaceTone: sanitizeTextArray(generated?.workplaceTone),
     statSnapshot: input.stats,
     keyRelationships: serializeRelationships(input.relationships),
@@ -1037,6 +1043,64 @@ async function buildFinalEndingRecord(input: {
     tags: sanitizeTags(generated?.tags, ["선택의 결과", careerPath]),
     similarityKey: `result-${careerPath}`,
   };
+}
+
+function deriveStructuredFieldsFromCareerPath(careerPath: string, stats: Record<string, number>): {
+  jobRole: string | null;
+  destinationName: string | null;
+  salaryBand: string | null;
+} {
+  if (careerPath.includes("전문직") || careerPath.includes("시험")) {
+    return { jobRole: "수험생", destinationName: "진로 준비", salaryBand: null };
+  }
+  if (careerPath.includes("창업") || careerPath.includes("자영업")) {
+    return { jobRole: "창업 준비", destinationName: "진로 준비", salaryBand: null };
+  }
+  if (careerPath.includes("취업") || careerPath.includes("지원") || careerPath.includes("준비")) {
+    return { jobRole: "구직·준비", destinationName: "진로 미정", salaryBand: null };
+  }
+  if (careerPath.includes("아르바이트") || careerPath.includes("알바")) {
+    return { jobRole: "아르바이트", destinationName: "생활 유지", salaryBand: null };
+  }
+  if (careerPath.includes("공공") || careerPath.includes("공무원") || careerPath.includes("공기관")) {
+    return { jobRole: "공공기관 준비", destinationName: "진로 준비", salaryBand: null };
+  }
+  if (careerPath.includes("기업") || careerPath.includes("회사") || careerPath.includes("실무자")) {
+    return { jobRole: "취업 준비", destinationName: "진로 미정", salaryBand: null };
+  }
+  if (careerPath.includes("연애") || careerPath.includes("결혼") || careerPath.includes("생활인")) {
+    return { jobRole: "생활인", destinationName: "개인 생활", salaryBand: null };
+  }
+  if (careerPath.includes("워홀") || careerPath.includes("해외")) {
+    return { jobRole: "해외 워홀", destinationName: "해외 체류", salaryBand: null };
+  }
+  if (careerPath.includes("생존") || careerPath.includes("생존자")) {
+    return { jobRole: "재정비", destinationName: "진로 미정", salaryBand: null };
+  }
+  if (careerPath.includes("마케팅") || careerPath.includes("콘텐츠")) {
+    return { jobRole: "마케팅·콘텐츠 준비", destinationName: "진로 미정", salaryBand: null };
+  }
+  if (careerPath.includes("안정") || careerPath.includes("조용히")) {
+    return { jobRole: "개인 생활", destinationName: "진로 미정", salaryBand: null };
+  }
+  return { jobRole: "구직·준비", destinationName: "진로 미정", salaryBand: null };
+}
+
+function deriveCrisisStructuredFields(endingType: string, stats: Record<string, number>): {
+  jobRole: string | null;
+  destinationName: string | null;
+  salaryBand: string | null;
+} {
+  if (endingType === "건강 붕괴") {
+    return { jobRole: "건강 회복 중", destinationName: "휴식·회복", salaryBand: null };
+  }
+  if (endingType === "멘탈 붕괴") {
+    return { jobRole: "심리 회복 중", destinationName: "휴식·회복", salaryBand: null };
+  }
+  if (endingType === "평판 붕괴") {
+    return { jobRole: "재정비", destinationName: "진로 미정", salaryBand: null };
+  }
+  return { jobRole: "재정비", destinationName: "진로 미정", salaryBand: null };
 }
 
 function getCareerGate(hiddenState: unknown): { status: string; path: string; label?: string } | null {

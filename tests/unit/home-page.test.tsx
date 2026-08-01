@@ -520,6 +520,171 @@ describe("Home page scaffold", () => {
     container.remove();
   });
 
+  it("auto-navigates to records screen with expanded card after final choice", async () => {
+    mockedSessionStatus = "authenticated";
+    let recordsCallCount = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input)).pathname;
+      if (url === "/api/characters") {
+        return Response.json({ characters: [character] });
+      }
+      if (url === "/api/characters/char-1") {
+        return Response.json({
+          character,
+          currentEvent: {
+            id: "event-1",
+            title: "마지막 장면",
+            body: "당신은 마지막 선택 앞에 선다.",
+            choices: [{ id: "final", label: "마지막 선택을 한다.", statDelta: {} }],
+            source: "TEMPLATE",
+          },
+        });
+      }
+      if (url === "/api/characters/char-1/choices" && init?.method === "POST") {
+        return Response.json({
+          result: {
+            endingTriggered: true,
+            endingRecordId: "record-final-1",
+            stats: character.stats,
+            statDelta: {},
+            relationshipDelta: [],
+            summary: "당신은 마지막 선택을 기록으로 남겼다.",
+          },
+        });
+      }
+      if (url === "/api/records") {
+        recordsCallCount += 1;
+        return Response.json({
+          records: [{
+            id: "record-final-1",
+            title: "선택의 결과: 컴퓨터공학도의 길",
+            summary: "당신은 마지막 선택을 기록으로 남겼다.",
+            longNarrative: "당신은 컴퓨터공학과의 강의실에서 시작한 여러 사건 끝에 불확실한 취업 준비 이후의 조용한 생존이라는 이름의 문 앞에 섰다. 마지막에 남은 선택은 단순한 합격이나 취업이 아니라, 그동안 쌓인 모든 태도의 계산서에 가까웠다.",
+            careerPath: "불확실한 취업 준비 이후의 조용한 생존",
+            healthState: "좋음",
+            relationshipState: "넓고 안정적",
+            satisfaction: 55,
+            growthPotential: 60,
+            workLifeBalance: 50,
+            tags: ["선택의 결과", "불확실한 취업 준비 이후의 조용한 생존"],
+          }],
+        });
+      }
+      return Response.json({});
+    }));
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<Home />);
+    });
+
+    await waitForAssertion(() => expect(findButton(container, /마지막 선택을 한다/)).toBeTruthy());
+
+    await act(async () => {
+      findButton(container, /마지막 선택을 한다/).click();
+    });
+
+    await waitForAssertion(() => expect(container.textContent).toContain("선택의 결과 기록"));
+    expect(container.textContent).toContain("컴퓨터공학도의 길");
+    expect(container.textContent).toContain("조용한 생존");
+    expect(recordsCallCount).toBe(1);
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it("retries /api/records fetch when initially unavailable after ending", async () => {
+    mockedSessionStatus = "authenticated";
+    let recordsCallCount = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input)).pathname;
+      if (url === "/api/characters") {
+        return Response.json({ characters: [character] });
+      }
+      if (url === "/api/characters/char-1") {
+        return Response.json({
+          character,
+          currentEvent: {
+            id: "event-1",
+            title: "마지막 장면",
+            body: "당신은 마지막 선택 앞에 선다.",
+            choices: [{ id: "final", label: "마지막 선택을 한다.", statDelta: {} }],
+            source: "TEMPLATE",
+          },
+        });
+      }
+      if (url === "/api/characters/char-1/choices" && init?.method === "POST") {
+        return Response.json({
+          result: {
+            endingTriggered: true,
+            endingRecordId: "record-final-2",
+            stats: character.stats,
+            statDelta: {},
+            relationshipDelta: [],
+            summary: "당신은 마지막 선택을 기록으로 남겼다.",
+          },
+        });
+      }
+      if (url === "/api/records") {
+        recordsCallCount += 1;
+        if (recordsCallCount === 1) {
+          return new Response(null, { status: 503 });
+        }
+        return Response.json({
+          records: [{
+            id: "record-final-2",
+            title: "선택의 결과: 두 번째 시도",
+            summary: "재시도 후 로드된 기록",
+            longNarrative: "재시도 후 로드된 긴 이야기.",
+            careerPath: "불확실한 취업 준비",
+            healthState: "보통",
+            relationshipState: "불안정",
+            satisfaction: 40,
+            growthPotential: 50,
+            workLifeBalance: 45,
+            tags: ["선택의 결과"],
+          }],
+        });
+      }
+      return Response.json({});
+    }));
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<Home />);
+    });
+
+    await waitForAssertion(() => expect(findButton(container, /마지막 선택을 한다/)).toBeTruthy());
+
+    await act(async () => {
+      findButton(container, /마지막 선택을 한다/).click();
+    });
+
+    // Retry has 500ms delay; wait up to 3s for the retried fetch to resolve
+    const started = Date.now();
+    while (Date.now() - started < 3000) {
+      if (container.textContent?.includes("두 번째 시도")) break;
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      });
+    }
+    expect(container.textContent).toContain("두 번째 시도");
+    expect(recordsCallCount).toBeGreaterThanOrEqual(2);
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
   it("shows new start instead of progress after a final result", async () => {
     mockedSessionStatus = "authenticated";
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
