@@ -7,9 +7,23 @@ export interface NpcProfile {
   tags: string[];
   thread: string; // story thread this NPC is associated with
   dangerLevel: number; // 0=safe, 1=risky, 2=dangerous
+  starterEligible?: boolean;
 }
 
 export const NPC_POOL: NpcProfile[] = [
+  // ===== 중립 시작 관계 =====
+  // These roles can plausibly appear in many opening scenes without forcing
+  // a gym, club, library, workplace, or other concrete plot premise.
+  { name: "가은", role: "학과 선배", greeting: "처음 보면 복잡하지? 필요한 거 있으면 물어봐.", personality: "차분하고 현실적인", backstory: "학과 생활에 익숙하지만 후배의 선택을 대신 정해주지는 않는 선배", tags: ["선배", "학업", "일상"], thread: "daily_life", dangerLevel: 0, starterEligible: true },
+  { name: "민재", role: "같은 과 동기", greeting: "우리 같은 수업 맞지? 같이 들어갈래?", personality: "호기심 많고 붙임성 있는", backstory: "아직 진로를 정하지 않아 여러 활동을 가볍게 탐색하는 동기", tags: ["동기", "수업", "친구"], thread: "daily_life", dangerLevel: 0, starterEligible: true },
+  { name: "예나", role: "교양 수업 동기", greeting: "여기 자리 비었어. 앉아도 돼.", personality: "관찰력이 좋고 솔직한", backstory: "전공은 다르지만 교양 수업에서 자주 마주치는 학생", tags: ["동기", "수업", "일상"], thread: "social_life", dangerLevel: 0, starterEligible: true },
+  { name: "시온", role: "팀 프로젝트 동료", greeting: "역할부터 천천히 나눠볼까?", personality: "신중하고 협업을 중시하는", backstory: "처음 만난 사람과도 규칙을 정해 차분히 협업하는 동료", tags: ["동료", "협업", "학업"], thread: "group_project", dangerLevel: 0, starterEligible: true },
+  { name: "나래", role: "학교 친구", greeting: "오늘 일정 끝나고 뭐 할 거야?", personality: "유연하고 다정한", backstory: "특정 활동보다 주인공의 일상 변화에 관심이 많은 친구", tags: ["친구", "일상", "관계"], thread: "daily_life", dangerLevel: 0, starterEligible: true },
+  { name: "주원", role: "복학생 선배", greeting: "서두를 필요 없어. 학교는 생각보다 길거든.", personality: "느긋하지만 경험이 많은", backstory: "휴학과 복학을 거치며 여러 선택의 장단점을 아는 선배", tags: ["선배", "진로고민", "일상"], thread: "daily_life", dangerLevel: 0, starterEligible: true },
+  { name: "다희", role: "학과 후배", greeting: "선배, 이것만 잠깐 물어봐도 돼요?", personality: "성실하고 조심스러운", backstory: "학교생활의 작은 질문을 계기로 가까워질 수 있는 후배", tags: ["후배", "학업", "관계"], thread: "social_life", dangerLevel: 0, starterEligible: true },
+  { name: "성민", role: "스터디 동기", greeting: "일단 계획부터 같이 맞춰보자.", personality: "계획적이지만 융통성 있는", backstory: "아직 어떤 공부를 함께할지 정하지 않은 느슨한 학습 동료", tags: ["동기", "학업", "계획"], thread: "academic_research", dangerLevel: 0, starterEligible: true },
+  { name: "아린", role: "학생지원관 선배", greeting: "모르는 제도 있으면 같이 찾아볼까?", personality: "친절하고 꼼꼼한", backstory: "학생 지원 정보를 잘 알지만 특정 진로를 강권하지 않는 선배", tags: ["선배", "학교", "지원"], thread: "daily_life", dangerLevel: 0, starterEligible: true },
+  { name: "윤호", role: "수업 동료", greeting: "아까 그 부분, 너는 어떻게 이해했어?", personality: "생각이 깊고 질문이 많은", backstory: "수업에서 의견을 나누며 여러 관심사로 이어질 수 있는 동료", tags: ["동료", "수업", "대화"], thread: "academic_research", dangerLevel: 0, starterEligible: true },
   // ===== 학업/진로 라인 =====
   { name: "지민", role: "동아리 선배", greeting: "어, 00아! 잠깐 얘기 좀 할 수 있나?", personality: "진지하고 다정한", backstory: "졸업을 앞둔 동아리 선배로 실제로는 상당히 유능하지만 취업 시장에 대해선 냉소적", tags: ["선배", "동아리", "인턴", "멘토"], thread: "career_internship", dangerLevel: 0 },
   { name: "소연", role: "조교 선배", greeting: "00씨, 교수님이 보낸 메일 보셨어요?", personality: "차분하고 믿음직한", backstory: "교수님의 신임을 받는 조교로 학점과 연구실 인턴에 큰 영향력을 가짐", tags: ["선배", "조교", "학업", "연구"], thread: "academic_research", dangerLevel: 0 },
@@ -17,7 +31,7 @@ export const NPC_POOL: NpcProfile[] = [
   { name: "도윤", role: "팀플 동료", greeting: "00... 조금 얘기할 시간 있어?", personality: "조용하지만 책임감 없는", backstory: "발표 전날 잠수타는 타입으로 만나면 매번 스트레스를 주지만 어쩔 수 없이 같은 과제를 해야 하는 사이", tags: ["동기", "팀플", "스트레스"], thread: "group_project", dangerLevel: 0 },
 
   // ===== 친구/일상 라인 =====
-  { name: "민하", role: "단짝 친구", greeting: "00야! 오늘 점심 같이 먹을 사람 여기 붙었어!", personality: "밝고 수다스럽지만 은근히 속이 깊은", backstory: "초등학교 때부터 알던 동네 친구는 아니지만 어쩌다 보니 대학까지 같은 길을 걷게 된 운명의 친구", tags: ["친구", "수업", "일상", "진로고민"], thread: "daily_life", dangerLevel: 0 },
+  { name: "민하", role: "단짝 친구", greeting: "00야! 오늘 점심 같이 먹을 사람 여기 붙어라~", personality: "밝고 수다스럽지만 은근히 속이 깊은", backstory: "초등학교 때부터 알던 동네 친구는 아니지만 어쩌다 보니 대학까지 같은 길을 걷게 된 운명의 친구", tags: ["친구", "수업", "일상", "진로고민"], thread: "daily_life", dangerLevel: 0 },
   { name: "태수", role: "동기", greeting: "야 00! 어제 그거 봤냐?", personality: "유쾌하고 가벼운 정보통", backstory: "모든 걸 농담으로 넘기지만 모르는 게 없는 인싸. 좋은 정보도 주지만 가끔 위험한 제안도 함", tags: ["친구", "동기", "정보", "유흥"], thread: "social_life", dangerLevel: 1 },
   { name: "유진", role: "취업 선배", greeting: "00, 요즘 어떻게 지내? 나랑 커피 한 잔 할래?", personality: "친절하고 현실적인 조언을 잘하는", backstory: "이미 취업에 성공한 선배지만 회사 생활에 회의를 느끼고 있어 은근히 창업을 권유하는 중", tags: ["선배", "멘토", "취업", "회의"], thread: "career_internship", dangerLevel: 0 },
   { name: "미영", role: "고민 상담소 선배", greeting: "안녕 00아. 요즘 표정이 안 좋아 보여…", personality: "조용히 다가와 진심으로 걱정해주는", backstory: "학생처에서 아르바이트를 하는 선배로 많은 학생들의 고민을 듣지만 그만큼 무거운 비밀도 알고 있음", tags: ["선배", "위로", "상담", "비밀"], thread: "mental_health", dangerLevel: 0 },
@@ -94,7 +108,7 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
  * NPC_POOL which has 12+ safe NPCs).
  */
 export function selectStarterNpcs(seed: string, count: number): NpcProfile[] {
-  const safePool = NPC_POOL.filter((npc) => npc.dangerLevel === 0);
+  const safePool = NPC_POOL.filter((npc) => npc.dangerLevel === 0 && npc.starterEligible === true);
   if (safePool.length < count) {
     throw new Error(
       `Safe NPC pool has only ${safePool.length} entries, but ${count} were requested. ` +
@@ -114,7 +128,7 @@ export function selectStarterNpcs(seed: string, count: number): NpcProfile[] {
  * character UUID with no DB or network call.
  */
 export function selectStarterCandidates(seed: string, count: number): { name: string; role: string }[] {
-  const safePool = NPC_POOL.filter((npc) => npc.dangerLevel === 0);
+  const safePool = NPC_POOL.filter((npc) => npc.dangerLevel === 0 && npc.starterEligible === true);
   if (safePool.length < count) {
     throw new Error(
       `Safe NPC pool has only ${safePool.length} entries, but ${count} were requested.`,
@@ -129,22 +143,11 @@ export function selectStarterCandidates(seed: string, count: number): { name: st
 }
 
 /**
- * Role labels that fit a "senior/mentor" first-event scene context.
- */
-const SENIOR_ROLE_KEYWORDS = ["선배", "교수", "부장", "점장", "리더", "할아버지"];
-
-/**
- * Role labels that fit a "peer/friend" first-event scene context.
- */
-const PEER_ROLE_KEYWORDS = ["동료", "친구", "동기", "후배", "원", "트레이너"];
-
-/**
- * Select exactly two safe NPCs for starter relationships, ensuring one is
- * senior/mentor-role compatible and one is peer/friend-role compatible.
+ * Select exactly two distinct, safe starter NPCs without imposing a scene role.
  * Uses the same deterministic seed as selectStarterNpcs.
  */
 export function selectStarterPair(seed: string): [NpcProfile, NpcProfile] {
-  const safePool = NPC_POOL.filter((npc) => npc.dangerLevel === 0);
+  const safePool = NPC_POOL.filter((npc) => npc.dangerLevel === 0 && npc.starterEligible === true);
   if (safePool.length < 2) {
     throw new Error(
       `Safe NPC pool has only ${safePool.length} entries, but 2 were requested.`,
@@ -153,14 +156,7 @@ export function selectStarterPair(seed: string): [NpcProfile, NpcProfile] {
   const numericSeed = hashSeed(seed);
   const shuffled = seededShuffle(safePool, numericSeed);
 
-  const senior = shuffled.find((npc) =>
-    SENIOR_ROLE_KEYWORDS.some((kw) => npc.role.includes(kw)),
-  ) ?? shuffled[0];
-  const peer = shuffled.find((npc) =>
-    npc.name !== senior.name && PEER_ROLE_KEYWORDS.some((kw) => npc.role.includes(kw)),
-  ) ?? shuffled.find((npc) => npc.name !== senior.name) ?? shuffled[1];
-
-  return [senior, peer];
+  return [shuffled[0], shuffled[1]];
 }
 
 export function pickNpcs(
