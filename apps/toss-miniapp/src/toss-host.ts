@@ -1,4 +1,4 @@
-import { getAnonymousKey, getTossShareLink } from "@apps-in-toss/web-framework";
+import { getAnonymousKey, getTossShareLink, saveBase64Data, share } from "@apps-in-toss/web-framework";
 
 import { api } from "./api";
 import { createSafeAreaInsets, type HostFailure, type HostRequestCredential, type SafeAreaInsets, type SessionBootstrapResult } from "@/lib/game-ui/types";
@@ -94,6 +94,21 @@ export async function createTossEndingShareLink(recordId: string): Promise<strin
     5_000,
     () => new Error(SHARE_LINK_TIMEOUT_MESSAGE),
   );
+}
+
+export async function shareTossEnding(recordId: string, title: string): Promise<void> {
+  const link = await createTossEndingShareLink(recordId);
+  await share({ message: `${title}\n${link}` });
+}
+
+export async function saveTossEndingImage(dataUrl: string, recordId: string): Promise<void> {
+  const base64 = dataUrl.replace(/^data:image\/png;base64,/, "");
+  if (!base64 || base64 === dataUrl) throw new Error("invalid PNG data URL");
+  await saveBase64Data({
+    data: base64,
+    fileName: `career-record-${recordId.slice(0, 8)}.png`,
+    mimeType: "image/png",
+  });
 }
 
 export async function bootstrapTossSession(

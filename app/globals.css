@@ -2152,3 +2152,53 @@ button {
     transform: translateY(0) scale(1);
   }
 }
+
+.ending-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: stretch;
+  overflow: hidden;
+  padding: max(28px, env(safe-area-inset-top)) 22px max(30px, env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, #e99568 0%, #c76d67 34%, #334463 70%, #18243a 100%);
+}
+
+.ending-transition-paper {
+  display: flex;
+  width: min(620px, 100%);
+  min-height: 100%;
+  margin: 0 auto;
+  flex-direction: column;
+  justify-content: center;
+  color: #fffaf0;
+  animation: ending-paper-in 520ms ease-out both;
+}
+
+.ending-transition-kicker { margin: 0; color: #f7d08b; font-size: 11px; font-weight: 900; letter-spacing: .12em; }
+.ending-transition-rule { width: 54px; height: 4px; margin: 10px 0 26px; background: #f7d08b; }
+.ending-transition-paper h2 { margin: 22px 0 0; font-size: clamp(24px, 6vw, 34px); font-weight: 950; line-height: 1.22; letter-spacing: -.04em; }
+.ending-transition-paper > p:not(.ending-transition-kicker) { margin: 18px 0 0; color: #dbe4ef; font-size: 14px; line-height: 1.7; }
+.ending-transition-progress { height: 5px; margin-top: 28px; background: rgb(255 250 240 / 25%); }
+.ending-transition-progress span { display: block; width: 100%; height: 100%; background: #f7d08b; transform-origin: left; animation: ending-progress 2.4s ease-in-out infinite; }
+
+.ending-transition-landscape { position: relative; height: min(32vh, 220px); overflow: hidden; border-bottom: 2px solid rgb(255 250 240 / 35%); background: transparent; }
+.ending-transition-sun, .ending-transition-moon { position: absolute; top: 24px; width: 42px; height: 42px; border: 3px solid #2a2018; border-radius: 50%; }
+.ending-transition-sun { left: 17%; background: #f7d08b; animation: ending-sun-set 1.6s steps(8, end) both; }
+.ending-transition-moon { right: 16%; background: #fff2c4; transform: translateY(96px); animation: ending-moon-rise 1.6s steps(8, end) both; }
+.ending-transition-stars { position: absolute; top: 15px; right: 7%; color: #fff2c4; font-size: 18px; opacity: 0; animation: ending-stars-in 1.6s steps(4, end) both; }
+.ending-transition-hill { position: absolute; right: -8%; bottom: -52px; width: 75%; height: 118px; border: 3px solid #2a2018; border-radius: 50% 50% 0 0; background: #493c35; }
+.ending-transition-hill-back { left: -12%; bottom: -65px; width: 82%; background: #6d5743; }
+.ending-transition-hill-front { background: #302b2a; }
+.ending-transition-window { position: absolute; left: 48%; bottom: 30px; width: 8px; height: 8px; background: #ffd66b; box-shadow: 12px 0 #ffd66b, 24px 0 #ffd66b; animation: ending-windows-in 1.6s steps(2, end) both; }
+
+@keyframes ending-paper-in { from { opacity: 0; transform: translateY(18px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes ending-progress { 0% { transform: scaleX(.08); opacity: .55; } 65% { transform: scaleX(1); opacity: 1; } 100% { transform: scaleX(1); opacity: .35; } }
+@keyframes ending-sun-set { from { transform: translateY(0); } to { transform: translateY(100px); } }
+@keyframes ending-moon-rise { from { transform: translateY(96px); } to { transform: translateY(0); } }
+@keyframes ending-stars-in { 0%, 45% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes ending-windows-in { 0%, 60% { opacity: 0; } 100% { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ending-transition-paper, .ending-transition-progress span, .ending-transition-sun, .ending-transition-moon, .ending-transition-stars, .ending-transition-window { animation-duration: 1ms; animation-delay: 0ms; }
+}

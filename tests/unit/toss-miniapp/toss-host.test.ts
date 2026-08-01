@@ -6,10 +6,14 @@ import {
   createTossEndingShareLink,
   createTossFeedbackPort,
   createTossSafeAreaPort,
+  saveTossEndingImage,
+  shareTossEnding,
   TOSS_SHARE_ICON_URL,
 } from "../../../apps/toss-miniapp/src/toss-host";
 
-const { tossShareLink } = vi.hoisted(() => ({
+const { nativeSaveBase64Data, nativeShare, tossShareLink } = vi.hoisted(() => ({
+  nativeSaveBase64Data: vi.fn(),
+  nativeShare: vi.fn(),
   tossShareLink: vi.fn(),
 }));
 
@@ -18,6 +22,8 @@ vi.mock("@apps-in-toss/web-framework", async () => {
   return {
     ...actual,
     getTossShareLink: tossShareLink,
+    saveBase64Data: nativeSaveBase64Data,
+    share: nativeShare,
   };
 });
 
@@ -202,23 +208,33 @@ describe("Toss host adapter", () => {
     }
   });
 
-  it("creates an exact Toss share link with the production icon and times out cleanly", async () => {
-    tossShareLink.mockResolvedValueOnce("https://share.example/link");
-
-    await expect(createTossEndingShareLink("record-42")).resolves.toBe("https://share.example/link");
-    expect(tossShareLink).toHaveBeenCalledWith(
-      "intoss://sano-job-seeker/share/record-42",
-      TOSS_SHARE_ICON_URL,
-    );
+  it("creates a Toss app deep link to the standalone ending screen", async () => {
+    tossShareLink.mockResolvedValueOnce("https://toss.im/share/record-42");
+    await expect(createTossEndingShareLink("record 42")).resolves.toBe("https://toss.im/share/record-42");
+    expect(tossShareLink).toHaveBeenCalledWith("intoss://sano-job-seeker/share/record%2042", TOSS_SHARE_ICON_URL);
   });
 
-  it("rejects after five seconds when Toss share-link generation stalls", async () => {
-    vi.useFakeTimers();
-    tossShareLink.mockImplementationOnce(() => new Promise(() => undefined));
+  it("opens the Toss native share sheet with the generated Toss link", async () => {
+    tossShareLink.mockResolvedValueOnce("https://toss.im/share/ending-42");
+    nativeShare.mockResolvedValueOnce(undefined);
 
-    const pending = createTossEndingShareLink("record-42");
-    const assertion = expect(pending).rejects.toThrow("링크를 만들지 못했습니다. 다시 시도해 주세요.");
-    await vi.advanceTimersByTimeAsync(5_000);
-    await assertion;
+    await shareTossEnding("ending-42", "현실적인 첫 직장");
+
+    expect(nativeShare).toHaveBeenCalledWith({
+      message: "현실적인 첫 직장\nhttps://toss.im/share/ending-42",
+    });
   });
+
+  it("saves a generated PNG through the Toss native data bridge", async () => {
+    nativeSaveBase64Data.mockResolvedValueOnce(undefined);
+
+    await saveTossEndingImage("data:image/png;base64,aGVsbG8=", "record-123456789");
+
+    expect(nativeSaveBase64Data).toHaveBeenCalledWith({
+      data: "aGVsbG8=",
+      fileName: "career-record-record-1.png",
+      mimeType: "image/png",
+    });
+  });
+
 });

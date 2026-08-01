@@ -17,7 +17,7 @@ export interface CharacterData {
   coreEventCount: number;
   progressLabel?: string;
   lifeStage?: {
-    term?: { label?: string };
+    term?: { gradeYear?: number; semester?: number; label?: string };
     lifeStage?: string;
     graduation?: string;
   };
@@ -42,6 +42,12 @@ export interface ChoiceFeedback {
   statDelta: Stats;
   relationshipDelta: { name: string; trust: number }[];
   summary: string;
+}
+
+export interface ChoiceLifeStage {
+  term?: { gradeYear?: number; semester?: number; label?: string };
+  lifeStage?: string;
+  graduation?: string;
 }
 
 export interface CareerRecord {

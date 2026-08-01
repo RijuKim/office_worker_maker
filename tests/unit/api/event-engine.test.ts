@@ -1,9 +1,31 @@
 import { describe, expect, it } from "vitest";
 
 import { normalizeStatDeltas } from "@/lib/game/game-rules";
-import { buildBurnoutEvent, CONDITIONAL_STATIC_EVENTS, getStoryArc, isEventAllowedForLifeStage, pickRandomStaticEvent, selectNextEvent, STATIC_EVENTS } from "@/lib/game/event-engine";
+import { buildBurnoutEvent, CONDITIONAL_STATIC_EVENTS, getStoryArc, isEventAllowedForLifeStage, personalizeEvent, pickRandomStaticEvent, selectNextEvent, STATIC_EVENTS } from "@/lib/game/event-engine";
 
 describe("STATIC_EVENTS", () => {
+  it("replaces legacy player-name placeholders with the configured name", () => {
+    const event = personalizeEvent({
+      title: "00의 하루",
+      body: "선배가 00와 ㅇㅇ, ○○, OO를 불렀다.",
+      choices: [{
+        id: "answer",
+        label: "00가 답한다.",
+        summary: "00는 대답했다.",
+        statDelta: {},
+        relationshipDelta: [],
+        flagDelta: {},
+      }],
+      tags: ["일상"],
+      source: "FALLBACK",
+    }, "한서윤");
+
+    expect(event.title).toBe("한서윤의 하루");
+    expect(event.body).toBe("선배가 한서윤와 한서윤, 한서윤, 한서윤를 불렀다.");
+    expect(event.choices[0].label).toBe("한서윤가 답한다.");
+    expect(event.choices[0].summary).toBe("한서윤는 대답했다.");
+  });
+
   it("has events with valid structure", () => {
     for (const event of STATIC_EVENTS) {
       expect(event.title).toBeTruthy();
@@ -53,7 +75,7 @@ describe("pickRandomStaticEvent", () => {
   it("prioritizes a career gate before final career results", () => {
     const event = pickRandomStaticEvent([], {
       burnoutRisk: 10,
-      coreEventCount: 14,
+      coreEventCount: 20,
       gradeYear: 4,
       eventFlags: {},
       stats: { academic: 8, practical: 7, reputation: 6, health: 6, mental: 6 },
@@ -68,17 +90,17 @@ describe("pickRandomStaticEvent", () => {
     ]).toContain(event.title);
   });
 
-  it("does not offer the IT-specific certification fallback to an education major", () => {
+  it("does not ban a certification event solely because the major is education", () => {
     expect(isEventAllowedForLifeStage(
       STATIC_EVENTS.find((event) => event.title === "자격증 시험")!,
       { burnoutRisk: 0, major: "교육학과", lifeStage: "college_mid", eventFlags: {} },
-    )).toBe(false);
+    )).toBe(true);
   });
 
   it("blocks late career gates during early college even when stats are high", () => {
     const event = pickRandomStaticEvent([], {
       burnoutRisk: 10,
-      coreEventCount: 14,
+      coreEventCount: 20,
       gradeYear: 1,
       lifeStage: "college_early",
       graduation: "normal",
@@ -109,7 +131,7 @@ describe("pickRandomStaticEvent", () => {
   it("uses strategy choices when graduation gate state opens career gates", () => {
     const event = pickRandomStaticEvent([], {
       burnoutRisk: 10,
-      coreEventCount: 14,
+      coreEventCount: 20,
       gradeYear: 4,
       lifeStage: "college_late",
       graduation: "gate_ready",
@@ -175,7 +197,7 @@ describe("pickRandomStaticEvent", () => {
     }
   });
 
-  it("does not introduce a generic app startup to a medical senior without an existing startup thread", () => {
+  it("does not ban an app idea solely because a medical major lacks startup history", () => {
     const appEvent = STATIC_EVENTS.find((event) => event.title === "작은 앱 아이디어");
     expect(appEvent).toBeDefined();
     expect(isEventAllowedForLifeStage(appEvent!, {
@@ -185,7 +207,7 @@ describe("pickRandomStaticEvent", () => {
       lifeStage: "college_late",
       eventFlags: {},
       careerPaths: [],
-    })).toBe(false);
+    })).toBe(true);
   });
 });
 
@@ -225,11 +247,28 @@ describe("selectNextEvent", () => {
     expect(result.event.body).not.toMatch(/강의실|동아리|수강/);
   });
 
-  it("uses five compact story arcs across the 24-event run", () => {
-    expect(getStoryArc(0).title).toBe("첫 학기와 생활 기반");
-    expect(getStoryArc(3).title).toBe("소속과 첫 약속");
-    expect(getStoryArc(6).title).toBe("압박과 유혹");
-    expect(getStoryArc(9).title).toBe("선택의 청구서");
-    expect(getStoryArc(12).title).toBe("졸업 직전의 방향");
+  it("uses eight belief-changing story arcs across the 24-event run", () => {
+    expect(getStoryArc(0).id).toBe("arrival");
+    expect(getStoryArc(3).id).toBe("belonging");
+    expect(getStoryArc(6).id).toBe("proof");
+    expect(getStoryArc(9).id).toBe("fracture");
+    expect(getStoryArc(13).id).toBe("reckoning");
+    expect(getStoryArc(17).id).toBe("narrowing");
+    expect(getStoryArc(20).id).toBe("finale");
+    expect(getStoryArc(23).id).toBe("aftermath");
+    expect(getStoryArc(24).focusAxes).toContain("정체성");
+  });
+
+  it("quarantines repeated legacy scenes from the normal fallback pool", () => {
+    for (let index = 0; index < 200; index += 1) {
+      expect(pickRandomStaticEvent([], { burnoutRisk: 0, coreEventCount: 8 }).title).not.toMatch(/헬스장에서 만난 사람|도서관의 노인/);
+    }
+  });
+
+  it("blocks university and application procedures after the finale", () => {
+    const context = { burnoutRisk: 0, coreEventCount: 23 };
+    expect(isEventAllowedForLifeStage({ title: "중간고사 시즌", tags: ["중간고사", "학업"] }, context)).toBe(false);
+    expect(isEventAllowedForLifeStage({ title: "추가 서류 제출 안내", tags: ["취업", "서류"] }, context)).toBe(false);
+    expect(isEventAllowedForLifeStage({ title: "합격 다음 날의 첫 출근", tags: ["취업", "결과"] }, context)).toBe(true);
   });
 });

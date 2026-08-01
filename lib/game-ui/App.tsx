@@ -5,6 +5,28 @@ import type { GameHost } from "./host";
 
 export type SharedStats = Record<string, number>;
 
+export function EndingTransition({ characterName }: { characterName?: string | null }) {
+  return (
+    <div className="ending-transition" role="status" aria-live="polite" aria-label="선택의 결과를 기록하는 중">
+      <div className="ending-transition-paper">
+        <p className="ending-transition-kicker">CAREER ARCHIVE</p>
+        <div className="ending-transition-rule" />
+        <div className="ending-transition-landscape" aria-hidden="true">
+          <span className="ending-transition-sun" />
+          <span className="ending-transition-moon" />
+          <span className="ending-transition-stars">·　✦　·</span>
+          <span className="ending-transition-hill ending-transition-hill-back" />
+          <span className="ending-transition-hill ending-transition-hill-front" />
+          <span className="ending-transition-window" />
+        </div>
+        <h2>{characterName ? `${characterName}의 시간이 흐르고 있습니다` : "당신의 시간이 흐르고 있습니다"}</h2>
+        <p>당신의 선택들이 모인 결과가 기록되는 중입니다.<br />잠시만 기다려 주세요.</p>
+        <div className="ending-transition-progress" aria-hidden="true"><span /></div>
+      </div>
+    </div>
+  );
+}
+
 export interface SharedCharacterView {
   id?: string;
   name: string;
@@ -295,7 +317,17 @@ function statDeltaText(delta: SharedStats) {
   return entries.map(([key, value]) => `${STAT_LABELS[key] ?? key} ${value > 0 ? "+" : ""}${value}`).join(" · ");
 }
 
-export function LoadingPanel() {
+export function LoadingPanel({
+  badge = "새 장면",
+  firstLine = "당신이 모르는 곳에서,",
+  secondLine = "다음 일이 시작되고 있습니다",
+  hint = "선택의 시간이 곧 찾아옵니다.",
+}: {
+  badge?: string;
+  firstLine?: string;
+  secondLine?: string;
+  hint?: string;
+} = {}) {
   return (
     <div className="event-loading-panel" aria-busy="true" aria-live="polite" data-reduced-motion={useReducedMotion() ? "true" : "false"}>
       <div className="event-loading-scene" aria-hidden="true">
@@ -305,10 +337,10 @@ export function LoadingPanel() {
         <span className="loading-lamp"><i /></span>
       </div>
       <div className="event-loading-copy">
-        <span className="event-loading-badge">새 장면</span>
-        <p>당신이 모르는 곳에서,</p>
-        <p>다음 일이 시작되고 있습니다<span className="loading-dots"><i>.</i><i>.</i><i>.</i></span></p>
-        <small>선택의 시간이 곧 찾아옵니다.</small>
+        <span className="event-loading-badge">{badge}</span>
+        <p>{firstLine}</p>
+        <p>{secondLine}<span className="loading-dots"><i>.</i><i>.</i><i>.</i></span></p>
+        <small>{hint}</small>
       </div>
     </div>
   );
@@ -601,7 +633,7 @@ export function RecordCardShell({
   if (onToggle) {
     return (
       <article className={className} id={id}>
-        <button className="w-full text-left" type="button" onClick={onToggle}>
+        <button aria-expanded={expanded} className="w-full text-left" type="button" onClick={onToggle}>
           {poster}
           {content}
         </button>

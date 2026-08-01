@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { buildFallbackLongEnding, pickFallbackCareerPath } from "@/lib/game/ending-fallbacks";
 
 import { logger } from "@/lib/server/logger";
 import { normalizeRelationshipName } from "@/lib/game/npcs";
@@ -44,10 +45,11 @@ const ollamaProvider = (): AiProvider => ({
 });
 
 function configuredProviders(): { primary: AiProvider; fallback: AiProvider } {
-  const ollamaIsPrimary = process.env.AI_PRIMARY_PROVIDER?.trim().toLowerCase() === "ollama";
-  return ollamaIsPrimary
-    ? { primary: ollamaProvider(), fallback: openRouterProvider() }
-    : { primary: openRouterProvider(), fallback: ollamaProvider() };
+  // Ollama is ALWAYS the primary provider for story events and endings,
+  // regardless of AI_PRIMARY_PROVIDER being unset, blank, "openrouter",
+  // typo, legacy, or unknown. Only a concrete Ollama failure permits
+  // exactly one OpenRouter fallback attempt.
+  return { primary: ollamaProvider(), fallback: openRouterProvider() };
 }
 
 const aiProviders = (options: AiProviderOptions = {}) =>
@@ -69,9 +71,10 @@ export const SLOW_AI_GENERATION_MS = 10_000;
 const DEFAULT_AI_MAX_TOKENS = 1_400;
 const MIN_AI_MAX_TOKENS = 400;
 const MAX_AI_MAX_TOKENS = 4_000;
-const DEFAULT_OLLAMA_EVENT_TOKENS = 1_600;
+const DEFAULT_OLLAMA_EVENT_TOKENS = 2_400;
+const DEFAULT_OLLAMA_EVENT_REPAIR_TOKENS = 1_600;
 const DEFAULT_ENDING_TIMEOUT_MS = 120_000;
-const DEFAULT_OLLAMA_ENDING_TOKENS = 2_800;
+const DEFAULT_OLLAMA_ENDING_TOKENS = 5_000;
 const DEFAULT_OPENROUTER_ENDING_TOKENS = 3_200;
 
 export function getOpenRouterTimeoutMs(raw = process.env.OPENROUTER_TIMEOUT_MS): number {
@@ -149,10 +152,10 @@ export type AiEventResponse = z.infer<typeof aiEventSchema>;
 const aiEndingSchema = z.object({
   title: z.string().min(1).max(120),
   summary: z.string().min(80).max(500),
-  longNarrative: z.string().min(500).max(5000),
+  longNarrative: z.string().min(900).max(2600),
   careerPath: z.string().min(1).max(100),
-  jobRole: z.string().nullable().optional(),
-  destinationName: z.string().nullable().optional(),
+  jobRole: z.string().min(1).max(100).nullable().optional(),
+  destinationName: z.string().min(1).max(100).nullable().optional(),
   salaryBand: z.string().nullable().optional(),
   workplaceTone: z.array(z.string()).max(8).default([]),
   satisfaction: z.number().int().min(0).max(100),
@@ -161,52 +164,36 @@ const aiEndingSchema = z.object({
   healthState: z.string().min(1).max(80),
   relationshipState: z.string().min(1).max(120),
   tags: z.array(z.string()).min(1).max(10),
+}).superRefine((ending, context) => {
+  const paragraphs = ending.longNarrative.trim().split(/\n\s*\n/).filter(Boolean);
+  if (paragraphs.length < 2 || paragraphs.length > 3) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["longNarrative"], message: "must contain exactly 2-3 paragraphs" });
+  }
+  if (paragraphs.some((paragraph) => paragraph.length < 220)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["longNarrative"], message: "each paragraph must be a developed scene" });
+  }
+  if (/(?:^|[.!?]\s+)(?:나는|내가|우리는|우리가)\s/.test(ending.longNarrative)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["longNarrative"], message: "must keep second-person viewpoint" });
+  }
 });
 
 export type AiEndingResponse = z.infer<typeof aiEndingSchema>;
 
 const allowedStats = ["academic", "practical", "health", "mental", "wealth", "reputation", "charm"] as const;
 
-const SYSTEM_PROMPT = `You are a Korean college-life text-adventure writer.
+const SYSTEM_PROMPT = `한국 대학생활 텍스트 어드벤처 사건 하나를 작성한다. Return only a single JSON object.
 
-Return ONLY valid JSON in a single JSON object with "title", "body", "tags", and "choices". "choices" must contain 2-3 complete objects, and each choice must include "id", "label", "summary", "statDelta", and "relationshipDelta". Keep the event in Korean, in "당신은" voice. Write two short paragraphs with a blank line between them. Use 4-5 compact sentences and roughly 220-380 Korean characters for the body: establish a concrete situation, let it change through action or dialogue, show the immediate consequence, then end at a meaningful decision. Make it one small incident inside the larger story arc. Prefer concrete action and dialogue over explanation.
+형식: {"title","body","tags","choices"}. "choices" must contain 2-3 complete objects, 각 항목은 {"id","label","summary","statDelta","relationshipDelta"}. body는 한국어 2문단, 4~5문장, 약 220~380자다. 구체적 행동이나 대화로 상황을 변화시킨 뒤 의미 있는 선택 직전에 끝낸다. summary는 "당신은"으로 시작한다.
 
-Keep continuity with recent choices, relationships, open threads, and stats. Avoid repeating closed proposals or stale scenes. Use only the public stats in statDelta, keep health and mental decreases at -1 or above, and make at least one choice clearly risky with a downside. Choice labels should be natural actions. Summaries must start with "당신은".
-The protagonist's narration must remain second-person throughout. Never switch the protagonist to first-person forms such as "나는", "내가", "나의", or "저는". Dialogue from other characters may use first person.
+이야기의 중심 질문은 취업할 수 있는 사람이 되어가는 동안 돈·관계·건강·자존감 중 무엇을 지키고 포기할지다. 현재 아크는 수행 목록이 아니라 사건의 극적 역할이다. 사건은 생존·능력·관계·정체성 중 하나 이상을 건드리고, 가능하면 두 축에 실제 득실을 만든다. 착하거나 이상적인 선택에도 비용을, 실용적이거나 이기적인 선택에도 실익을 준다. 평범한 삶을 억지로 취업 사건으로 바꾸지 않는다.
 
-Stats and relationship trust values in the context are INTERNAL STATE ONLY. Never reveal, quote, or paraphrase an exact stat/trust score, signed change, percentage, or threshold in the title, body, tags, choice labels, or summaries. In particular, never write phrases such as "동규와의 신뢰가 -5%", "신뢰 20", or "호감도 +10". Express relationships only through observable behavior and qualitative atmosphere, such as "동규가 아직 거리를 둔다".
+연속 사건은 같은 카테고리·핵심 활동·갈등을 반복하지 않는다. 이번사건필수주제가 있으면 제목·갈등·본문·태그에 반영하고, 자유이면 최근 맥락에서 연결점 하나만 재사용한다. 회피 카테고리·회피인물·사용제목은 쓰지 않는다. 설정·인물 구성·활동·압박 원인·감정 톤을 따로 조합하며 우연한 문서, 전화, 소문으로 억지 전개하지 않는다.
 
-relationshipDelta may include status only for an explicit relationship transition. Set status="dating" only when both people explicitly agree to date after a confession or equivalent conversation; never infer dating from high trust or ordinary affection. Use status="ex" only after an explicit breakup. Otherwise omit status.
+관계에 있는 이름은 영속 상태다. 등장인물 이름은 관계 또는 안전후보의 정확한 이름을 사용한다. 새 관계가 생기거나 기존 관계가 변하면 모든 관련 선택의 relationshipDelta에 그 이름과 작은 방향성 변화를 넣는다. status는 명시적으로 교제 합의 또는 이별한 경우에만 dating/ex로 쓴다. 관계 인물은 미해결 흐름을 진전시킬 때만 재등장시키고 역할·직업을 자동으로 사건 소재로 삼지 않는다. 위험 인물은 명시적 범죄·위험 맥락에만 등장한다.
 
-Relationship continuity is persistent game state, not optional flavor text. When a named person is an active participant in the scene, every choice that changes, deepens, maintains, or strains that interaction must include that exact person's name in relationshipDelta with a small, directionally appropriate trust change. This also applies to ordinary time spent together, cooperation, conversation, and emotional support—not only dramatic romance or conflict. If the event introduces a recurring named person, at least one plausible choice must create that relationship. Do not leave relationshipDelta empty for every choice in a person-centered event.
+취준서사의 eventKind와 제공된 가상 조직만 사용한다. 활성 지원이 없으면 재직을 만들지 않고, 종료된 회사는 재진입 근거 없이 현 직장으로 쓰지 않는다. 전공·누적 증거 없는 특정 직업을 만들지 않는다.
 
-The scene can come from college, work, family, romance, clubs, career prep, exams, overseas plans, hobbies, or other daily life. Treat the protagonist as a woman by default, avoid male-coded address, and use fictional/parody names only.
-
-CRITICAL - Event diversity rules:
-1. Each event must cover a DIFFERENT life area than the previous event. If the last event was about work/part-time, the next must switch to study, relationships, hobbies, family, health, or another area.
-2. Never generate two consecutive events in the same category (e.g. two part-time events in a row, two study events in a row).
-3. The "회피" field lists categories to avoid. The "우선" field lists categories to prioritize. Follow these strictly.
-4. Vary locations, people, and pressure sources. Do not reuse the same setting or character from the previous event.
-5. When "이번사건필수주제" is not "자유", the event title, main conflict, body, and tags must clearly belong to that category. When it is "자유", use at most one continuity anchor from a recent choice, relationship, consequence, resource constraint, or open thread. Do not automatically repeat both the same person and the same activity.
-6. New-category events may reuse one established continuity anchor so the full run feels connected, but the new incident itself must have a different activity, location, or source of pressure.
-7. Stay inside "이번이야기영역". These are the recurring themes selected for this protagonist; deepen and cross them rather than sampling every possible life category.
-8. Follow 취준서사.eventKind: CAREER_GATE is a concrete stage-appropriate career decision; CAREER_LINKED is an ordinary life event that can later become evidence without turning into an interview scene; LIFE may remain personally meaningful without an immediate career payoff.
-9. Use only organizations supplied in 취준서사.organizations. They are fictional parody organizations; never claim real salaries, policies, scandals, or hiring facts.
-10. Category labels describe only the life area, never a preferred plot. Invent the concrete activity, object, location, pressure, and conflict independently. Do not collapse a category into one stereotyped motif, and do not repeat the recent event's central motif under a renamed title.
-11. "사용제목"에 있는 제목은 절대 다시 사용하지 마라. 최근 사건과 핵심 활동이나 갈등이 같으면 제목만 바꾸지 말고 사건 자체를 바꿔라.
-11a. Avoid contrived coincidences and nonsensical props. A found document, sudden phone call, overheard rumor, or stranger's advice must have a believable source and causal reason; do not use it merely to force the next choice.
-11b. A career-linked event must fit the supplied major or be earned by explicit prior evidence. Generic words such as internship, project, fieldwork, or study do not by themselves justify a specialized medical, engineering, legal, or licensed path.
-
-CRITICAL - Relationship and NPC continuity rules:
-12. The "관계" field lists the protagonist's current relationships with concrete canonical names. These are PERSISTED GAME STATE. Every event that involves a named person must use their exact persisted name. Never invent generic role labels (e.g. "동아리 친구", "같은 과 동기") as relationship names.
-13. When introducing a new social contact, prefer names from the safe canonical candidates supplied in the "안전후보" field. Do not invent generic default names like 수아 or 새롭게 만난 친구.
-14. Dangerous NPCs (재석, 수진, 준호, 비밀(여/남), 미정) with dangerLevel >= 2 must ONLY appear in explicit crime, risk, or underworld contexts. They must never be proposed as ordinary starter friends, mentors, or social contacts.
-15. If a persisted relationship with a specific name exists (e.g. 수아), that relationship may continue naturally. The restriction is against the AI inventing default names, not against legitimate continuity.
-
-CRITICAL - Company continuity rules:
-16. The "지원" field lists active job applications. A company with an active application may appear as the current workplace or in stage-progression events. A company that was rejected, declined, lost to a competitor, or departed must NOT be narrated as the current workplace without explicit later re-entry. If no active application exists, do not invent current employment — mention candidates or offers instead.
-17. Ordinary (non-crisis) events must have at most one mental-decreasing choice and at least one non-loss choice among 2-3 choices. This is enforced by the system, not a suggestion.
-`;
+statDelta에는 공개 스탯만 쓴다. health와 mental 감소는 -1 이상이다. 평범한 공부·일·심부름·지출·가벼운 어색함에는 mental 감소를 주지 않는다. mental:-1은 수면 부족, 심각한 거절·갈등, 위험·윤리 압박, 상실·고립·명백한 공포처럼 실제 심리 부담이 있을 때만 쓴다. 일반 사건은 mental 감소 선택이 최대 하나이며 손실 없는 선택이 하나 이상이다. 스탯·신뢰의 숫자나 증감은 서사에 노출하지 않는다. 주인공은 여성으로 취급하며 남성 호칭과 1인칭 주인공 서술을 쓰지 않는다.`;
 
 export type AiEventPromptState = {
   name: string;
@@ -244,34 +231,28 @@ export function buildUserPrompt(state: AiEventPromptState): string {
   const totalSemesters = 8;
   const eventsPerSemester = 3;
   const currentSemester = Math.min(Math.floor(state.coreEventCount / eventsPerSemester) + 1, totalSemesters);
-  const progressRatio = state.coreEventCount / 24;
-
-  let toneGuidance = "";
-  if (progressRatio < 0.15) {
-    toneGuidance = "발단: 새로운 생활의 가능성을 열고 작은 선택으로 성향을 드러낸다.";
-  } else if (progressRatio < 0.35) {
-    toneGuidance = "전개: 앞선 선택의 여파를 확장하고 관계나 목표에 변화를 만든다.";
-  } else if (progressRatio < 0.55) {
-    toneGuidance = "위기: 쌓인 선택들이 충돌하며 포기하기 어려운 대가를 요구한다.";
-  } else if (progressRatio < 0.75) {
-    toneGuidance = "절정: 이전 선택의 결과와 구체적인 대가.";
-  } else {
-    toneGuidance = "결말: 지금까지의 선택과 열린 갈등이 서로 다른 삶의 방향으로 수렴한다.";
-  }
+  const toneGuidance = state.coreEventCount <= 2 ? "발단: 부족한 조건 속에서 처음 지킬 기준을 세운다." :
+    state.coreEventCount <= 5 ? "전개: 소속, 동료, 경쟁자와 첫 책임을 얻는다." :
+      state.coreEventCount <= 8 ? "상승: 첫 증명을 얻되 유지 비용을 선택하게 한다." :
+        state.coreEventCount <= 12 ? "위기: 지금까지 옳다고 믿은 생존 방식에 균열을 낸다." :
+          state.coreEventCount <= 16 ? "심화: 미뤄둔 선택이 사람, 자원, 평판을 통해 돌아온다." :
+            state.coreEventCount <= 19 ? "결단: 하나의 미래를 우선하고 다른 가능성을 실제로 포기하게 한다." :
+              state.coreEventCount <= 22 ? "절정: 최종 관문에서 어떤 모습의 자신을 증명할지 묻는다." :
+                "결말: 합격 여부와 별개로 돈, 건강, 관계, 정체성에 남은 삶을 보여준다.";
 
   const contextParts = [
     `주인공=${state.name}|${state.age}세|${state.major}|${state.gradeYear ?? "?"}학년|${state.residence ?? "미상"}`,
     `단계=${state.lifeStage ?? "unknown"}|${state.graduation ?? "normal"}|학기=${semesterLabel}/${totalSemesters}|사건=${state.coreEventCount}|가이드=${toneGuidance}`,
-    `아크=${JSON.stringify(state.storyArc)}`,
-    `최근=${state.recentSummaries.slice(0, 4).join(" || ") || "낯선 아침"}`,
-    `사용제목=${state.usedEventTitles.slice(0, 8).join(" | ") || "없음"}`,
+    `아크=${JSON.stringify(compactStoryArc(state.storyArc))}`,
+    `최근=${state.recentSummaries.slice(0, 3).join(" || ") || "낯선 아침"}`,
+    `사용제목=${state.usedEventTitles.slice(0, 6).join(" | ") || "없음"}`,
     `닫힘=${buildResolvedOfferPrompt(state.eventFlags)}`,
     `이번이야기영역=${state.allowedCategories?.join(",") || "자유"}`,
-    `취준서사=${JSON.stringify(state.careerNarrative ?? {})}`,
+    `취준서사=${compactJson(state.careerNarrative ?? {}, 900)}`,
     `스토리모드=${state.targetCategory ? "새영역확장" : "기존선택연결"}|이번사건필수주제=${state.targetCategory ?? "자유"}|구체소재는 최근 사건과 겹치지 않게 새로 발명`,
     `회피=${state.avoidCategories?.join(",") || "없음"}|보조후보=${state.preferCategories?.join(",") || "없음"}|회피인물=${state.avoidPeople?.join(",") || "없음"}`,
     `스탯=${JSON.stringify(state.stats)}`,
-    `관계=${JSON.stringify(state.relationships.map(({ name, role, trust }) => ({
+    `관계=${JSON.stringify(state.relationships.slice(0, 12).map(({ name, role, trust }) => ({
       name,
       role,
       state: relationshipTrustBand(trust),
@@ -282,16 +263,32 @@ export function buildUserPrompt(state: AiEventPromptState): string {
   ];
 
   const activeParts = [
-    state.academicPlan ? `학업=${JSON.stringify(state.academicPlan)}` : "",
-    state.destinationCandidates ? `목적지=${JSON.stringify(state.destinationCandidates)}` : "",
-    (state.specs ?? []).length > 0 ? `스펙=${JSON.stringify(state.specs)}` : "",
-    (state.jobApplications ?? []).some((app) => app.isActive) ? `지원=${JSON.stringify((state.jobApplications ?? []).filter((app) => app.isActive))}` : "",
-    (state.careerPaths ?? []).length > 0 ? `진로=${JSON.stringify(state.careerPaths)}` : "",
+    state.academicPlan ? `학업=${compactJson(state.academicPlan, 500)}` : "",
+    state.destinationCandidates ? `목적지=${compactJson(state.destinationCandidates, 700)}` : "",
     (state.closedCompanies ?? []).length > 0 ? `거절/퇴사회사=${JSON.stringify(state.closedCompanies)}` : "",
     buildCareerDiversityPrompt(state),
   ].filter(Boolean);
 
   return [...contextParts, ...activeParts].join("\n");
+}
+
+function compactStoryArc(raw: unknown) {
+  const arc = readRecord(raw) ?? {};
+  return {
+    id: arc.currentArcId,
+    title: arc.title,
+    phase: arc.phase,
+    question: arc.dramaticQuestion,
+    axes: arc.focusAxes,
+    threads: Array.isArray(arc.openThreads) ? arc.openThreads.slice(0, 3) : [],
+    tension: arc.tension,
+  };
+}
+
+function compactJson(value: unknown, maxChars: number) {
+  const serialized = JSON.stringify(value);
+  if (!serialized || serialized.length <= maxChars) return serialized || "{}";
+  return `${serialized.slice(0, maxChars)}…`;
 }
 
 function relationshipTrustBand(trust: number) {
@@ -319,13 +316,13 @@ function buildCareerDiversityPrompt(state: AiEventPromptState) {
     guidance.push(`진로=${activePaths.map((path) => `${path.pathType}:${path.pathName ?? ""}`).join(",")}`);
   }
   if (state.lifeStage === "college_mid" || state.lifeStage === "college_late") {
-    guidance.push("중반/후반: 스터디만 반복하지 말고 인턴, 어학, 포트폴리오, 공모전, 현장실습, 추가학기, 워홀, 시험 준비를 우선 고려");
+    guidance.push("중반/후반: 스터디만 반복하지 말고 인턴, 어학, 포트폴리오, 공모전, 현장실습, 추가학기, 워홀, 시험 준비, 대학원을 우선 고려");
   }
   if (state.lifeStage === "college_late") {
-    guidance.push("후반: 서류/인성검사/코테/면접/발표/불합격/조건협상");
+    guidance.push("후반: 서류/인성검사/시험/면접/발표/불합격/조건협상");
   }
   if (/의학|간호|약학|치의|수의|방사선|임상|보건/.test(state.major)) {
-    guidance.push("의료·보건계열: 4학년에는 임상실습, 국가시험, 병원 지원, 환자·보호자 응대, 당직과 진로 선택을 전공 맥락에 맞게 우선한다. 기존 창업 서사가 명시적으로 진행 중인 경우가 아니면 앱 개발, 코딩테스트, IT 포트폴리오, 범용 스타트업 소재를 사용하지 않는다");
+    guidance.push("의료·보건계열: 4학년에는 임상실습, 국가시험, 병원 지원, 환자·보호자 응대, 당직과 진로 선택을 전공 맥락에 맞게 우선한다.");
   }
   if (state.lifeStage === "college_late" || state.graduation === "gate_ready") {
     guidance.push("관문: 최근 선택+지원/스펙/관계 2개 이상 반영");
@@ -513,6 +510,45 @@ export async function generateAiEvent(
         providerRole: providerIndex === 0 ? "primary" : "fallback",
       });
     }
+
+    // --- Same-Ollama repair for parse failures ---
+    // When the primary provider (Ollama) produces a parse/schema failure,
+    // issue one short same-Ollama JSON repair request before OpenRouter.
+    if (!measured.success && providerIndex === 0 && provider.id === "ollama" && isParseFailure(measured.reason)) {
+      const repairStartedAt = Date.now();
+      const repairRemainingMs = getOpenRouterTimeoutMs() - (repairStartedAt - totalStartedAt);
+      if (repairRemainingMs > 0) {
+        const repairResult = await attemptEventRepair(provider, state, measured, repairRemainingMs, repairStartedAt);
+        const repairTotalElapsedMs = Date.now() - totalStartedAt;
+        const repairMeasured = { ...repairResult, totalElapsedMs: repairTotalElapsedMs, slow: repairTotalElapsedMs > SLOW_AI_GENERATION_MS };
+        logAiAttempt({
+          phase: "result",
+          kind: "json",
+          attemptId: `${attemptId}-repair`,
+          providerId: provider.id,
+          providerLabel: provider.label,
+          model: provider.model,
+          success: repairMeasured.success,
+          reason: repairMeasured.success ? null : repairMeasured.reason,
+          providerElapsedMs: repairMeasured.providerElapsedMs ?? 0,
+          totalElapsedMs: repairTotalElapsedMs,
+          failureReasons: repairMeasured.success ? [] : (repairMeasured.providerFailures ?? []).map((f) => f.reason),
+          ...options.trace,
+        });
+        if (repairMeasured.success) {
+          return { ...repairMeasured, retryUsed: true, providerFailures: [...providerFailures, toProviderFailureTelemetry(provider, measured)] };
+        }
+        // Preserve the causal order for auditability: the original Ollama
+        // parse/schema failure happened before the same-provider repair
+        // failure. Do not append the original failure again below.
+        providerFailures.push(toProviderFailureTelemetry(provider, measured));
+        providerFailures.push(toProviderFailureTelemetry(provider, repairMeasured));
+        lastFailure = repairMeasured;
+        console.warn("AI event provider repair failed", { provider: provider.label, reason: repairMeasured.reason });
+        continue;
+      }
+    }
+
     if (measured.success) return { ...measured, retryUsed: providerFailures.length > 0, providerFailures };
     lastFailure = measured;
     providerFailures.push(toProviderFailureTelemetry(provider, measured));
@@ -520,6 +556,111 @@ export async function generateAiEvent(
   }
 
   return { ...lastFailure, retryUsed: providerFailures.length > 1, providerFailures };
+}
+
+async function attemptEventRepair(
+  provider: AiProvider,
+  state: AiEventPromptState,
+  originalFailure: OpenRouterFailure,
+  timeoutMs: number,
+  startedAt: number,
+): Promise<OpenRouterResult | OpenRouterFailure> {
+  const issues = originalFailure.issues ?? [];
+  const contentPreview = originalFailure.contentPreview;
+  const repairMessages = buildAiEventRepairMessages(state, issues, contentPreview);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const failure = (reason: AiEventFailureReason, repairIssues?: string[]): OpenRouterFailure => ({
+    success: false,
+    reason,
+    providerId: provider.id,
+    providerLabel: provider.label,
+    providerElapsedMs: Date.now() - startedAt,
+    issues: repairIssues,
+  });
+
+  try {
+    const response = await fetch(
+      provider.id === "ollama"
+        ? `${provider.baseUrl}/chat`
+        : `${provider.baseUrl}/chat/completions`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${provider.key}`,
+          "Content-Type": "application/json",
+          ...provider.headers,
+        },
+        body: JSON.stringify({
+          model: provider.model,
+          messages: repairMessages,
+          format: "json",
+          stream: false,
+          think: "low",
+          options: {
+            temperature: 0.3,
+            num_predict: DEFAULT_OLLAMA_EVENT_REPAIR_TOKENS,
+          },
+        }),
+        signal: controller.signal,
+      },
+    );
+
+    if (!response.ok) return failure("api_error");
+    const responseText = await response.text();
+    let parsedData: unknown;
+    try {
+      parsedData = JSON.parse(responseText);
+    } catch {
+      return failure("malformed_json");
+    }
+    const data = parsedData as Record<string, unknown> | null;
+    const choices = data?.choices;
+    const firstChoice = Array.isArray(choices) ? choices[0] : null;
+    const openAiMessage = firstChoice && typeof firstChoice === "object" ? (firstChoice as Record<string, unknown>).message : null;
+    const message = provider.id === "ollama" ? (data?.message ?? openAiMessage) : openAiMessage;
+    const content: string | undefined = message && typeof message === "object"
+      ? (message as Record<string, unknown>).content as string | undefined
+      : undefined;
+    if (!content) return failure("empty_content");
+
+    const parsed = parseAiEventContentDetailed(content);
+    if (!parsed.success) return failure(parsed.reason, parsed.issues);
+
+    const providerElapsedMs = Date.now() - startedAt;
+    return { success: true, event: parsed.event, providerId: provider.id, providerLabel: provider.label, providerElapsedMs, totalElapsedMs: 0, slow: false, retryUsed: true, providerFailures: [] };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") return failure("timeout");
+    return failure("api_error");
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function buildAiEventRepairMessages(state: AiEventPromptState, issues: string[], contentPreview?: string) {
+  const originalPrompt = buildUserPrompt(state);
+  const repairGuidance = issues.length > 0
+    ? `검증 실패 필드: ${issues.join(", ")}`
+    : "JSON 형식이 올바르지 않습니다. 유효한 JSON 객체만 출력하세요.";
+  const previewLine = contentPreview ? `원본 응답 미리보기: ${contentPreview.slice(0, 300)}` : "";
+
+  return [
+    {
+      role: "system",
+      content: `다음 JSON을 내용과 인과관계는 유지한 채 스키마에 맞게 교정한다. JSON 객체만 출력한다. 누락 필드를 채우고 타입을 바로잡는다.
+필수 필드: title (1-100자), body (100-5200자 한국어 2문단), choices (2-3개, 각각 id/label/summary/statDelta/relationshipDelta), tags (1-5개).
+body는 한국어 2문단, 4~5문장이다. summary는 "당신은"으로 시작한다.
+statDelta 필드: academic, practical, health, mental, wealth, reputation, charm (선택적, 정수 -15~15, health/mental은 -1 이상).
+temperature 0.3, 출력만 반환.`,
+    },
+    {
+      role: "user",
+      content: `${repairGuidance}
+${previewLine}
+원본 프롬프트:
+${originalPrompt.slice(0, 1500)}`,
+    },
+  ];
 }
 
 async function generateAiEventWithProvider(
@@ -622,7 +763,7 @@ async function generateAiEventWithProvider(
     const firstChoice = Array.isArray(choices) ? choices[0] : null;
     const openAiMessage = firstChoice && typeof firstChoice === "object" ? (firstChoice as Record<string, unknown>).message : null;
     const message = provider.id === "ollama" ? (data?.message ?? openAiMessage) : openAiMessage;
-    let content: string | undefined = message && typeof message === "object"
+    const content: string | undefined = message && typeof message === "object"
       ? (message as Record<string, unknown>).content as string | undefined
       : undefined;
     if (!content) {
@@ -962,7 +1103,7 @@ function buildAiEventRequestBody(state: AiEventPromptState, provider: AiProvider
       stream: false,
       think: "low",
       options: {
-        temperature: 0.45,
+        temperature: 0.85,
         num_predict: getAiEventMaxTokens(provider.id),
       },
     };
@@ -1001,7 +1142,7 @@ For streaming responsiveness, output the JSON object in this field order exactly
       stream: true,
       think: "low",
       options: {
-        temperature: 0.45,
+        temperature: 0.85,
         num_predict: getAiEventMaxTokens(provider.id),
       },
     };
@@ -1168,60 +1309,48 @@ async function generateAiEndingWithProvider(
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(provider.baseUrl + "/chat/completions", {
+    const messages = buildAiEndingMessages(state);
+    const requestUrl = provider.id === "ollama"
+      ? `${provider.baseUrl}/chat`
+      : `${provider.baseUrl}/chat/completions`;
+    const requestBody = provider.id === "ollama"
+      ? {
+          model: provider.model,
+          messages,
+          format: "json",
+          stream: false,
+          think: "low",
+          options: { temperature: 0.9, num_predict: maxTokens },
+        }
+      : {
+          model: provider.model,
+          messages,
+          response_format: { type: "json_object" },
+          max_tokens: maxTokens,
+          temperature: 0.9,
+        };
+    const requestEnding = (requestMessages: ReturnType<typeof buildAiEndingMessages>, temperature: number, tokenLimit: number) => fetch(requestUrl, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${provider.key}`,
         "Content-Type": "application/json",
         ...provider.headers,
       },
-        body: JSON.stringify({
-          model: provider.model,
-          messages: [
-            {
-              role: "system",
-              content: `You write final result records for a Korean literary career text-adventure. Return ONLY valid JSON.
-The result must be Korean prose, second-person "당신은" voice, and longNarrative must be at least 500 Korean characters.
-Treat the protagonist as a woman by default. Do not call the protagonist "오빠", "형", "군", or use male-coded address. Use "언니", "선배", "씨", or the protagonist's name if needed.
-Use public stats, hidden state, every major event, and relationships. Include career life and what happened afterward.
-The result must be layered, surprising, and novelistic: success can contain private loss, failure can contain quiet dignity, bad relationships can return as reversals. However, do not make every ordinary final result feel like a bad ending. If result mode is "final", write a mixed but livable life with costs, gains, and a future. Reserve collapse, ruin, and hopelessness for result mode "crisis".
-Possible results are not limited to office jobs. They may include romance, marriage, living alone, overseas working holiday, police/public safety, private investigator, lawyer/accountant/professional, founder, self-employed owner, artist/marketer, civil servant, criminal downfall, whistleblower, quiet rural life, or a lonely but peaceful life.
-Do not use the word "엔딩" in title, summary, tags, or longNarrative. Call it "선택의 결과", "기록", or describe the concrete life result.
-Never expose raw stat numbers in prose. Do not write phrases like "학점 10", "건강 6", "네트워크 3", "mental 4", "reputation 2", or any stat label followed by a number. Translate stats into qualitative language such as "성실하게 쌓은 지식", "좁지만 남은 관계망", "무리를 견디기 어려운 몸", or "쉽게 흔들리는 마음".
-Do not grant a licensed profession, specific company job, public safety role, or startup selection unless hiddenState.eventFlags.careerGate.status is "passed" for that path. If the gate is failed or absent, write about preparation, rejection, retrying, or a different unspecific path.
-The longNarrative must be 700-1400 Korean characters when possible. It must cover:
-1. What career/life path happened right after university.
-2. A turning point caused by at least one past event or relationship.
-3. How love, marriage, solitude, family, money, health, or reputation changed afterward.
-4. A reversal or irony based on mismatched stats/relationships, such as high academic + bad relationship, high wealth + low mental, high charm + low reputation.
-5. A final image, not a generic lesson.
-Mention at least three concrete past event titles or relationship names from the supplied history when they matter. Avoid generic summaries that could fit any playthrough.
-Do not write route grades such as A/B/C, GOOD ROUTE, MIXED ROUTE, or HARD ROUTE.
-Use fictional/parody company or institution names only. No real defamatory claims.
-Use hiddenState.eventFlags.careerState as the causal career spine. Prefer its leading candidates and selected organizations, and explicitly connect at least two careerState.evidence entries to the final role. Do not invent an organization outside that supplied pool.
-If the character has a relationship life state (single, dating, cohabitation, married, divorced, widowed) or parenting state (expecting, newborn, toddler, school_age), reflect it naturally in the narrative. A marriage ending should feel earned from prior relationship history, not sudden. A parenting ending should show how the child changed the character's daily life and priorities. A single/independent ending should feel like a conscious choice, not a failure.`,
-            },
-            {
-              role: "user",
-              content: `주인공: ${state.name}, ${state.age}세, ${state.major}
-주인공 성별/호칭: 여성. "오빠", "형", "군" 금지. 필요하면 "언니", "선배", "씨", 이름 사용.
-결과 성격: ${state.resultMode ?? "final"}
-공개 스탯 질적 요약: ${buildQualitativeStatsPrompt(state.stats)}
-숨은 상태: ${JSON.stringify(state.hiddenState)}
-관계도: ${JSON.stringify(state.relationships)}
-전체 사건 기록(시간순, 하나도 생략하지 않음): ${JSON.stringify(buildEndingEventLedger(state.eventHistory))}
-마지막 선택: ${state.finalChoiceSummary}
-${state.relationshipLife ? `관계 생활 상태: ${state.relationshipLife.relationshipLife}${state.relationshipLife.parenting.hasChildren ? `, 자녀: ${state.relationshipLife.parenting.childCount}명 (${state.relationshipLife.parenting.parentingStage})` : ""}` : ""}
-
-JSON fields: title, summary, longNarrative, careerPath, jobRole, destinationName, salaryBand, workplaceTone, satisfaction, growthPotential, workLifeBalance, healthState, relationshipState, tags.`,
-            },
-          ],
-          response_format: { type: "json_object" },
-          max_tokens: maxTokens,
-          temperature: 0.9,
-        }),
+      body: JSON.stringify(provider.id === "ollama"
+        ? {
+            ...requestBody,
+            messages: requestMessages,
+            options: { temperature, num_predict: tokenLimit },
+          }
+        : {
+            ...requestBody,
+            messages: requestMessages,
+            max_tokens: tokenLimit,
+            temperature,
+          }),
       signal: controller.signal,
     });
+    const response = await requestEnding(messages, 0.9, maxTokens);
 
     if (response.status === 429) return { success: false, reason: "rate_limited", issues: ["http_429"] };
     if (!response.ok) {
@@ -1239,11 +1368,13 @@ JSON fields: title, summary, longNarrative, careerPath, jobRole, destinationName
     }
 
     const data = await response.json();
-    const content = data?.choices?.[0]?.message?.content;
+    const content = provider.id === "ollama"
+      ? data?.message?.content ?? data?.choices?.[0]?.message?.content
+      : data?.choices?.[0]?.message?.content;
     if (!content) return { success: false, reason: "invalid_response", issues: ["empty_content"] };
 
     const parsed = extractJson(content);
-    const validated = aiEndingSchema.safeParse(normalizeAiEnding(parsed, state));
+    let validated = aiEndingSchema.safeParse(normalizeAiEnding(parsed, state));
     if (!validated.success) {
       const issues = validated.error.issues.map((issue) => issue.path.join(".") || "ending");
       logger.warn("ai_ending_schema_failure", {
@@ -1252,7 +1383,27 @@ JSON fields: title, summary, longNarrative, careerPath, jobRole, destinationName
         issues,
         contentLength: content.length,
       });
-      return { success: false, reason: "invalid_response", issues };
+      const repairMessages = buildAiEndingRepairMessages(content, issues);
+      const repairResponse = await requestEnding(repairMessages, 0.35, Math.min(3_200, maxTokens));
+      if (!repairResponse.ok) {
+        return { success: false, reason: repairResponse.status === 429 ? "rate_limited" : "api_error", issues };
+      }
+      const repairData = await repairResponse.json();
+      const repairedContent = provider.id === "ollama"
+        ? repairData?.message?.content ?? repairData?.choices?.[0]?.message?.content
+        : repairData?.choices?.[0]?.message?.content;
+      if (!repairedContent) return { success: false, reason: "invalid_response", issues: [...issues, "repair_empty_content"] };
+      validated = aiEndingSchema.safeParse(normalizeAiEnding(extractJson(repairedContent), state));
+      if (!validated.success) {
+        const repairIssues = validated.error.issues.map((issue) => issue.path.join(".") || "ending");
+        logger.warn("ai_ending_repair_schema_failure", {
+          providerId: provider.id,
+          providerLabel: provider.label,
+          issues: repairIssues,
+          contentLength: repairedContent.length,
+        });
+        return { success: false, reason: "invalid_response", issues: repairIssues };
+      }
     }
 
     return { success: true, ending: validated.data, providerId: provider.id, providerLabel: provider.label };
@@ -1264,6 +1415,73 @@ JSON fields: title, summary, longNarrative, careerPath, jobRole, destinationName
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function buildAiEndingRepairMessages(content: string, issues: string[]) {
+  return [
+    {
+      role: "system",
+      content: `다음 JSON을 내용과 인과관계는 유지한 채 현실적인 한국어 커리어 회고문으로 교정한다. JSON 객체만 출력한다. 누락 필드를 채우고 타입을 바로잡는다. summary는 한국어 80~500자다. longNarrative는 900~2600자, 빈 줄로 나눈 정확히 2~3문단이어야 하며 각 문단은 220자 이상이어야 한다. 졸업 뒤 구직과 첫 직장, 실제 업무, 수입과 지출, 건강, 관계가 선택의 결과로 어떻게 달라졌는지 구체적으로 쓴다. 사건 제목을 목록처럼 나열하거나 교훈을 선언하지 않는다. 과장된 비유, 시적 상징, 운명적인 반전, 감상적인 마지막 문장을 피하고 일상적인 행동과 대화로 마무리한다. 시점은 끝까지 2인칭 "당신은"으로 유지하고 "나는/내가"로 바꾸지 않는다. 실제 기업·기관명 대신 원문에 주어진 허구 이름만 사용한다. 필수 필드: title, summary, longNarrative, careerPath, jobRole, destinationName, salaryBand, workplaceTone, satisfaction, growthPotential, workLifeBalance, healthState, relationshipState, tags. jobRole과 destinationName은 careerPath와 일관된 값을 채워야 하며, 절대 null이나 빈 값이면 안 된다.`,
+    },
+    {
+      role: "user",
+      content: `검증 실패 필드: ${issues.join(", ")}\n원본 JSON:\n${content}`,
+    },
+  ];
+}
+
+function buildAiEndingMessages(state: {
+  name: string;
+  age: number;
+  major: string;
+  stats: Record<string, number>;
+  hiddenState: unknown;
+  relationships: { name: string; role: string; trust: number; tags: unknown }[];
+  eventHistory: { title: string; summary: string; statDelta: unknown; relationshipDelta: unknown; flagDelta: unknown }[];
+  finalChoiceSummary: string;
+  resultMode?: "final" | "crisis";
+  relationshipLife?: { relationshipLife: string; parenting: { hasChildren: boolean; childCount: number; parentingStage: string } };
+}) {
+  return [
+            {
+              role: "system",
+              content: `You write realistic final result records for a Korean career text-adventure. Return ONLY valid JSON.
+The result must read like a polished but plainspoken Korean career retrospective, consistently in second-person "당신은" voice.
+Treat the protagonist as a woman by default. Do not call the protagonist "오빠", "형", "군", or use male-coded address. Use "언니", "선배", "씨", or the protagonist's name if needed.
+Use public stats, hidden state, every major event, and relationships. Include career life and what happened afterward.
+The result should be nuanced but plausible: success can have practical costs and failure can leave a workable next step. Avoid dramatic reversals unless the supplied history clearly supports them. Do not make every ordinary final result feel like a bad ending. If result mode is "final", write a mixed but livable life with costs, gains, and a future. Reserve collapse, ruin, and hopelessness for result mode "crisis".
+Possible results are not limited to office jobs. They may include romance, marriage, living alone, overseas working holiday, police/public safety, private investigator, lawyer/accountant/professional, founder, self-employed owner, artist/marketer, civil servant, criminal downfall, whistleblower, quiet rural life, or a lonely but peaceful life.
+Do not use the word "엔딩" in title, summary, tags, or longNarrative. Call it "선택의 결과", "기록", or describe the concrete life result.
+Never expose raw stat numbers in prose. Do not write phrases like "학점 10", "건강 6", "네트워크 3", "mental 4", "reputation 2", or any stat label followed by a number. Translate stats into qualitative language such as "성실하게 쌓은 지식", "좁지만 남은 관계망", "무리를 견디기 어려운 몸", or "쉽게 흔들리는 마음".
+Do not grant a licensed profession, specific company job, public safety role, or startup selection unless hiddenState.eventFlags.careerGate.status is "passed" for that path. If the gate is failed or absent, write about preparation, rejection, retrying, or a different unspecific path.
+The longNarrative must be 900-1800 Korean characters in exactly 2-3 substantial paragraphs separated by blank lines. Each paragraph must be at least 220 characters. Build one continuous story rather than a chronology or résumé:
+1. Open in a concrete scene immediately after university, where a past choice changes what the protagonist can do now.
+2. Move forward in time through a turning point. Weave career, a recurring person, money, health, and private life into causal action; do not list event titles or explain stats.
+3. Close with one ordinary, specific action that shows the protagonist's current routine or next practical decision. Do not end with a generic lesson, aspiration, or summary.
+Use concrete workplace and daily-life detail, including a short natural line of dialogue and a visible consequence of an earlier choice. Prefer direct description over metaphor. Avoid poetic symbols, ornate sensory imagery, fate-like language, melodrama, and sentimental closing lines. Never switch to first-person narration such as "나는" or "내가".
+Separate the career result from the condition of the life that remains. Make careerPath/jobRole answer what happened occupationally, while healthState and relationshipState answer what it cost or preserved. In the prose, also resolve money, health, relationships, and self-respect independently so that two identical career outcomes can still represent different lives.
+Mention at least three concrete past event titles or relationship names from the supplied history when they matter. Avoid generic summaries that could fit any playthrough.
+Do not write route grades such as A/B/C, GOOD ROUTE, MIXED ROUTE, or HARD ROUTE.
+Use only fictional/parody company or institution names found in the supplied state. Never name a real company or institution; if the supplied history contains one, replace it with a plausible fictional name.
+Use hiddenState.eventFlags.careerState as the causal career spine. Prefer its leading candidates and selected organizations, and explicitly connect at least two careerState.evidence entries to the final role. Do not invent an organization outside that supplied pool.
+If the character has a relationship life state (single, dating, cohabitation, married, divorced, widowed) or parenting state (expecting, newborn, toddler, school_age), reflect it naturally in the narrative. A marriage ending should feel earned from prior relationship history, not sudden. A parenting ending should show how the child changed the character's daily life and priorities. A single/independent ending should feel like a conscious choice, not a failure.`,
+            },
+            {
+              role: "user",
+              content: `주인공: ${state.name}, ${state.age}세, ${state.major}
+주인공 성별/호칭: 여성. "오빠", "형", "군" 금지. 필요하면 "언니", "선배", "씨", 이름 사용.
+결과 성격: ${state.resultMode ?? "final"}
+공개 스탯 질적 요약: ${buildQualitativeStatsPrompt(state.stats)}
+숨은 상태: ${JSON.stringify(state.hiddenState)}
+관계도: ${JSON.stringify(state.relationships)}
+전체 사건 기록(시간순, 하나도 생략하지 않음): ${JSON.stringify(buildEndingEventLedger(state.eventHistory))}
+마지막 선택: ${state.finalChoiceSummary}
+${state.relationshipLife ? `관계 생활 상태: ${state.relationshipLife.relationshipLife}${state.relationshipLife.parenting.hasChildren ? `, 자녀: ${state.relationshipLife.parenting.childCount}명 (${state.relationshipLife.parenting.parentingStage})` : ""}` : ""}
+
+JSON fields: title, summary, longNarrative, careerPath, jobRole, destinationName, salaryBand, workplaceTone, satisfaction, growthPotential, workLifeBalance, healthState, relationshipState, tags.
+jobRole과 destinationName은 careerPath와 일관된 구체적인 값이어야 한다. 절대 null이나 빈 문자열이면 안 된다. 예: careerPath가 "다람소프트 신입 실무자"이면 jobRole="신입 개발자", destinationName="다람소프트".`,
+            },
+          ];
 }
 
 function buildEndingEventLedger(
@@ -1285,7 +1503,7 @@ function hasMeaningfulEndingValue(value: unknown) {
   return value !== null && value !== undefined;
 }
 
-function normalizeAiEnding(raw: unknown, state: { name: string; major: string; stats: Record<string, number>; finalChoiceSummary: string }) {
+export function normalizeAiEnding(raw: unknown, state: { name: string; major: string; stats: Record<string, number>; finalChoiceSummary: string }) {
   const container = readRecord(raw) ?? {};
   const ending = readRecord(container.ending) ?? container;
   const careerPath = typeof ending.careerPath === "string" ? ending.careerPath : pickFallbackCareerPath(state.stats);
@@ -1300,6 +1518,11 @@ function normalizeAiEnding(raw: unknown, state: { name: string; major: string; s
       relationshipState: typeof ending.relationshipState === "string" ? ending.relationshipState : "관계의 빛과 그림자가 함께 남음",
     });
 
+  // Infer destinationName and jobRole from careerPath/title/summary when the
+  // model omits them, so no successful ending record has null values.
+  const inferredDestination = inferDestinationFromCareerPath(careerPath, ending, state);
+  const inferredJobRole = inferJobRoleFromCareerPath(careerPath, ending, state);
+
   return {
     title: sanitizeEndingStatNumbers(typeof ending.title === "string" ? ending.title : `${state.name}의 ${careerPath}`),
     summary: sanitizeEndingStatNumbers(typeof ending.summary === "string" ? ending.summary : `${state.name}은 대학의 선택들을 지나 ${careerPath}에 닿았다.`),
@@ -1312,8 +1535,8 @@ function normalizeAiEnding(raw: unknown, state: { name: string; major: string; s
       relationshipState: typeof ending.relationshipState === "string" ? ending.relationshipState : "관계의 빛과 그림자가 함께 남음",
     })}`),
     careerPath,
-    jobRole: typeof ending.jobRole === "string" ? sanitizeEndingStatNumbers(ending.jobRole) : null,
-    destinationName: typeof ending.destinationName === "string" ? sanitizeEndingStatNumbers(ending.destinationName) : null,
+    jobRole: sanitizeEndingStatNumbers(inferredJobRole),
+    destinationName: sanitizeEndingStatNumbers(inferredDestination),
     salaryBand: typeof ending.salaryBand === "string" ? ending.salaryBand : null,
     workplaceTone: Array.isArray(ending.workplaceTone) ? ending.workplaceTone.filter((item) => typeof item === "string").map(sanitizeEndingStatNumbers) : [],
     satisfaction: clampScore(ending.satisfaction, Math.round((state.stats.health + state.stats.mental + state.stats.reputation) / 3)),
@@ -1323,6 +1546,64 @@ function normalizeAiEnding(raw: unknown, state: { name: string; major: string; s
     relationshipState: typeof ending.relationshipState === "string" ? sanitizeEndingStatNumbers(ending.relationshipState) : "관계의 빛과 그림자가 함께 남음",
     tags: Array.isArray(ending.tags) && ending.tags.length > 0 ? ending.tags.filter((tag) => typeof tag === "string").map(sanitizeEndingStatNumbers).slice(0, 10) : ["선택의 결과", careerPath],
   };
+}
+
+function inferDestinationFromCareerPath(
+  careerPath: string,
+  ending: Record<string, unknown>,
+  state: { name: string; major: string; stats: Record<string, number> },
+): string {
+  if (typeof ending.destinationName === "string" && ending.destinationName.trim().length > 0) {
+    return ending.destinationName;
+  }
+  const title = typeof ending.title === "string" ? ending.title : "";
+  const summary = typeof ending.summary === "string" ? ending.summary : "";
+  const combined = `${careerPath} ${title} ${summary}`;
+
+  if (combined.includes("다람소프트") || combined.includes("삼슨") || combined.includes("네이봐") ||
+      combined.includes("카캉") || combined.includes("배달이민족") || combined.includes("규글") ||
+      combined.includes("스타벅수") || combined.includes("엘쥐") || combined.includes("현댜") ||
+      combined.includes("에스끼리텔")) {
+    const companies = ["다람소프트", "삼슨전자", "네이봐", "카캉오", "배달이민족", "규글코리아", "스타벅수커피", "엘쥐전자", "현댜모터스", "에스끼리텔"];
+    const matched = companies.find((c) => combined.includes(c));
+    if (matched) return matched;
+  }
+  if (combined.includes("공공") || combined.includes("공무원") || combined.includes("공기업")) return "공공기관";
+  if (combined.includes("창업") || combined.includes("스타트업")) return "창업";
+  if (combined.includes("전문직") || combined.includes("시험") || combined.includes("회계사") || combined.includes("변리사") || combined.includes("로스쿨")) return "전문직 시험";
+  if (combined.includes("대학원") || combined.includes("석사") || combined.includes("박사") || combined.includes("연구")) return "대학원";
+  if (combined.includes("워홀") || combined.includes("해외")) return "해외";
+  if (combined.includes("결혼") || combined.includes("연애") || combined.includes("가정")) return "가정";
+  if (combined.includes("자영업") || combined.includes("프리랜서")) return "자영업";
+
+  return `${careerPath} 관련 직장`;
+}
+
+function inferJobRoleFromCareerPath(
+  careerPath: string,
+  ending: Record<string, unknown>,
+  state: { name: string; major: string; stats: Record<string, number> },
+): string {
+  if (typeof ending.jobRole === "string" && ending.jobRole.trim().length > 0) {
+    return ending.jobRole;
+  }
+  const title = typeof ending.title === "string" ? ending.title : "";
+  const summary = typeof ending.summary === "string" ? ending.summary : "";
+  const combined = `${careerPath} ${title} ${summary}`;
+
+  if (combined.includes("신입") || combined.includes("사원") || combined.includes("실무자")) return "신입 사원";
+  if (combined.includes("대표") || combined.includes("CEO") || combined.includes("창업자")) return "창업자";
+  if (combined.includes("연구") || combined.includes("개발") || combined.includes("엔지니어")) return "연구개발 직무";
+  if (combined.includes("마케팅") || combined.includes("홍보") || combined.includes("콘텐츠")) return "마케팅 직무";
+  if (combined.includes("영업") || combined.includes("세일즈")) return "영업 직무";
+  if (combined.includes("회계") || combined.includes("재무") || combined.includes("경리")) return "회계/재무 직무";
+  if (combined.includes("인사") || combined.includes("HR") || combined.includes("채용")) return "인사 직무";
+  if (combined.includes("디자인") || combined.includes("UI") || combined.includes("UX")) return "디자인 직무";
+  if (combined.includes("공무") || combined.includes("행정")) return "행정 직무";
+  if (combined.includes("간호") || combined.includes("의사") || combined.includes("약사") || combined.includes("보건")) return "의료/보건 직무";
+  if (combined.includes("교사") || combined.includes("강사") || combined.includes("교육")) return "교육 직무";
+
+  return "일반 사무직";
 }
 
 function buildQualitativeStatsPrompt(stats: Record<string, number>) {
@@ -1377,37 +1658,14 @@ function sanitizeEndingStatNumbers(text: string) {
   const labelPattern = labels.join("|");
   return text
     .replace(new RegExp(`(${labelPattern})\\s*(?:수치|점수|스탯|stat)?\\s*(?:은|는|이|가|의)?\\s*[:：]?\\s*(?:10|[0-9])\\b`, "gi"), "$1")
-    .replace(/\s{2,}/g, " ")
+    .replace(/[^\S\r\n]{2,}/g, " ")
+    .replace(/\n[\t ]*\n(?:[\t ]*\n)+/g, "\n\n")
     .trim();
 }
 
 function clampScore(value: unknown, fallback: number) {
   const numeric = Number(value);
   return Math.max(0, Math.min(100, Math.round(Number.isFinite(numeric) ? numeric : fallback)));
-}
-
-function pickFallbackCareerPath(stats: Record<string, number>) {
-  if (stats.academic >= 8 && stats.reputation < 4) return "전문직을 준비했으나 관계의 역풍을 맞은 삶";
-  if (stats.practical >= 7 && stats.wealth >= 6) return "창업과 자영업 사이의 독립";
-  if (stats.reputation >= 7 && stats.charm >= 6) return "기업 조직의 핵심 실무자";
-  if (stats.academic >= 7) return "공공기관 또는 자격시험의 긴 길";
-  return "불확실한 취업 준비 이후의 조용한 생존";
-}
-
-function buildFallbackLongEnding(input: {
-  name: string;
-  major: string;
-  careerPath: string;
-  stats: Record<string, number>;
-  finalChoiceSummary: string;
-  relationshipState: string;
-}) {
-  const strength = input.stats.academic >= input.stats.practical ? "공부로 버티는 법" : "현장에서 배우는 법";
-  const weakness = input.stats.health < 5 ? "몸을 너무 늦게 돌본 대가" :
-    input.stats.mental < 5 ? "마음을 오래 방치한 대가" :
-    input.stats.reputation < 5 ? "사람들 사이에 남은 오해" :
-    "끝내 놓지 못한 미련";
-  return `당신은 ${input.major}의 강의실에서 시작한 여러 사건 끝에 ${input.careerPath}라는 이름의 문 앞에 섰다. 마지막에 남은 선택은 단순한 합격이나 취업이 아니라, 그동안 쌓인 모든 태도의 계산서에 가까웠다. ${input.finalChoiceSummary} 그 문장은 이력서에는 쓰이지 않았지만, 훗날 당신이 중요한 결정을 앞두고 잠시 말을 멈추게 만드는 기억이 되었다. 당신은 ${strength}을 알고 있었고, 그래서 남들보다 늦게 무너질 수 있었다. 하지만 ${weakness}는 예상하지 못한 순간에 되돌아왔다. 한때 좋았던 관계는 추천서가 되기도 했고, 틀어진 관계는 가장 중요한 면접장이나 협상 자리에서 차가운 표정으로 다시 나타나기도 했다. 그래서 당신의 커리어는 곧장 상승하는 선이 아니라, 몇 번의 후퇴와 우회로 이루어진 긴 문장에 가까웠다. 시간이 지나 당신은 처음 꿈꾸던 모습과는 조금 다른 사람이 되었다. 돈을 더 벌 때도 있었고, 조용히 물러서야 할 때도 있었으며, 누군가에게는 성공한 사람으로, 누군가에게는 조금 차가워진 사람으로 기억되었다. 그래도 당신은 완전히 실패하지 않았다. ${input.relationshipState}이라는 결론 속에서, 당신은 자신이 무엇을 얻었고 무엇을 잃었는지 알고 살아가는 사람이 되었다.`;
 }
 
 function extractJson(content: string) {
@@ -1497,6 +1755,12 @@ export function normalizeAiEvent(raw: unknown) {
     statDelta: Record<string, number>;
     relationshipDelta: { name: string; trust: number; status?: string }[];
   }>;
+  for (let index = 0; index < choices.length; index += 1) {
+    const delta = choices[index].statDelta;
+    if (typeof delta?.mental === "number" && delta.mental < 0 && !hasMeaningfulMentalCost(event, choices[index])) {
+      choices[index] = { ...choices[index], statDelta: { ...delta, mental: 0 } };
+    }
+  }
   const mentalLossIndices = choices
     .map((c, i) => {
       const delta = c.statDelta;
@@ -1534,6 +1798,20 @@ export function normalizeAiEvent(raw: unknown) {
     tags: event.tags,
     choices,
   };
+}
+
+function hasMeaningfulMentalCost(
+  event: Record<string, unknown>,
+  choice: { label: string; summary: string },
+) {
+  const choiceText = `${choice.label ?? ""} ${choice.summary ?? ""}`;
+  const directBurden = /(밤을?\s*새|밤샘|수면을?\s*포기|잠을?\s*줄|과로|무리(?:하|해서|를\s*감수)|혼자\s*(?:떠안|감당)|부담을?\s*숨|감정을?\s*숨|고립을?\s*택|관계를?\s*끊|이별|상실|장례|죽음|모욕|굴욕|망신|협박|폭력|범죄|불법|도박|위험을?\s*감수|양심을?\s*저버|배신|정면\s*충돌|격렬한\s*갈등|공황|극심한\s*(?:불안|공포)|두려움을?\s*억누)/;
+  if (directBurden.test(choiceText)) return true;
+
+  const eventText = `${String(event.title ?? "")} ${String(event.body ?? "")} ${Array.isArray(event.tags) ? event.tags.join(" ") : ""}`;
+  const severeSituation = /(협박|폭력|범죄|불법|장례|죽음|이별\s*통보|해고|퇴출|심각한\s*갈등|공황|극심한\s*(?:불안|공포)|밤샘|과로)/.test(eventText);
+  const engagedChoice = /(맞서|감수|버티|숨기|계속하|받아들이|혼자|직접\s*부딪)/.test(choiceText);
+  return severeSituation && engagedChoice;
 }
 
 function normalizeChoice(raw: unknown) {

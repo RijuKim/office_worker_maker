@@ -1,19 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { toPng } from "html-to-image";
 
 import { api } from "./api";
 import { playCue, startBgm, stopBgm, vibrate, type AudioSettings } from "./audio";
 import { getTossAnonymousKey } from "./toss-auth";
-import { CharacterSheet, PlaySurface, RelationshipsSheet } from "@/lib/game-ui/App";
+import { CharacterSheet, EndingTransition, PlaySurface, RelationshipsSheet } from "@/lib/game-ui/App";
 import { SharedGameChrome, SharedGameWorkspace, SharedOnboardingFlow } from "../../../lib/game-ui/shell";
-import { RecordCardShell, RecordShareActions, copyEndingShareLink } from "@/lib/game-ui/App";
+import { RecordCardShell, RecordShareActions } from "@/lib/game-ui/App";
 import { CodexDetailModal } from "@/app/components/codex/CodexDetailModal";
 import { CodexGrid } from "@/app/components/codex/CodexGrid";
 import { CODEX_CATALOG, type CodexSlot } from "@/lib/game/codex-catalog";
 import { deriveCodexState } from "@/lib/game/derive-codex-state";
 import { EndingArt } from "@/lib/game/ending-art";
 import type { CareerEndingRecord } from "@prisma/client";
-import { createTossEndingShareLink } from "./toss-host";
+import { saveTossEndingImage, shareTossEnding } from "./toss-host";
 import type { CareerPath, CareerRecord, CharacterData, CharacterSpec, ChoiceFeedback, EventData, JobApplication, Screen } from "./types";
+import { parseRouteIntent, type PublicEndingDto } from "@/lib/game-ui/types";
 
 const statLabels: Record<string, string> = {
   academic: "학업",
@@ -91,24 +93,36 @@ function formatRelationshipResult(value: string) {
   return value;
 }
 
-async function copyText(text: string) {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
-  const textarea = document.createElement("textarea");
-  textarea.value = text;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.opacity = "0";
-  document.body.appendChild(textarea);
-  textarea.select();
-  const copied = document.execCommand("copy");
-  textarea.remove();
-  if (!copied) throw new Error("clipboard unavailable");
+function SharedEndingScreen({ ending }: { ending: PublicEndingDto }) {
+  return (
+    <main className="shared-ending-screen min-h-screen p-4 pt-8">
+      <article className="shared-ending-card pixel-panel mx-auto max-w-2xl overflow-hidden">
+        <header>
+          <p className="record-kicker">SHARED ENDING</p>
+          <h1>{ending.title}</h1>
+          <p>{ending.summary}</p>
+        </header>
+        <div className="shared-ending-body">
+          <div className="record-narrative whitespace-pre-wrap">{ending.longNarrative}</div>
+          <div className="shared-ending-chips">
+            <span className="record-chip">{ending.careerPath}</span>
+            {ending.destinationName && <span className="record-chip">{ending.destinationName}</span>}
+            {ending.jobRole && <span className="record-chip">{ending.jobRole}</span>}
+          </div>
+          <div className="shared-ending-scores">
+            <p><span>만족도</span><strong>{ending.satisfaction}</strong></p>
+            <p><span>성장 가능성</span><strong>{ending.growthPotential}</strong></p>
+            <p><span>워라밸</span><strong>{ending.workLifeBalance}</strong></p>
+          </div>
+          <button className="pixel-button-dark mt-6 w-full px-4 py-3 font-bold" type="button" onClick={() => window.location.assign("/")}>나도 시작하기</button>
+        </div>
+      </article>
+    </main>
+  );
 }
 
 export function App() {
+  const routeIntent = useMemo(() => parseRouteIntent(typeof window === "undefined" ? "/" : window.location.href), []);
   const [initialLoading, setInitialLoading] = useState(true);
   const [screen, setScreen] = useState<Screen>("create");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -123,6 +137,7 @@ export function App() {
   const [currentEvent, setCurrentEvent] = useState<EventData | null>(null);
   const [feedback, setFeedback] = useState<ChoiceFeedback | null>(null);
   const [endingNotice, setEndingNotice] = useState("");
+  const [showEndingTransition, setShowEndingTransition] = useState(false);
   const [latestRecordId, setLatestRecordId] = useState<string | null>(null);
   const [records, setRecords] = useState<CareerRecord[]>([]);
   const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
@@ -132,6 +147,8 @@ export function App() {
   const [specs, setSpecs] = useState<CharacterSpec[]>([]);
   const [jobApplications, setJobApplications] = useState<JobApplication[]>([]);
   const [careerPaths, setCareerPaths] = useState<CareerPath[]>([]);
+  const [sharedEnding, setSharedEnding] = useState<PublicEndingDto | null>(null);
+  const [sharedEndingError, setSharedEndingError] = useState("");
   const [createStep, setCreateStep] = useState<CreateStep>("intro");
   const [name, setName] = useState("");
   const [age, setAge] = useState(22);
@@ -354,12 +371,16 @@ export function App() {
 
   const choose = useCallback(async (choiceIndex: number) => {
     if (!currentCharacter || !currentEvent) return;
+    const expectsFinalEnding = currentCharacter.coreEventCount >= 23;
+    const endingTransitionStartedAt = expectsFinalEnding ? Date.now() : null;
     cue("tap");
     setLoading(true);
     setError("");
+    if (expectsFinalEnding) setShowEndingTransition(true);
     try {
       const result = await api.choose(currentCharacter.id, choiceIndex);
       if (!result.ok) {
+        if (expectsFinalEnding) setShowEndingTransition(false);
         setError(result.data.error ?? "선택을 처리하지 못했습니다.");
         return;
       }
@@ -369,7 +390,22 @@ export function App() {
         summary: result.data.result?.summary ?? "",
       });
       if (result.data.result?.stats) {
-        setCurrentCharacter((character) => character ? { ...character, stats: result.data.result!.stats!, ...(result.data.result?.relationships ? { relationships: result.data.result.relationships.map((rel) => ({ ...rel, tags: rel.tags ?? [] })) } : {}) } : character);
+        setCurrentCharacter((character) => {
+          if (!character) return character;
+          const resultData = result.data.result;
+          const nextLifeStage = resultData?.lifeStage;
+          return {
+            ...character,
+            stats: resultData!.stats!,
+            coreEventCount: character.coreEventCount + 1,
+            ...(resultData?.relationships ? { relationships: resultData.relationships.map((rel) => ({ ...rel, tags: rel.tags ?? [] })) } : {}),
+            ...(nextLifeStage ? {
+              lifeStage: nextLifeStage,
+              currentGradeYear: nextLifeStage.term?.gradeYear ?? character.currentGradeYear,
+              progressLabel: nextLifeStage.term?.label ?? character.progressLabel,
+            } : {}),
+          };
+        });
       } else if (result.data.result?.relationships) {
         setCurrentCharacter((character) => character ? { ...character, relationships: result.data.result!.relationships!.map((rel) => ({ ...rel, tags: rel.tags ?? [] })) } : character);
       }
@@ -379,16 +415,45 @@ export function App() {
         setLatestRecordId(result.data.result.endingRecordId ?? null);
         setEndingNotice("선택의 결과가 기록되었습니다. 당신이 지나온 선택이 어떤 삶으로 이어졌는지 확인해 보세요.");
         cue("ending");
-        const recordsResult = await api.records();
-        if (recordsResult.ok) {
-          setRecords(recordsResult.data.records ?? []);
-          setExpandedRecord(result.data.result.endingRecordId ?? null);
+        setShowEndingTransition(true);
+        const endingRecordId = result.data.result.endingRecordId ?? null;
+        const transitionElapsed = endingTransitionStartedAt ? Date.now() - endingTransitionStartedAt : 0;
+        const minimumTransition = new Promise((resolve) => setTimeout(resolve, Math.max(0, 1_600 - transitionElapsed)));
+        const committedEndingRecord = result.data.result.endingRecord ?? null;
+        let endingReady = Boolean(committedEndingRecord && committedEndingRecord.id === endingRecordId);
+        if (committedEndingRecord) {
+          setRecords((current) => [committedEndingRecord, ...current.filter((record) => record.id !== committedEndingRecord.id)]);
+        }
+        let recordsResult = await api.records();
+        for (let attempt = 0; !endingReady && attempt < 40; attempt++) {
+          const nextRecords = recordsResult.ok ? recordsResult.data.records ?? [] : [];
+          const endingRecordVisible = endingRecordId
+            ? nextRecords.some((record) => record.id === endingRecordId)
+            : nextRecords.length > 0;
+          if (endingRecordVisible) {
+            endingReady = true;
+            break;
+          }
+          if (!recordsResult.ok) break;
+          await new Promise((resolve) => setTimeout(resolve, 750));
+          recordsResult = await api.records();
+        }
+        await minimumTransition;
+        if (endingReady) {
+          if (recordsResult.ok && (recordsResult.data.records?.length ?? 0) > 0) {
+            setRecords(recordsResult.data.records ?? []);
+          }
+          setExpandedRecord(endingRecordId);
+          setRecordsTab("records");
+          setScreen("records");
         } else {
           setError(recordsResult.data.error ?? "선택의 결과를 불러오지 못했습니다.");
+          setScreen("play");
         }
-        setScreen("play");
+        setShowEndingTransition(false);
         return;
       }
+      if (expectsFinalEnding) setShowEndingTransition(false);
       setCurrentEvent(null);
       setGeneratingNextEvent(true);
       const next = await api.nextEvent(currentCharacter.id);
@@ -399,6 +464,9 @@ export function App() {
         await openCharacter(currentCharacter);
         if (!next.ok && next.data.error) setError(next.data.error);
       }
+    } catch {
+      if (expectsFinalEnding) setShowEndingTransition(false);
+      setError("선택을 처리하지 못했습니다.");
     } finally {
       setGeneratingNextEvent(false);
       setLoading(false);
@@ -423,34 +491,30 @@ export function App() {
   }, [cue]);
 
   const shareRecord = useCallback(async (recordId: string) => {
-    const result = await copyEndingShareLink(
-      {
-        sharing: {
-          async createEndingShareLink(id) {
-            try {
-              return await createTossEndingShareLink(id);
-            } catch {
-              return `https://sano-officeworker.vercel.app/share/${encodeURIComponent(id)}`;
-            }
-          },
-        },
-        clipboard: {
-          async copy(text: string) {
-            await copyText(text);
-          },
-        },
-      },
-      recordId,
-    );
+    const record = records.find((candidate) => candidate.id === recordId);
+    try {
+      await shareTossEnding(recordId, record?.title ?? "선택의 결과");
+      setError("");
+    } catch {
+      setError("토스 공유 화면을 열지 못했습니다. 다시 시도해 주세요.");
+    }
+  }, [records]);
 
-    if (!result.ok) {
-      setError(result.message);
+  const saveRecordImage = useCallback(async (recordId: string) => {
+    const card = document.getElementById(`record-card-${recordId}`);
+    if (!card) {
+      setError("이미지 생성에 실패했습니다.");
       return;
     }
-
-    setError("");
-    setCopiedRecordId(recordId);
-    window.setTimeout(() => setCopiedRecordId((current) => current === recordId ? null : current), 1_800);
+    try {
+      const dataUrl = await toPng(card, { quality: 0.95, pixelRatio: 2 });
+      await saveTossEndingImage(dataUrl, recordId);
+      setError("");
+      setCopiedRecordId(recordId);
+      window.setTimeout(() => setCopiedRecordId((current) => current === recordId ? null : current), 1_800);
+    } catch {
+      setError("이미지를 기기에 저장하지 못했습니다. 다시 시도해 주세요.");
+    }
   }, []);
 
   useEffect(() => {
@@ -476,6 +540,21 @@ export function App() {
   }, [audioSettings.music]);
 
   useEffect(() => {
+    if (routeIntent.kind !== "share") return;
+    let active = true;
+    void api.publicEnding(routeIntent.recordId).then((result) => {
+      if (!active) return;
+      if (result.ok && "id" in result.data) setSharedEnding(result.data);
+      else setSharedEndingError("공유된 엔딩을 찾을 수 없습니다.");
+    }).catch(() => {
+      if (active) setSharedEndingError("공유된 엔딩을 불러오지 못했습니다.");
+    }).finally(() => {
+      if (active) setInitialLoading(false);
+    });
+    return () => { active = false; };
+  }, [routeIntent]);
+
+  useEffect(() => {
     const onVisibilityChange = () => {
       if (document.visibilityState === "hidden") runOptional(stopBgm);
       else if (audioSettings.music) runOptional(() => startBgm(true));
@@ -485,6 +564,7 @@ export function App() {
   }, [audioSettings.music]);
 
   useEffect(() => {
+    if (routeIntent.kind === "share") return;
     const timer = window.setTimeout(() => {
       void (async () => {
         setLoading(true);
@@ -508,7 +588,7 @@ export function App() {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [refreshCharacters]);
+  }, [refreshCharacters, routeIntent]);
 
   if (initialLoading) {
     return (
@@ -521,8 +601,14 @@ export function App() {
     );
   }
 
+  if (routeIntent.kind === "share") {
+    if (sharedEnding) return <SharedEndingScreen ending={sharedEnding} />;
+    return <main className="shared-ending-screen min-h-screen p-6 text-center"><div className="pixel-panel mx-auto mt-20 max-w-md p-8"><p>{sharedEndingError || "공유된 엔딩을 불러오고 있습니다."}</p></div></main>;
+  }
+
   return (
     <main className="app-shell">
+      {showEndingTransition && <EndingTransition characterName={currentCharacter?.name} />}
       <SharedGameChrome
         variant="web"
         menuOpen={menuOpen}
@@ -604,8 +690,9 @@ export function App() {
             onStartNewCharacter={requestNewSimulation}
             endingActions={latestRecordId ? (
               <RecordShareActions
-                copyLabel={copiedRecordId === latestRecordId ? "복사 완료" : "링크 복사"}
+                copyLabel="토스로 공유"
                 onCopyLink={shareRecord}
+                onSaveImage={saveRecordImage}
                 recordId={latestRecordId}
                 wrapperClassName="mt-3 flex flex-wrap gap-2"
               />
@@ -674,7 +761,7 @@ export function App() {
             <RecordCardShell
               className="record-card pixel-panel overflow-hidden p-0"
               expanded={isExpanded}
-              id={record.id}
+              id={`record-card-${record.id}`}
               key={record.id}
               onToggle={() => setExpandedRecord(isExpanded ? null : record.id)}
               preview={preview}
@@ -688,7 +775,7 @@ export function App() {
                   <span className="record-chip">{healthState}</span>
                   <span className="record-chip">관계 · {relationshipState}</span>
                 </div>
-                <RecordShareActions copyLabel={copiedRecordId === record.id ? "복사 완료" : "링크 복사"} onCopyLink={shareRecord} recordId={record.id} wrapperClassName="mt-3 flex flex-wrap gap-2" />
+                <RecordShareActions copyLabel="토스로 공유" onCopyLink={shareRecord} onSaveImage={saveRecordImage} recordId={record.id} wrapperClassName="mt-3 flex flex-wrap gap-2" />
               </div>
             </RecordCardShell>
             );

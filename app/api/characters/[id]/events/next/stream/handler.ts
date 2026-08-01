@@ -1,11 +1,11 @@
 import type { EventSource } from "@prisma/client";
 import type { NextRequest } from "next/server";
 
-import { getStoryArc, isEventAllowedForLifeStage, selectNextEvent, type EventSelectionContext, type StaticEvent } from "@/lib/game/event-engine";
+import { getStoryArc, isEventAllowedForLifeStage, personalizeEvent, selectNextEvent, STORY_CORE_QUESTION, type EventSelectionContext, type StaticEvent } from "@/lib/game/event-engine";
 import { evaluateCandidateEvent, findValidatedStaticFallback } from "@/lib/game/event-quality-policy";
 import { deriveLifeStageState } from "@/lib/game/life-stage";
 import { normalizeCareerNarrativeState, summarizeCareerNarrativeForPrompt } from "@/lib/game/career-narrative";
-import { buildDiversityCategoryGuidance, eventMatchesCategory, normalizeEventCategory, selectStoryCategoryPalette } from "@/lib/game/event-diversity";
+import { buildDiversityCategoryGuidance, collectRecentPeople, eventMatchesCategory, normalizeEventCategory, selectStoryCategoryPalette } from "@/lib/game/event-diversity";
 import { checkDailyAiLimit, generateAiEventStream, getOpenRouterTimeoutMs, incrementAiUsage } from "@/lib/game/openrouter";
 import { recordEventQualityLog } from "@/lib/server/event-quality-log";
 import { acquireAuthoritativeEvent, createPrismaEventAuthorityStore, EventAuthorityLostError, resolveEventGenerationRole, startEventGenerationHeartbeat, toPublicEvent, type EventGenerationHeartbeat } from "@/lib/server/event-authority";
@@ -192,7 +192,7 @@ export function createNextEventStreamPost({
           major: character.major,
           coreEventCount: character.coreEventCount,
         });
-        const diversityGuidance = buildDiversityGuidance(character.eventHistory, character.coreEventCount, character.id);
+        const diversityGuidance = buildDiversityGuidance(character.eventHistory, character.relationships, character.coreEventCount, character.id);
         const selectionContext: EventSelectionContext = {
           burnoutRisk: character.hiddenState.burnoutRisk,
           major: character.major,
@@ -378,7 +378,7 @@ export function createNextEventStreamPost({
           providerId = aiResult.providerId ?? null;
           providerFailures = aiResult.providerFailures ?? [];
 
-          if (aiResult.success) {
+            if (aiResult.success) {
             if (aiResult.providerId === "ollama") {
               assertConnected();
               await incrementAiUsage(userId);
@@ -418,9 +418,26 @@ export function createNextEventStreamPost({
               selectedEvent = aiEvent;
               source = "AI";
             } else if (initialEvaluation.verdict.hardFailure || !matchesTargetCategory) {
-              aiFailed = true;
-              generationReason = matchesTargetCategory ? "post_parse_quality_failure" : "target_category_mismatch";
-              generationStage = "quality";
+              // Attempt same-Ollama targeted correction/regeneration for quality rejections
+              // before falling through to OpenRouter or static fallback.
+              const qualityRepairResult = await attemptQualityRepair(aiState, aiResult, initialEvaluation, diversityGuidance, qualityContext, selectionContext, id, userId, log);
+              if (qualityRepairResult) {
+                selectedEvent = qualityRepairResult.event;
+                source = "AI";
+                retryUsed = true;
+                providerFailures = [...(aiResult.providerFailures ?? []), {
+                  providerId: "ollama",
+                  providerLabel: "Ollama GPT-OSS",
+                  providerElapsedMs: 0,
+                  reason: matchesTargetCategory ? "narrative_schema" : "target_category_mismatch",
+                  stage: "quality",
+                  issues: initialEvaluation.verdict.reasons,
+                }];
+              } else {
+                aiFailed = true;
+                generationReason = matchesTargetCategory ? "post_parse_quality_failure" : "target_category_mismatch";
+                generationStage = "quality";
+              }
             } else {
               selectedEvent = aiEvent;
               source = "AI";
@@ -470,6 +487,8 @@ export function createNextEventStreamPost({
         const candidateId = crypto.randomUUID();
         assertConnected();
         generationLease.assertOwned();
+        selectedEvent = personalizeEvent(selectedEvent, character.name);
+
         const commitStartedAt = Date.now();
         const newEvent = await acquireAuthoritativeEvent({
           store: authorityStore,
@@ -607,7 +626,8 @@ function advanceStoryArc(rawArc: unknown, coreEventCount: number, flags: Record<
   const arc = getStoryArc(coreEventCount);
   const tensionBase = typeof base.tension === "number" ? base.tension : 18;
   const riskDebt = typeof flags.riskDebt === "number" ? flags.riskDebt : 0;
-  const tension = Math.max(10, Math.min(95, tensionBase + (arc.phase === "위기" ? 9 : arc.phase === "절정" ? 12 : 4) + Math.min(12, riskDebt * 2)));
+  const phaseTension = arc.phase === "절정" ? 12 : arc.phase === "위기" ? 9 : arc.phase === "심화" || arc.phase === "결단" ? 7 : 4;
+  const tension = Math.max(10, Math.min(95, tensionBase + phaseTension + Math.min(12, riskDebt * 2)));
   const openThreads = Array.isArray(base.openThreads) && base.openThreads.length > 0
     ? base.openThreads.filter((thread) => typeof thread === "string")
     : [arc.openThread];
@@ -617,25 +637,28 @@ function advanceStoryArc(rawArc: unknown, coreEventCount: number, flags: Record<
 
   return {
     ...base,
-    title: typeof base.title === "string" ? base.title : arc.title,
+    title: arc.title,
+    premise: typeof base.premise === "string" ? base.premise : "취업을 준비하는 동안 무엇을 지키고 포기할지 선택한다.",
+    coreQuestion: STORY_CORE_QUESTION,
     phase: arc.phase,
     chapter: Math.floor(coreEventCount / 3) + 1,
     currentArcId: arc.id,
+    dramaticQuestion: arc.dramaticQuestion,
+    focusAxes: arc.focusAxes,
     tension,
-    openThreads: [...new Set([...openThreads, ...activeThreads, arc.openThread])].slice(-6),
+    openThreads: [...new Set([arc.openThread, ...activeThreads, ...openThreads])].slice(0, 8),
   };
 }
 
 function buildDiversityGuidance(eventHistory: Array<{
-  event?: { tags?: unknown };
+  event?: { title?: string | null; body?: string | null; tags?: unknown };
   relationshipDelta?: unknown;
-}>, coreEventCount: number, storySeed: string) {
+}>, relationships: Array<{ name: string }>, coreEventCount: number, storySeed: string) {
   const recent = eventHistory.slice(0, 5);
   const recentTags = recent.flatMap((history) =>
     Array.isArray(history.event?.tags) ? history.event.tags.filter((tag) => typeof tag === "string") : [],
   );
-  const recentPeople = recent.flatMap((history) => readRelationshipNames(history.relationshipDelta));
-  const peopleCounts = countItems(recentPeople);
+  const { recentPeople, avoidPeople } = collectRecentPeople(recent, relationships);
   const allowedCategories = selectStoryCategoryPalette(storySeed);
   const categoryGuidance = buildDiversityCategoryGuidance(
     recentTags.map(normalizeEventCategory).filter(Boolean),
@@ -644,9 +667,6 @@ function buildDiversityGuidance(eventHistory: Array<{
     coreEventCount % 3 === 2,
   );
   const avoidCategories = categoryGuidance.avoidCategories;
-  const avoidPeople = Object.entries(peopleCounts)
-    .filter(([, count]) => count >= 2)
-    .map(([name]) => name);
   const preferCategories = categoryGuidance.preferCategories;
   const targetCategory = categoryGuidance.targetCategory;
 
@@ -660,9 +680,131 @@ function readRelationshipNames(raw: unknown) {
     .filter((name): name is string => typeof name === "string" && name.trim().length > 0);
 }
 
-function countItems(items: string[]) {
-  return items.reduce<Record<string, number>>((counts, item) => {
-    counts[item] = (counts[item] ?? 0) + 1;
-    return counts;
-  }, {});
+/**
+ * Attempt a same-Ollama targeted correction/regeneration when the initial AI
+ * event passes parsing but fails quality checks (hard failure or target category
+ * mismatch). Returns a corrected event on success, or null if repair fails.
+ */
+async function attemptQualityRepair(
+  aiState: Record<string, unknown>,
+  originalResult: { event: { title: string; body: string; tags: string[]; choices: unknown[] } },
+  qualityEvaluation: { verdict: { reasons: string[]; diversityScore: number; continuityExemptions: string[] }; durationMs: number },
+  diversityGuidance: { targetCategory?: string | null },
+  qualityContext: Record<string, unknown>,
+  selectionContext: EventSelectionContext,
+  characterRunId: string,
+  userId: string,
+  log: ReturnType<typeof logger.withRequestId>,
+): Promise<{ event: StaticEvent } | null> {
+  const repairPrompt = buildQualityRepairPrompt(aiState, originalResult, qualityEvaluation, diversityGuidance);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+
+  try {
+    const ollamaKey = process.env.OLLAMA_API_KEY?.trim() || null;
+    if (!ollamaKey) return null;
+    const ollamaModel = (process.env.OLLAMA_MODEL ?? "gpt-oss:20b").trim();
+    const response = await fetch("https://ollama.com/api/chat", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${ollamaKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: ollamaModel,
+        messages: [
+          { role: "system", content: repairPrompt.system },
+          { role: "user", content: repairPrompt.user },
+        ],
+        format: "json",
+        stream: false,
+        think: "low",
+        options: {
+          temperature: 0.4,
+          num_predict: 2_000,
+        },
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) return null;
+    const responseText = await response.text();
+    let parsedData: unknown;
+    try {
+      parsedData = JSON.parse(responseText);
+    } catch {
+      return null;
+    }
+    const data = parsedData as Record<string, unknown> | null;
+    const message = data?.message;
+    const content: string | undefined = message && typeof message === "object"
+      ? (message as Record<string, unknown>).content as string | undefined
+      : undefined;
+    if (!content) return null;
+
+    const { parseAiEventContentDetailed } = await import("@/lib/game/openrouter");
+    const parsed = parseAiEventContentDetailed(content);
+    if (!parsed.success) return null;
+
+    const { evaluateCandidateEvent } = await import("@/lib/game/event-quality-policy");
+    const { isEventAllowedForLifeStage } = await import("@/lib/game/event-engine");
+    const { eventMatchesCategory } = await import("@/lib/game/event-diversity");
+    const repairedEvent = {
+      title: parsed.event.title,
+      body: parsed.event.body,
+      choices: parsed.event.choices.map((choice) => ({
+        ...choice,
+        relationshipDelta: choice.relationshipDelta ?? [],
+        flagDelta: { aiGenerated: true, qualityRepair: true },
+      })),
+      tags: parsed.event.tags,
+      source: "FALLBACK" as const,
+    };
+    const repairEvaluation = evaluateCandidateEvent("AI", repairedEvent, qualityContext as Parameters<typeof evaluateCandidateEvent>[2]);
+    const matchesTarget = !diversityGuidance.targetCategory || eventMatchesCategory(diversityGuidance.targetCategory, repairedEvent);
+    if (repairEvaluation.verdict.status === "pass" && matchesTarget && isEventAllowedForLifeStage({ title: repairedEvent.title, tags: repairedEvent.tags }, selectionContext)) {
+      return { event: repairedEvent };
+    }
+    return null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function buildQualityRepairPrompt(
+  aiState: Record<string, unknown>,
+  originalResult: { event: { title: string; body: string; tags: string[]; choices: unknown[] } },
+  qualityEvaluation: { verdict: { reasons: string[]; diversityScore: number; continuityExemptions: string[] }; durationMs: number },
+  diversityGuidance: { targetCategory?: string | null },
+): { system: string; user: string } {
+  const reasons = qualityEvaluation.verdict.reasons.join(", ");
+  const targetCategory = diversityGuidance.targetCategory;
+  const categoryGuidance = targetCategory
+    ? `이번 사건의 필수 주제는 "${targetCategory}"입니다. 제목, 갈등, 본문, 태그에 이 주제를 반영해야 합니다.`
+    : "자유 주제로 생성하되 최근 맥락과 겹치지 않게 합니다.";
+
+  return {
+    system: `한국 대학생활 텍스트 어드벤처 사건 하나를 JSON으로 작성한다. 이전 시도에서 다음 이유로 거절되었다: ${reasons}.
+${categoryGuidance}
+JSON 형식: {"title","body","tags","choices"}. choices는 2-3개, 각각 {"id","label","summary","statDelta","relationshipDelta"}.
+body는 한국어 2문단. summary는 "당신은"으로 시작.
+statDelta: academic/practical/health/mental/wealth/reputation/charm (정수 -15~15, health/mental -1 이상).
+이전과 완전히 다른 내용으로 생성한다. 같은 제목, 같은 갈등, 같은 인물 조합을 반복하지 않는다.
+temperature 0.4, JSON만 출력.`,
+    user: `주인공 정보: ${JSON.stringify({
+      name: aiState.name,
+      age: aiState.age,
+      major: aiState.major,
+      lifeStage: aiState.lifeStage,
+      coreEventCount: aiState.coreEventCount,
+    })}
+이전 시도 제목: "${originalResult.event.title}"
+이전 시도 태그: ${JSON.stringify(originalResult.event.tags)}
+거절 사유: ${reasons}
+다양성 점수: ${qualityEvaluation.verdict.diversityScore}
+${categoryGuidance}
+완전히 다른 사건을 생성하라.`,
+  };
 }

@@ -1,4 +1,5 @@
-import type { CareerPath, CareerRecord, CharacterData, CharacterSpec, EventData, JobApplication } from "./types";
+import type { CareerPath, CareerRecord, CharacterData, CharacterSpec, ChoiceLifeStage, EventData, JobApplication } from "./types";
+import type { PublicEndingDto } from "@/lib/game-ui/types";
 
 type ApiResult<T> = {
   ok: boolean;
@@ -69,6 +70,8 @@ export const api = {
         summary?: string;
         endingTriggered?: boolean;
         endingRecordId?: string;
+        endingRecord?: CareerRecord | null;
+        lifeStage?: ChoiceLifeStage;
       };
       error?: string;
     }>(`/api/characters/${characterId}/choices`, {
@@ -83,6 +86,9 @@ export const api = {
   },
   async records() {
     return request<{ records?: CareerRecord[]; error?: string }>("/api/records");
+  },
+  async publicEnding(recordId: string) {
+    return request<PublicEndingDto | { error?: string }>(`/api/share/${encodeURIComponent(recordId)}`);
   },
   async specs(characterId: string) {
     return request<{ specs?: CharacterSpec[]; error?: string }>(`/api/characters/${characterId}/specs`);

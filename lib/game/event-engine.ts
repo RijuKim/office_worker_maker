@@ -105,6 +105,24 @@ export interface StaticEvent {
   source: "STATIC" | "AI" | "FALLBACK" | "FORCED";
 }
 
+const CHARACTER_NAME_PLACEHOLDER = /00|ㅇㅇ|○○|OO/g;
+
+/** Replace legacy player-name placeholders before an event is persisted or shown. */
+export function personalizeEvent(event: StaticEvent, characterName: string): StaticEvent {
+  const replaceName = (text: string) => text.replace(CHARACTER_NAME_PLACEHOLDER, characterName);
+
+  return {
+    ...event,
+    title: replaceName(event.title),
+    body: replaceName(event.body),
+    choices: event.choices.map((choice) => ({
+      ...choice,
+      label: replaceName(choice.label),
+      summary: replaceName(choice.summary),
+    })),
+  };
+}
+
 const QUARANTINED_LEGACY_EVENT_TITLES = new Set([
   "헬스장에서 만난 사람",
   "도서관의 노인",

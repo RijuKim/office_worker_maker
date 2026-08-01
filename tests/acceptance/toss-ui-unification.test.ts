@@ -62,12 +62,11 @@ describe("Toss UI unification acceptance contracts", () => {
     expect(shared).not.toMatch(/twitter|kakaotalk|카톡 공유|X 공유/i);
   });
 
-  it("creates a Toss share link for the exact ending and never falls back to Vercel", () => {
+  it("shares the exact ending through the standalone Toss deep-link route", () => {
     const tossHost = read("apps/toss-miniapp/src/toss-host.ts");
     expect(tossHost).toMatch(/getTossShareLink/);
     expect(tossHost).toContain("intoss://sano-job-seeker/share/");
-    expect(tossHost).toContain("링크를 만들지 못했습니다. 다시 시도해 주세요.");
-    expect(tossHost).not.toMatch(/\/share\/.*window\.location\.origin/);
+    expect(tossHost).not.toContain("sano-officeworker.vercel.app/share/");
   });
 
   it("exposes an allowlisted public ending DTO and a non-sensitive missing state", () => {

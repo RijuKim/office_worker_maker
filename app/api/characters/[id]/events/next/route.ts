@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { EventSource } from "@prisma/client";
 
-import { getStoryArc, isEventAllowedForLifeStage, selectNextEvent, STORY_CORE_QUESTION, type StaticEvent } from "@/lib/game/event-engine";
+import { getStoryArc, isEventAllowedForLifeStage, personalizeEvent, selectNextEvent, STORY_CORE_QUESTION, type EventSelectionContext, type StaticEvent } from "@/lib/game/event-engine";
 import { evaluateCandidateEvent, findValidatedStaticFallback } from "@/lib/game/event-quality-policy";
 import { deriveLifeStageState } from "@/lib/game/life-stage";
 import { normalizeCareerNarrativeState, summarizeCareerNarrativeForPrompt } from "@/lib/game/career-narrative";
@@ -360,9 +360,25 @@ export async function POST(request: Request | NextRequest, context: RouteContext
         selectedEvent = aiEvent;
         source = "AI";
       } else if (initialEvaluation.verdict.hardFailure || !matchesTargetCategory) {
-        aiFailed = true;
-        generationReason = matchesTargetCategory ? "post_parse_quality_failure" : "target_category_mismatch";
-        generationStage = "quality";
+        // Attempt same-Ollama targeted correction/regeneration for quality rejections
+        const qualityRepairResult = await attemptQualityRepair(aiState, aiResult, initialEvaluation, diversityGuidance, qualityContext, selectionContext, id, userId, log);
+        if (qualityRepairResult) {
+          selectedEvent = qualityRepairResult.event;
+          source = "AI";
+          retryUsed = true;
+          providerFailures = [...(aiResult.providerFailures ?? []), {
+            providerId: "ollama",
+            providerLabel: "Ollama GPT-OSS",
+            providerElapsedMs: 0,
+            reason: matchesTargetCategory ? "narrative_schema" : "target_category_mismatch",
+            stage: "quality",
+            issues: initialEvaluation.verdict.reasons,
+          }];
+        } else {
+          aiFailed = true;
+          generationReason = matchesTargetCategory ? "post_parse_quality_failure" : "target_category_mismatch";
+          generationStage = "quality";
+        }
       } else {
         selectedEvent = aiEvent;
         source = "AI";
@@ -403,6 +419,8 @@ export async function POST(request: Request | NextRequest, context: RouteContext
     }
     fallbackUsed = source === "FALLBACK";
   }
+
+  selectedEvent = personalizeEvent(selectedEvent, character.name);
 
   const commitStartedAt = Date.now();
   let newEvent;
@@ -580,4 +598,133 @@ function readRelationshipNames(raw: unknown) {
   return raw
     .map((item) => typeof item === "object" && item !== null ? (item as Record<string, unknown>).name : null)
     .filter((name): name is string => typeof name === "string" && name.trim().length > 0);
+}
+
+/**
+ * Attempt a same-Ollama targeted correction/regeneration when the initial AI
+ * event passes parsing but fails quality checks (hard failure or target category
+ * mismatch). Returns a corrected event on success, or null if repair fails.
+ */
+async function attemptQualityRepair(
+  aiState: Record<string, unknown>,
+  originalResult: { event: { title: string; body: string; tags: string[]; choices: unknown[] } },
+  qualityEvaluation: { verdict: { reasons: string[]; diversityScore: number; continuityExemptions: string[] }; durationMs: number },
+  diversityGuidance: { targetCategory?: string | null },
+  qualityContext: Record<string, unknown>,
+  selectionContext: EventSelectionContext,
+  characterRunId: string,
+  userId: string,
+  log: ReturnType<typeof logger.withRequestId>,
+): Promise<{ event: StaticEvent } | null> {
+  const repairPrompt = buildQualityRepairPrompt(aiState, originalResult, qualityEvaluation, diversityGuidance);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+
+  try {
+    const ollamaKey = process.env.OLLAMA_API_KEY?.trim() || null;
+    if (!ollamaKey) return null;
+    const ollamaModel = (process.env.OLLAMA_MODEL ?? "gpt-oss:20b").trim();
+    const response = await fetch("https://ollama.com/api/chat", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${ollamaKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: ollamaModel,
+        messages: [
+          { role: "system", content: repairPrompt.system },
+          { role: "user", content: repairPrompt.user },
+        ],
+        format: "json",
+        stream: false,
+        think: "low",
+        options: {
+          temperature: 0.4,
+          num_predict: 2_000,
+        },
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) return null;
+    const responseText = await response.text();
+    let parsedData: unknown;
+    try {
+      parsedData = JSON.parse(responseText);
+    } catch {
+      return null;
+    }
+    const data = parsedData as Record<string, unknown> | null;
+    const message = data?.message;
+    const content: string | undefined = message && typeof message === "object"
+      ? (message as Record<string, unknown>).content as string | undefined
+      : undefined;
+    if (!content) return null;
+
+    const { parseAiEventContentDetailed } = await import("@/lib/game/openrouter");
+    const parsed = parseAiEventContentDetailed(content);
+    if (!parsed.success) return null;
+
+    const { evaluateCandidateEvent } = await import("@/lib/game/event-quality-policy");
+    const { isEventAllowedForLifeStage } = await import("@/lib/game/event-engine");
+    const { eventMatchesCategory } = await import("@/lib/game/event-diversity");
+    const repairedEvent = {
+      title: parsed.event.title,
+      body: parsed.event.body,
+      choices: parsed.event.choices.map((choice) => ({
+        ...choice,
+        relationshipDelta: choice.relationshipDelta ?? [],
+        flagDelta: { aiGenerated: true, qualityRepair: true },
+      })),
+      tags: parsed.event.tags,
+      source: "FALLBACK" as const,
+    };
+    const repairEvaluation = evaluateCandidateEvent("AI", repairedEvent, qualityContext as Parameters<typeof evaluateCandidateEvent>[2]);
+    const matchesTarget = !diversityGuidance.targetCategory || eventMatchesCategory(diversityGuidance.targetCategory, repairedEvent);
+    if (repairEvaluation.verdict.status === "pass" && matchesTarget && isEventAllowedForLifeStage({ title: repairedEvent.title, tags: repairedEvent.tags }, selectionContext)) {
+      return { event: repairedEvent };
+    }
+    return null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function buildQualityRepairPrompt(
+  aiState: Record<string, unknown>,
+  originalResult: { event: { title: string; body: string; tags: string[]; choices: unknown[] } },
+  qualityEvaluation: { verdict: { reasons: string[]; diversityScore: number; continuityExemptions: string[] }; durationMs: number },
+  diversityGuidance: { targetCategory?: string | null },
+): { system: string; user: string } {
+  const reasons = qualityEvaluation.verdict.reasons.join(", ");
+  const targetCategory = diversityGuidance.targetCategory;
+  const categoryGuidance = targetCategory
+    ? `이번 사건의 필수 주제는 "${targetCategory}"입니다. 제목, 갈등, 본문, 태그에 이 주제를 반영해야 합니다.`
+    : "자유 주제로 생성하되 최근 맥락과 겹치지 않게 합니다.";
+
+  return {
+    system: `한국 대학생활 텍스트 어드벤처 사건 하나를 JSON으로 작성한다. 이전 시도에서 다음 이유로 거절되었다: ${reasons}.
+${categoryGuidance}
+JSON 형식: {"title","body","tags","choices"}. choices는 2-3개, 각각 {"id","label","summary","statDelta","relationshipDelta"}.
+body는 한국어 2문단. summary는 "당신은"으로 시작.
+statDelta: academic/practical/health/mental/wealth/reputation/charm (정수 -15~15, health/mental -1 이상).
+이전과 완전히 다른 내용으로 생성한다. 같은 제목, 같은 갈등, 같은 인물 조합을 반복하지 않는다.
+temperature 0.4, JSON만 출력.`,
+    user: `주인공 정보: ${JSON.stringify({
+      name: aiState.name,
+      age: aiState.age,
+      major: aiState.major,
+      lifeStage: aiState.lifeStage,
+      coreEventCount: aiState.coreEventCount,
+    })}
+이전 시도 제목: "${originalResult.event.title}"
+이전 시도 태그: ${JSON.stringify(originalResult.event.tags)}
+거절 사유: ${reasons}
+다양성 점수: ${qualityEvaluation.verdict.diversityScore}
+${categoryGuidance}
+완전히 다른 사건을 생성하라.`,
+  };
 }
